@@ -1,0 +1,459 @@
+/* ===========================================================
+   CMS Livestock Auction — Listing Builder
+   Screen + print styles, all in one file.
+   =========================================================== */
+
+/* ---------- DESIGN TOKENS ---------- */
+:root {
+  --cms-navy: #0f2747;
+  --cms-navy-2: #1a3a66;
+  --cms-blue: #2a5aa0;
+  --cms-gold: #c89b3c;
+  --ink: #1a1d24;
+  --ink-soft: #4a5260;
+  --muted: #7b8391;
+  --line: #e2e5ea;
+  --line-strong: #9aa2ad;
+  --row-alt: #f7f9fc;
+  --bg: #f1f3f6;
+  --panel: #ffffff;
+  --danger: #b3261e;
+  --ok: #1f7a4d;
+
+  --fs-xs: 9.5px;
+  --fs-sm: 10.5px;
+  --fs-base: 11px;
+  --fs-md: 12px;
+  --fs-lg: 15px;
+  --fs-xl: 20px;
+  --fs-2xl: 26px;
+
+  --radius: 8px;
+  --shadow: 0 1px 2px rgba(16, 22, 40, 0.06), 0 6px 20px rgba(16, 22, 40, 0.06);
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- APP HEADER ---------- */
+.app-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 20px;
+  background: var(--cms-navy);
+  color: #fff;
+  position: sticky; top: 0; z-index: 100;
+  border-bottom: 3px solid var(--cms-gold);
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark {
+  width: 42px; height: 42px;
+  display: grid; place-items: center;
+  background: var(--cms-gold);
+  color: var(--cms-navy);
+  font-weight: 800; border-radius: 6px;
+  letter-spacing: 0.5px;
+}
+.brand-title { font-size: var(--fs-lg); font-weight: 700; letter-spacing: 0.3px; }
+.brand-sub   { font-size: var(--fs-sm); color: #c9d3e5; }
+.app-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- BUTTONS ---------- */
+.btn {
+  padding: 8px 14px; border-radius: 6px;
+  font-size: var(--fs-md); font-weight: 600;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+  color: #fff; cursor: pointer;
+  transition: background 0.15s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn:hover:not(:disabled) { background: rgba(255,255,255,0.18); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: var(--cms-gold); color: var(--cms-navy); border-color: transparent; }
+.btn-primary:hover:not(:disabled) { background: #d9ad4e; }
+.btn-accent  { background: var(--cms-blue); border-color: transparent; }
+.btn-accent:hover:not(:disabled) { background: #3366b3; }
+.btn-ghost {
+  background: transparent; color: var(--cms-navy);
+  border: 1px solid var(--line-strong);
+  font-size: var(--fs-sm); padding: 6px 10px;
+}
+.btn-ghost:hover:not(:disabled) { background: #eef1f6; }
+
+/* ---------- APP BODY ---------- */
+.app-body {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  height: calc(100vh - 65px);
+}
+.sidebar {
+  overflow-y: auto;
+  background: #fff;
+  border-right: 1px solid var(--line);
+  padding: 16px;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 14px;
+}
+.panel h3 {
+  margin: 0 0 10px 0;
+  font-size: var(--fs-sm); font-weight: 700;
+  color: var(--cms-navy);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.panel label {
+  display: block; margin-bottom: 8px;
+  font-size: var(--fs-sm); color: var(--ink-soft);
+  font-weight: 500;
+}
+.panel input[type=text], .panel input[type=file] {
+  width: 100%; margin-top: 3px;
+  padding: 6px 8px;
+  border: 1px solid var(--line); border-radius: 4px;
+  font-size: var(--fs-md);
+}
+.panel input[type=text]:focus {
+  outline: none; border-color: var(--cms-blue);
+  box-shadow: 0 0 0 2px rgba(42,90,160,0.15);
+}
+.check { display: flex !important; align-items: center; gap: 6px; }
+.check input { margin: 0; }
+.muted { color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
+
+.section-nav a {
+  display: block; padding: 6px 8px;
+  border-radius: 4px;
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+  text-decoration: none;
+  margin-bottom: 2px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+.section-nav a:hover { background: #f4f6f9; border-left-color: var(--cms-blue); }
+
+.color-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px;
+}
+.color-row input[type=color] {
+  width: 32px; height: 28px; border: 1px solid var(--line); border-radius: 4px; cursor: pointer;
+}
+.color-row span { flex: 1; font-size: var(--fs-sm); color: var(--ink-soft); }
+
+/* ---------- PREVIEW AREA ---------- */
+.preview-area {
+  overflow-y: auto;
+  padding: 28px;
+  background: var(--bg);
+}
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center;
+  padding: 80px 20px; color: var(--ink-soft);
+  max-width: 500px; margin: 80px auto;
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.empty-icon { font-size: 60px; margin-bottom: 12px; opacity: 0.6; }
+.empty-state h2 { margin: 0 0 8px 0; font-size: var(--fs-xl); color: var(--cms-navy); }
+
+/* ===========================================================
+   DOCUMENT — same markup used on screen and in print
+   Landscape page: 11in x 8.5in
+   =========================================================== */
+
+.doc-root { max-width: none; }
+
+/* Flex column so footer sits at bottom without overlap */
+.doc-page {
+  background: #fff;
+  width: 11in; height: 8.5in;
+  margin: 0 auto 24px auto;
+  padding: 0.3in 0.35in 0.25in 0.35in;
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  font-size: var(--fs-base);
+  page-break-after: always;
+  break-after: page;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.doc-page:last-child { page-break-after: auto; break-after: auto; }
+
+.page-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---- SALE HEADER (first page only) ---- */
+.sale-header {
+  display: grid;
+  grid-template-columns: 140px 1fr 140px;
+  align-items: center;
+  border-bottom: 3px solid var(--cms-gold);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+.sale-header-center { text-align: center; }
+.sale-title {
+  font-size: var(--fs-2xl);
+  font-weight: 800;
+  color: var(--cms-navy);
+  letter-spacing: 0.3px;
+  line-height: 1.1;
+}
+.sale-subtitle {
+  font-size: var(--fs-lg);
+  color: var(--cms-navy-2);
+  font-weight: 600;
+  margin-top: 3px;
+}
+.sale-meta {
+  display: flex; justify-content: center;
+  gap: 14px;
+  margin-top: 5px;
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+  flex-wrap: wrap;
+}
+.sale-meta span { white-space: nowrap; }
+.sale-datetime {
+  margin-top: 4px;
+  font-weight: 700;
+  font-size: var(--fs-md);
+  color: var(--cms-navy);
+}
+.sale-logo {
+  width: 130px; height: 70px;
+  border: 2px solid var(--cms-navy);
+  border-radius: 6px;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--cms-navy) 0%, var(--cms-navy-2) 100%);
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 1px;
+  line-height: 1.1;
+  font-size: 10px;
+  text-align: center;
+  padding: 4px;
+  justify-self: end;
+}
+.sale-logo b { display: block; font-size: 22px; color: var(--cms-gold); letter-spacing: 3px; }
+.sale-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.sale-logo.has-image { background: transparent; border: none; padding: 0; }
+
+/* ---- SECTION BAR ---- */
+.section-bar {
+  background: var(--cms-navy);
+  color: #fff;
+  padding: 6px 10px;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border-radius: 4px 4px 0 0;
+  margin-top: 8px;
+}
+.section-bar:first-child { margin-top: 0; }
+
+/* ---- DATA TABLE ---- */
+.lot-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  table-layout: fixed;
+}
+.lot-table thead th {
+  background: #eef2f8;
+  color: var(--cms-navy);
+  font-weight: 700;
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 5px 4px;
+  border-bottom: 2px solid var(--cms-navy);
+  text-align: center;
+  vertical-align: middle;
+}
+.lot-table tbody td {
+  padding: 4px 5px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  text-align: center;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+.lot-table tbody td.align-left { text-align: left; }
+
+.zebra tbody tr.row-alt td { background: var(--row-alt); }
+
+/* Column widths — more room for Description + Notes */
+col.c-lot     { width: 4.5%; }
+col.c-seller  { width: 9%; }
+col.c-head    { width: 3.5%; }
+col.c-desc    { width: 16%; }
+col.c-sex     { width: 6%; }
+col.c-wt      { width: 4.5%; }
+col.c-del     { width: 8%; }
+col.c-loc     { width: 8%; }
+col.c-shrink  { width: 4%; }
+col.c-slide   { width: 8%; }
+col.c-notes   { width: 22%; }
+col.c-price   { width: 6.5%; }
+
+/* Emphasis on key columns */
+.cell-lot {
+  font-weight: 700;
+  color: var(--cms-navy);
+  font-size: var(--fs-md);
+}
+.cell-price {
+  font-weight: 700;
+  font-size: var(--fs-md);
+  color: var(--ink);
+  background: #fafbfc;
+}
+.cell-price.price-po      { color: #8a6a10; background: #fff7e0; }
+.cell-price.price-scratch { color: var(--danger); background: #fde8e8; text-decoration: line-through; }
+.cell-price.price-numeric { color: var(--ok); }
+
+/* Notes cell */
+.notes-primary { font-weight: 600; color: var(--ink); white-space: pre-line; }
+.notes-secondary {
+  margin-top: 2px; color: var(--ink-soft);
+  font-size: var(--fs-xs); white-space: pre-line;
+}
+.notes-external {
+  margin-top: 3px; color: var(--cms-blue);
+  font-size: var(--fs-xs); font-style: italic; white-space: pre-line;
+}
+.notes-internal {
+  margin-top: 3px; padding: 2px 4px;
+  background: #fff8e1; color: #8a6a10;
+  font-size: var(--fs-xs);
+  border-left: 2px solid var(--cms-gold);
+  white-space: pre-line;
+}
+
+/* Video icon */
+.video-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 14px;
+  margin-left: 4px;
+  background: var(--danger); color: #fff;
+  border-radius: 2px;
+  font-size: 8px; font-weight: 700;
+  vertical-align: middle;
+  text-decoration: none;
+}
+
+/* ---- OPTION LOT GROUPING ----
+   - rows within a cluster: no bottom border between them
+   - last row in a cluster: thick navy boundary rule
+   - standalone rows: standard thin divider
+   - gold accent stripe on the left of every cluster row */
+
+tr.opt-group-start td,
+tr.opt-group-mid   td { border-bottom: none !important; }
+
+tr.opt-group-end td   { border-bottom: 2.5px solid var(--cms-navy) !important; }
+tr.opt-standalone td  { border-bottom: 1px solid var(--line) !important; }
+tr.opt-group-start td { border-top: 2.5px solid var(--cms-navy) !important; }
+
+/* Gold accent stripe down the left of clustered option lots */
+tr.opt-group-start td:first-child,
+tr.opt-group-mid   td:first-child,
+tr.opt-group-end   td:first-child { position: relative; }
+
+tr.opt-group-start td:first-child::before,
+tr.opt-group-mid   td:first-child::before,
+tr.opt-group-end   td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--cms-gold);
+}
+
+/* ---- FOOTER ---- */
+.doc-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-top: 5px;
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.doc-footer .sale-tag { color: var(--cms-navy); font-weight: 600; }
+
+/* ---- EDITABLE ELEMENTS ---- */
+[contenteditable="true"] {
+  outline: none;
+  transition: background 0.12s, box-shadow 0.12s;
+  border-radius: 2px;
+}
+[contenteditable="true"]:hover {
+  background: #fff6d9;
+  box-shadow: 0 0 0 1px var(--cms-gold);
+}
+[contenteditable="true"]:focus {
+  background: #fff;
+  box-shadow: 0 0 0 2px var(--cms-blue);
+}
+
+/* ---- SCRATCHED LOTS ---- */
+tr.lot-scratched td:not(:last-child) {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+/* ---- UTILITIES ---- */
+.print-only { display: none; }
+
+/* ===========================================================
+   PRINT STYLES
+   =========================================================== */
+@page { size: 11in 8.5in; margin: 0; }
+
+@media print {
+  html, body { background: #fff; margin: 0; padding: 0; }
+  .no-print { display: none !important; }
+  .print-only { display: block; }
+  .preview-area { padding: 0; background: #fff; overflow: visible; }
+  .app-body { display: block; height: auto; }
+
+  .doc-page {
+    box-shadow: none;
+    margin: 0;
+    width: 11in; height: 8.5in;
+    page-break-after: always;
+    break-after: page;
+  }
+  .doc-page:last-child { page-break-after: auto; }
+
+  tr { page-break-inside: avoid; break-inside: avoid; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  .section-bar { break-after: avoid; }
+
+  [contenteditable="true"]:hover,
+  [contenteditable="true"]:focus {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+}

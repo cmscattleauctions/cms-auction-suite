@@ -1,0 +1,75 @@
+/* =============================================================
+ * Banner Generator — Light theme override
+ * -------------------------------------------------------------
+ * Re-points the app's CSS variables to light-theme values that
+ * match the suite's design tokens. Loaded AFTER the original
+ * inline <style> so these values win.
+ *
+ * Original :root block in banners/index.html:
+ *   --blue: #35679a; --blue-light: #4385c8;
+ *   --bg: #111820; --surface: #1b2433; --surface2: #222f42;
+ *   --border: #2a3a52; --text: #e4eaf3; --muted: #7a95b8;
+ *   --green: #2ea85a; --red: #c03; --yellow:#d9a441;
+ * ============================================================= */
+
+:root {
+  /* Surfaces */
+  --bg:       #f5f1ea;     /* warm off-white canvas */
+  --surface:  #ffffff;     /* card */
+  --surface2: #f0ece4;     /* muted wash for inputs, dropzones */
+  --border:   #e6e0d4;
+
+  /* Text */
+  --text:  #1a1d23;
+  --muted: #6b7280;
+
+  /* Accent — the app's blue, retuned for white backgrounds */
+  --blue:       #2563a3;
+  --blue-light: #1e4f87;
+
+  /* Status colors — kept but slightly desaturated for light bg */
+  --green:  #2d7a4a;
+  --red:    #b91c1c;
+  --yellow: #b45309;
+}
+
+/* Some app rules use rgba() with hard-coded blue values that don't
+ * pull from variables. Override those tinted backgrounds here. */
+.upload-zone:hover,
+.upload-zone.drag-over { background: rgba(37, 99, 163, 0.05); }
+
+.toggle-btn.active   { background: rgba(37, 99, 163, 0.08); }
+.flow-step.active    { background: rgba(37, 99, 163, 0.08); }
+.flow-step.done      { background: rgba(45, 122, 74, 0.10); }
+.style-pick-card.active { background: rgba(37, 99, 163, 0.06); }
+.banner-kind-chip.transition { background: rgba(37, 99, 163, 0.12); color: var(--blue); }
+.banner-kind-chip.option     { background: rgba(45, 122, 74, 0.14); color: var(--green); }
+.info-banner    { background: rgba(37, 99, 163, 0.05); border-color: rgba(37, 99, 163, 0.18); }
+.info-banner strong { color: var(--blue); }
+.info-banner code   { background: rgba(0, 0, 0, 0.06); color: var(--text); }
+.status-chip { background: rgba(37, 99, 163, 0.10); color: var(--blue); }
+.status-chip.warn { background: rgba(180, 83, 9, 0.10); color: var(--yellow); }
+.status-chip.good { background: rgba(45, 122, 74, 0.12); color: var(--green); }
+
+/* Toasts — were dark green/red on dark bg */
+.toast        { background: #e8f3ec; border-color: #b9d8c4; color: #1f5132; }
+.toast.error  { background: #fdecec; border-color: #e6b9b9; color: #842c2c; }
+
+/* Alert banner (warning yellow) */
+.alert-banner { background: #fff8e6; border-color: #ecd9a3; color: #8a5b00; }
+.missing-badge { background: #fff8e6; color: #8a5b00; border-color: #ecd9a3; }
+
+/* Banner card preview shells — keep dark bg since canvases are
+ * designed against dark; otherwise the canvas content washes out */
+.banner-preview-shell { background: #0e1620; }
+.style-pick-preview   { background: #0e1620; }
+.img-preview-thumb    { background: #0e1620; }
+
+/* State library card images — keep blue background as it
+ * provides contrast for white state silhouettes */
+/* (kept as-is from original) */
+
+/* Hide the admin gate visually since auth is now handled by the
+ * suite shell. The init code already calls unlockAdmin() in Phase 3
+ * to flip the right display values, so this is belt-and-suspenders. */
+#adminGate { display: none !important; }

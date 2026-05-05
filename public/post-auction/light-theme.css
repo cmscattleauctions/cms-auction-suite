@@ -1,0 +1,186 @@
+/* =============================================================
+ * Post-Auction Portal — Light theme override
+ * -------------------------------------------------------------
+ * Re-points the app's CSS variables and overrides hard-coded
+ * dark backgrounds. Loaded AFTER styles.css so values win.
+ * ============================================================= */
+
+:root {
+  --bg:      #f5f1ea;
+  --card:    #ffffff;
+  --text:    #1a1d23;
+  --muted:   #6b7280;
+  --line:    #e6e0d4;
+  --accent:  #2563a3;
+  --accent2: #1e4f87;
+  --shadow:  0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+
+  /* Inline-style theme variables (premium dark theme redesign) */
+  --bg-darkest: #ebe5d8;
+  --bg-dark:    #f0ece4;
+  --bg-panel:   #ffffff;
+  --bg-card:    #ffffff;
+  --bg-card-hover: #fafaf7;
+  --bg-input:   #ffffff;
+  --border-subtle: #efe9dc;
+  --border-strong: #d4cdbd;
+  --text-primary:   #1a1d23;
+  --text-secondary: #555b66;
+  --text-muted:     #8a8f99;
+  --accent-blue:        #2563a3;
+  --accent-blue-hover:  #1e4f87;
+  --accent-blue-subtle: rgba(37, 99, 163, 0.08);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+/* Body had two radial-gradient blue glows. Replace with subtle
+ * warm glow so the canvas isn't dead-flat but stays calm. */
+body {
+  background:
+    radial-gradient(1200px 800px at 20% 0%, rgba(184, 134, 11, 0.06), transparent 50%),
+    radial-gradient(900px 600px at 80% 20%, rgba(37, 99, 163, 0.04), transparent 55%),
+    var(--bg);
+}
+
+/* Topbar was translucent over a dark blur. Make it solid white
+ * with a subtle border. */
+.topbar {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+
+/* Logo wrapper had a white-fade background that looks weird on light */
+.logo {
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+
+/* Cards: subtle border, lighter shadow */
+.card {
+  background: var(--card) !important;
+  border: 1px solid var(--line) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+/* Section / collapsible headers */
+.collapsibleHeader,
+.cardHeader,
+.sectionTitle,
+.section-title {
+  color: var(--text);
+}
+
+/* Inputs */
+input, textarea, select {
+  background: var(--card);
+  color: var(--text);
+  border-color: var(--line);
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--text);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.08);
+}
+
+/* Generic backgrounds the original styles tuned for dark */
+.muted, .helper, .small {
+  color: var(--muted) !important;
+}
+
+/* Buttons — keep accent blue but ensure good contrast on light */
+.btn { color: var(--text); border-color: var(--line); }
+.btnPrimary,
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.btnPrimary:hover,
+.btn-primary:hover {
+  background: var(--accent2);
+  border-color: var(--accent2);
+}
+.btnGhost,
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--line);
+}
+.btnGhost:hover,
+.btn-ghost:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.btnDanger,
+.btn-danger {
+  background: #b91c1c;
+  color: #fff;
+  border-color: #b91c1c;
+}
+
+/* Tables */
+table { color: var(--text); }
+th, td { border-color: var(--line); }
+th { background: rgba(0, 0, 0, 0.03); }
+tbody tr:nth-child(even) { background: rgba(0, 0, 0, 0.02); }
+tbody tr:hover { background: rgba(184, 134, 11, 0.04); }
+
+/* Hide the auth page entirely now that the suite shell handles auth.
+ * The init code already routes around it (Phase 3 change), but this
+ * is belt-and-suspenders in case anyone calls goto(pageAuth). */
+#pageAuth { display: none !important; }
+
+/* Toast / notification surfaces — adjust if any are hard-coded dark */
+.toast {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+/* Code blocks / mono displays */
+code, pre, .mono {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text);
+}
+
+/* Links */
+a { color: var(--accent); }
+a:hover { color: var(--accent2); }
+
+/* Result chips, status pills — re-tune if dark-theme rgba values
+ * are used. These are common patterns in this app. */
+.statusGood { color: #2d7a4a; background: rgba(45, 122, 74, 0.1); }
+.statusWarn { color: #b45309; background: rgba(180, 83, 9, 0.1); }
+.statusBad  { color: #b91c1c; background: rgba(185, 28, 28, 0.1); }
+
+/* =============================================================
+ * Phase 5: Mode-based section visibility
+ * -------------------------------------------------------------
+ * mode-filter sets data-mode on html (immediately) and body
+ * (after DOMContentLoaded). We use the html selector so the
+ * section is hidden before paint, eliminating any flash.
+ * ============================================================= */
+
+/* Pre mode: hide Post, Contracts, Summaries sections */
+html[data-mode="pre"] [data-section="post"],
+html[data-mode="pre"] [data-section="contracts"],
+html[data-mode="pre"] [data-section="summaries"] {
+  display: none !important;
+}
+
+/* Post mode: hide the Pre section */
+html[data-mode="post"] [data-section="pre"] {
+  display: none !important;
+}
+
+/* In Pre mode the section is the only one shown — auto-expand it
+ * so the user doesn't need to click to reveal contents. */
+html[data-mode="pre"] [data-section="pre"] .collapsibleContent {
+  display: block !important;
+}
+html[data-mode="pre"] [data-section="pre"] .sectionChevron {
+  transform: rotate(90deg);
+}

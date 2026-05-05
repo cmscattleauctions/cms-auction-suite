@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#0b1220"/>
+  <!-- Document body -->
+  <rect x="7" y="5" width="14" height="18" rx="2" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.2"/>
+  <!-- Lines on document -->
+  <line x1="10" y1="10" x2="18" y2="10" stroke="#60a5fa" stroke-width="1.4" stroke-linecap="round"/>
+  <line x1="10" y1="13" x2="18" y2="13" stroke="#60a5fa" stroke-width="1.4" stroke-linecap="round"/>
+  <line x1="10" y1="16" x2="15" y2="16" stroke="#60a5fa" stroke-width="1.4" stroke-linecap="round"/>
+  <!-- Gavel head -->
+  <rect x="16" y="17" width="10" height="5" rx="1.5" fill="#3b82f6" transform="rotate(-40 21 19.5)"/>
+  <!-- Gavel handle -->
+  <line x1="18" y1="22" x2="24" y2="28" stroke="#60a5fa" stroke-width="2" stroke-linecap="round"/>
+</svg>

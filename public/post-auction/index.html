@@ -1,0 +1,1726 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CMS Auction Report Builder</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="shortcut icon" href="./favicon.svg">
+
+  <style>
+    /* ========== PREMIUM DARK THEME REDESIGN ========== */
+    
+    :root {
+      --bg-darkest: #0a0e17;
+      --bg-dark: #0f1419;
+      --bg-panel: #161b24;
+      --bg-card: #1a2030;
+      --bg-card-hover: #1e2538;
+      --bg-input: #0d1117;
+      --border-subtle: rgba(255, 255, 255, 0.06);
+      --border-strong: rgba(255, 255, 255, 0.12);
+      --text-primary: #e8edf5;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-blue: #3b82f6;
+      --accent-blue-hover: #2563eb;
+      --accent-blue-subtle: rgba(59, 130, 246, 0.1);
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg-darkest);
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+
+    /* ========== LAYOUT ========== */
+    
+    .app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      background: var(--bg-dark);
+      border-bottom: 1px solid var(--border-subtle);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      height: 40px;
+      width: auto;
+      border-radius: 6px;
+      padding: 6px;
+      background: var(--bg-panel);
+    }
+
+    .brandTitle {
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: -0.01em;
+    }
+
+    .brandSub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    .main {
+      flex: 1;
+      padding: 32px 24px;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* ========== CARDS ========== */
+    
+    .card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      box-shadow: var(--shadow-md);
+      padding: 32px;
+    }
+
+    .cardHeader {
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    h3 {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .muted {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .small {
+      font-size: 13px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    /* ========== WORKFLOW PRESETS ========== */
+    
+    .presetPanel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 32px;
+    }
+
+    .presetLabel {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .presetButtons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btnPreset {
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      background: transparent;
+      border: 1px solid var(--border-strong);
+      color: var(--text-primary);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btnPreset:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    .btnPreset.active {
+      background: var(--accent-blue-subtle);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    /* ========== FORM ELEMENTS ========== */
+    
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .row {
+      margin-top: 20px;
+    }
+
+    .row:first-child {
+      margin-top: 0;
+    }
+
+    .label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      padding: 10px 12px;
+      color: var(--text-primary);
+      font-size: 14px;
+      transition: all 0.15s;
+    }
+
+    .input:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px var(--accent-blue-subtle);
+    }
+
+    .input::placeholder {
+      color: var(--text-muted);
+    }
+
+    /* ========== DROPZONE ========== */
+    
+    .dropZone {
+      background: var(--bg-input);
+      border: 2px dashed var(--border-strong);
+      border-radius: 8px;
+      padding: 32px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .dropZone:hover {
+      border-color: var(--accent-blue);
+      background: rgba(59, 130, 246, 0.03);
+    }
+
+    .dropZone.dragover {
+      border-color: var(--accent-blue);
+      background: var(--accent-blue-subtle);
+    }
+
+    .dropIcon {
+      font-size: 32px;
+      margin-bottom: 12px;
+      opacity: 0.6;
+    }
+
+    .dropTitle {
+      font-weight: 500;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .dropSub {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    #csvConfirmation {
+      background: var(--bg-card);
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .csvConfirmIcon {
+      font-size: 28px;
+      color: var(--accent-blue);
+    }
+
+    #csvFileName {
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    #csvRowCount {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    #csvFieldsSummary {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* ========== COLLAPSIBLE SECTIONS ========== */
+    
+    .collapsibleSection {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      transition: all 0.2s;
+    }
+
+    .collapsibleSection:hover {
+      border-color: var(--border-strong);
+    }
+
+    .collapsibleHeader {
+      display: flex;
+      align-items: center;
+      padding: 14px 16px;
+      cursor: pointer;
+      gap: 12px;
+      user-select: none;
+    }
+
+    .collapsibleSection.collapsed .collapsibleHeader {
+      border-bottom: none;
+    }
+
+    .collapsibleSection:not(.collapsed) .collapsibleHeader {
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .sectionChevron {
+      font-size: 11px;
+      color: var(--text-muted);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+
+    .collapsibleSection:not(.collapsed) .sectionChevron {
+      transform: rotate(90deg);
+    }
+
+    .sectionTitle {
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: -0.01em;
+    }
+
+    .sectionSubtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .sectionCount {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      padding: 3px 8px;
+      background: var(--bg-input);
+      border-radius: 4px;
+    }
+
+    .sectionActions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .btnSectionControl {
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btnSectionControl:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    .collapsibleContent {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .collapsibleSection:not(.collapsed) .collapsibleContent {
+      max-height: 2000px;
+      padding: 16px;
+    }
+
+    /* ========== REPORT OPTIONS ========== */
+    
+    .reportGroup {
+      margin-bottom: 16px;
+    }
+
+    .reportGroup:last-child {
+      margin-bottom: 0;
+    }
+
+    .reportGroupTitle {
+      font-weight: 500;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .reportOptions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .optionCheckbox {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      cursor: pointer;
+      padding: 6px 0;
+      color: var(--text-primary);
+    }
+
+    .optionCheckbox input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--accent-blue);
+    }
+
+    .optionSub {
+      padding-left: 26px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* ========== CSV VALIDATION ========== */
+    
+    #csvPreview {
+      background: var(--bg-card);
+      border: 1px solid var(--accent-blue);
+      border-radius: 6px;
+      padding: 16px;
+      margin-top: 20px;
+    }
+
+    .validationTitle {
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--accent-blue);
+      margin-bottom: 12px;
+    }
+
+    #csvPreviewContent {
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text-secondary);
+    }
+
+    /* ========== GENERATION SUMMARY ========== */
+    
+    #generationSummary {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(59, 130, 246, 0.03));
+      border: 1px solid var(--accent-blue);
+      border-radius: 6px;
+      padding: 18px;
+      margin-top: 20px;
+    }
+
+    #generationSummaryContent {
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    /* ========== BUTTONS ========== */
+    
+    .btn {
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      background: var(--accent-blue);
+      border: none;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--accent-blue-hover);
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btnGhost {
+      background: transparent;
+      border: 1px solid var(--border-strong);
+      color: var(--text-primary);
+      box-shadow: none;
+    }
+
+    .btnGhost:hover:not(:disabled) {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    .btnSmall {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    .btnGenerate {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 600;
+      background: var(--accent-blue);
+      border: none;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4), 0 8px 10px -6px rgba(59, 130, 246, 0.3);
+      transition: all 0.2s;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btnGenerate:hover:not(:disabled) {
+      background: var(--accent-blue-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 15px 30px -5px rgba(59, 130, 246, 0.5), 0 10px 15px -6px rgba(59, 130, 246, 0.4);
+    }
+
+    .btnGenerate:disabled {
+      background: var(--bg-card);
+      color: var(--text-muted);
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    /* ========== RESULTS PAGE ========== */
+    
+    .resultsGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .sectionDivider {
+      grid-column: 1 / -1;
+      margin: 24px 0 16px 0;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .sectionDivider h2 {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    .resultsCol {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      overflow: hidden;
+      transition: all 0.2s;
+    }
+
+    .resultsCol:hover {
+      border-color: var(--border-strong);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .resultsHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-panel);
+    }
+
+    .resultsHeader h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .resultsHeaderRight {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .list {
+      padding: 8px;
+      background: var(--bg-card);
+    }
+
+    .list.collapsible {
+      max-height: 400px;
+      overflow: auto;
+      transition: max-height 0.2s ease, opacity 0.2s ease;
+      opacity: 1;
+    }
+
+    .list.collapsible.collapsed {
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      padding: 0;
+    }
+
+    .listItem {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      padding: 10px 12px;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      transition: all 0.15s;
+    }
+
+    .listItem:last-child {
+      margin-bottom: 0;
+    }
+
+    .listItem:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-blue);
+    }
+
+    .listName {
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+
+    .listMeta {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .file {
+      display: block;
+      padding: 10px 12px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      text-decoration: none;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+
+    .file:last-child {
+      margin-bottom: 0;
+    }
+
+    .file:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    .toggleBtn {
+      padding: 6px 8px;
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .toggleBtn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    .chev {
+      display: inline-block;
+      transform: rotate(-90deg);
+      transition: transform 0.2s;
+      font-size: 12px;
+    }
+
+    .toggleBtn[aria-expanded="true"] .chev {
+      transform: rotate(0deg);
+    }
+
+    .spaceBetween {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .divider {
+      border: 0;
+      border-top: 1px solid var(--border-subtle);
+      margin: 32px 0;
+    }
+
+    .footer {
+      padding: 24px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border-subtle);
+      background: var(--bg-dark);
+    }
+
+    .error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+      padding: 12px 14px;
+      border-radius: 6px;
+      margin-top: 16px;
+      font-size: 13px;
+    }
+
+    /* ========== RESPONSIVE ========== */
+    
+    @media (max-width: 768px) {
+      .main {
+        padding: 24px 16px;
+      }
+
+      .card {
+        padding: 24px 20px;
+      }
+
+      .sectionActions {
+        display: none;
+      }
+
+      .btnGenerate {
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+        justify-content: center;
+      }
+
+      .grid2 {
+        gap: 20px;
+      }
+    }
+  </style>
+
+  <!-- Client-only libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <!-- Phase 4: light theme override (loaded last so values win) -->
+  <link rel="stylesheet" href="./light-theme.css">
+
+  <!-- Phase 5: Pre/Post mode filter — runs before body renders -->
+  <script>
+    /* Inline so the body element gets data-mode set immediately,
+     * before the CSS in light-theme.css evaluates section visibility. */
+    (function() {
+      var m = new URLSearchParams(location.search).get('mode');
+      if (m) {
+        document.documentElement.dataset.mode = m;
+        document.addEventListener('DOMContentLoaded', function() {
+          document.body.dataset.mode = m;
+          var h = document.querySelector('#pageBuilder .cardHeader h1');
+          if (h) {
+            if (m === 'pre')  h.textContent = 'Pre Auction Files';
+            if (m === 'post') h.textContent = 'Post Auction Files';
+          }
+        });
+      }
+    })();
+  </script>
+</head>
+
+<body>
+  <div class="app">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <!-- Brand block removed in Phase 2 — suite shell owns the brand bar -->
+      <div></div>
+
+      <div class="topbarActions">
+        <button id="exitBtn" class="btn btnGhost btnSmall" title="Clears all data & resets app">
+          Exit / Clear
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+
+      <!-- PAGE 1: AUTH -->
+      <section id="pageAuth" class="card">
+        <div class="cardHeader">
+          <h1>Enter PIN</h1>
+          <p class="muted">Data is processed in your browser only. Nothing is uploaded or stored.</p>
+        </div>
+
+        <div class="row">
+          <label class="label">PIN</label>
+          <input id="pinInput" class="input" type="password" inputmode="numeric" autocomplete="off" placeholder="••••" />
+        </div>
+
+        <div class="row">
+          <button id="pinSubmit" class="btn">Enter</button>
+        </div>
+
+        <div id="authError" class="error hidden"></div>
+      </section>
+
+      <!-- PAGE 2: BUILDER -->
+      <section id="pageBuilder" class="card hidden">
+        <div class="cardHeader">
+          <h1>Generate Auction Reports</h1>
+          <p class="muted">Upload your auction data and select report outputs</p>
+        </div>
+
+        <!-- WORKFLOW PRESETS -->
+        <div class="presetPanel">
+          <div class="presetLabel">Workflow Presets</div>
+          <div class="presetButtons">
+            <button type="button" id="presetFullPostAuction" class="btnPreset">Full Post-Auction</button>
+            <button type="button" id="presetPreAuction" class="btnPreset">Pre-Auction</button>
+            <button type="button" id="presetContracts" class="btnPreset">Contracts Only</button>
+            <button type="button" id="presetSpecialReports" class="btnPreset">Special Reports</button>
+            <button type="button" id="presetCustom" class="btnPreset">Custom</button>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <!-- AUCTION INFO -->
+            <div class="row">
+              <label class="label">Auction Title</label>
+              <input id="auctionName" class="input" placeholder="e.g. CMS Weekly Video Auction" />
+            </div>
+
+            <div class="row">
+              <label class="label">Auction Date / Time</label>
+              <div style="display: flex; gap: 8px;">
+                <input id="auctionDatePicker" type="datetime-local" class="input" style="flex: 1;" />
+                <input id="auctionDate" class="input" style="flex: 2;" placeholder="e.g. February 12th, 2026 @ 1:00PM" />
+              </div>
+            </div>
+
+            <div class="row">
+              <label class="label">Optional Label</label>
+              <input id="auctionLabel" class="input" placeholder="e.g. Special Calf Sale" />
+            </div>
+
+            <!-- CSV UPLOAD -->
+            <div class="row">
+              <label class="label">Upload Auction Data (CSV)</label>
+              <div id="dropZone" class="dropZone">
+                <div id="dropzoneContent">
+                  <div class="dropIcon">📄</div>
+                  <div class="dropTitle">Drop CSV file here or click to browse</div>
+                  <div class="dropSub">Supports auction exports, post-auction data, and pre-auction listings</div>
+                </div>
+                <div id="csvConfirmation" class="hidden">
+                  <div style="display: flex; align-items: start; gap: 12px;">
+                    <div class="csvConfirmIcon">✓</div>
+                    <div style="flex: 1;">
+                      <div id="csvFileName"></div>
+                      <div id="csvRowCount"></div>
+                      <div id="csvFieldsSummary"></div>
+                    </div>
+                    <button type="button" id="csvRemove" class="btn btnSmall btnGhost">Change</button>
+                  </div>
+                </div>
+              </div>
+              <input id="fileInput" type="file" accept=".csv,text/csv" class="hidden" />
+              <div id="fileMeta" class="file hidden"></div>
+            </div>
+
+            <!-- CSV VALIDATION PREVIEW -->
+            <div id="csvPreview" class="hidden">
+              <div class="validationTitle">Data Validation</div>
+              <div id="csvPreviewContent"></div>
+            </div>
+
+            <!-- GENERATION SUMMARY -->
+            <div id="generationSummary" class="hidden">
+              <div class="validationTitle">You Are About To Generate:</div>
+              <div id="generationSummaryContent"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="row">
+              <label class="label">Report Outputs</label>
+              
+              <!-- PRE-AUCTION SECTION -->
+              <div class="collapsibleSection collapsed" data-section="pre">
+                <div class="collapsibleHeader">
+                  <span class="sectionChevron">▸</span>
+                  <div style="flex: 1;">
+                    <div class="sectionTitle">Pre-Auction Outputs</div>
+                    <div class="sectionSubtitle">Requires: Lot Number</div>
+                  </div>
+                  <div class="sectionCount">0 selected</div>
+                  <div class="sectionActions">
+                    <button type="button" class="btnSectionControl" data-action="all">All</button>
+                    <button type="button" class="btnSectionControl" data-action="none">None</button>
+                    <button type="button" class="btnSectionControl" data-action="standard">Standard</button>
+                  </div>
+                </div>
+                <div class="collapsibleContent">
+                  <div class="reportGroup">
+                    <div class="reportGroupTitle">Consignor Listing Confirmations</div>
+                    <div class="reportOptions">
+                      <label class="optionCheckbox"><input type="checkbox" id="chkPreConsignor" /> Standard</label>
+                      <label class="optionCheckbox optionSub"><input type="checkbox" id="chkShowPreConsignorCmsNotes" /> Include CMS Notes</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkPreConsignorCondensed" /> Condensed</label>
+                      <label class="optionCheckbox optionSub"><input type="checkbox" id="chkShowPreConsignorCondensedCmsNotes" /> Include CMS Notes</label>
+                    </div>
+                  </div>
+                  <div class="reportGroup">
+                    <div class="reportGroupTitle">Rep Listing Confirmations</div>
+                    <div class="reportOptions">
+                      <label class="optionCheckbox"><input type="checkbox" id="chkPreRep" /> Standard</label>
+                      <label class="optionCheckbox optionSub"><input type="checkbox" id="chkShowPreRepCmsNotes" /> Include CMS Notes</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkPreRepCondensed" /> Condensed</label>
+                      <label class="optionCheckbox optionSub"><input type="checkbox" id="chkShowPreRepCondensedCmsNotes" /> Include CMS Notes</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- POST-AUCTION SECTION -->
+              <div class="collapsibleSection collapsed" data-section="post">
+                <div class="collapsibleHeader">
+                  <span class="sectionChevron">▸</span>
+                  <div style="flex: 1;">
+                    <div class="sectionTitle">Post-Auction Outputs</div>
+                    <div class="sectionSubtitle">Requires: Contract #</div>
+                  </div>
+                  <div class="sectionCount">0 selected</div>
+                  <div class="sectionActions">
+                    <button type="button" class="btnSectionControl" data-action="all">All</button>
+                    <button type="button" class="btnSectionControl" data-action="none">None</button>
+                    <button type="button" class="btnSectionControl" data-action="standard">Standard</button>
+                  </div>
+                </div>
+                <div class="collapsibleContent">
+                  <div class="reportGroup">
+                    <div class="reportGroupTitle">Buyer Reports</div>
+                    <div class="reportOptions">
+                      <label class="optionCheckbox"><input type="checkbox" id="chkBuyer" /> Standard</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkBuyerCondensed" /> Condensed</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkLotByLot" /> Contract Details</label>
+                    </div>
+                    <!-- Banner color picker for Contract Details (Lot-by-Lot) -->
+                    <div id="lotByLotColorRow" style="margin-top: 10px; padding: 10px 0 4px 0; border-top: 1px solid var(--border-subtle);">
+                      <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">Contract Details Banner Color</div>
+                      <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                        <label title="CMS Blue (Jan & Jul)" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;">
+                          <input type="radio" name="lotByLotColor" id="lblColorBlue" value="#336699" checked style="accent-color:#336699;" />
+                          <span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#336699;border:2px solid rgba(255,255,255,0.3);vertical-align:middle;"></span>
+                          <span style="color:var(--text-secondary);">Blue</span>
+                        </label>
+                        <label title="Forest Green (Feb & Aug)" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;">
+                          <input type="radio" name="lotByLotColor" id="lblColorGreen" value="#2E6B4F" style="accent-color:#2E6B4F;" />
+                          <span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#2E6B4F;border:2px solid rgba(255,255,255,0.3);vertical-align:middle;"></span>
+                          <span style="color:var(--text-secondary);">Green</span>
+                        </label>
+                        <label title="Burnt Orange (Mar & Sep)" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;">
+                          <input type="radio" name="lotByLotColor" id="lblColorOrange" value="#B5541A" style="accent-color:#B5541A;" />
+                          <span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#B5541A;border:2px solid rgba(255,255,255,0.3);vertical-align:middle;"></span>
+                          <span style="color:var(--text-secondary);">Orange</span>
+                        </label>
+                        <label title="Purple (Apr & Oct)" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;">
+                          <input type="radio" name="lotByLotColor" id="lblColorPurple" value="#5B3A8A" style="accent-color:#5B3A8A;" />
+                          <span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#5B3A8A;border:2px solid rgba(255,255,255,0.3);vertical-align:middle;"></span>
+                          <span style="color:var(--text-secondary);">Purple</span>
+                        </label>
+                        <label title="Crimson (May & Nov)" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;">
+                          <input type="radio" name="lotByLotColor" id="lblColorCrimson" value="#8B1A1A" style="accent-color:#8B1A1A;" />
+                          <span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#8B1A1A;border:2px solid rgba(255,255,255,0.3);vertical-align:middle;"></span>
+                          <span style="color:var(--text-secondary);">Crimson</span>
+                        </label>
+                        <label title="Dark Teal (Jun & Dec)" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;">
+                          <input type="radio" name="lotByLotColor" id="lblColorTeal" value="#1A5F6B" style="accent-color:#1A5F6B;" />
+                          <span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#1A5F6B;border:2px solid rgba(255,255,255,0.3);vertical-align:middle;"></span>
+                          <span style="color:var(--text-secondary);">Teal</span>
+                        </label>
+                      </div>
+                      <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Suggested rotation: Blue Jan &amp; Jul · Green Feb &amp; Aug · Orange Mar &amp; Sep · Purple Apr &amp; Oct · Crimson May &amp; Nov · Teal Jun &amp; Dec</div>
+                    </div>
+                  </div>
+                  <div class="reportGroup">
+                    <div class="reportGroupTitle">Consignor Trade Confirmations</div>
+                    <div class="reportOptions">
+                      <label class="optionCheckbox"><input type="checkbox" id="chkConsignor" /> Standard</label>
+                      <label class="optionCheckbox optionSub"><input type="checkbox" id="chkShowConsignorCmsNotes" /> Include CMS Notes</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkConsignorCondensed" /> Condensed</label>
+                      <label class="optionCheckbox optionSub"><input type="checkbox" id="chkShowConsignorCondensedCmsNotes" /> Include CMS Notes</label>
+                    </div>
+                  </div>
+                  <div class="reportGroup">
+                    <div class="reportGroupTitle">Rep Trade Confirmations</div>
+                    <div class="reportOptions">
+                      <label class="optionCheckbox"><input type="checkbox" id="chkRep" /> Standard</label>
+                      <label class="optionCheckbox optionSub"><input type="checkbox" id="chkShowCmsNotes" /> Include CMS Notes</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkRepCondensed" /> Condensed</label>
+                      <label class="optionCheckbox optionSub"><input type="checkbox" id="chkShowRepCondensedCmsNotes" /> Include CMS Notes</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CONTRACTS SECTION -->
+              <div class="collapsibleSection collapsed" data-section="contracts">
+                <div class="collapsibleHeader">
+                  <span class="sectionChevron">▸</span>
+                  <div style="flex: 1;">
+                    <div class="sectionTitle">Contracts</div>
+                    <div class="sectionSubtitle">Requires: Contract #</div>
+                  </div>
+                  <div class="sectionCount">0 selected</div>
+                  <div class="sectionActions">
+                    <button type="button" class="btnSectionControl" data-action="all">All</button>
+                    <button type="button" class="btnSectionControl" data-action="none">None</button>
+                  </div>
+                </div>
+                <div class="collapsibleContent">
+                  <div class="reportGroup">
+                    <div class="reportOptions">
+                      <label class="optionCheckbox"><input type="checkbox" id="chkBuyerContracts" /> Buyer Contracts (Individual)</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkSellerContracts" /> Seller Contracts (Individual)</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkBuyerContractsGrouped" /> Buyer Contracts (Grouped by Buyer)</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkConsignorContractsGrouped" /> Consignor Contracts (Grouped by Consignor)</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SPECIAL REPORTS SECTION -->
+              <div class="collapsibleSection collapsed" data-section="special">
+                <div class="collapsibleHeader">
+                  <span class="sectionChevron">▸</span>
+                  <div style="flex: 1;">
+                    <div class="sectionTitle">Special Reports</div>
+                    <div class="sectionSubtitle">Requires: Contract #</div>
+                  </div>
+                  <div class="sectionCount">0 selected</div>
+                  <div class="sectionActions">
+                    <button type="button" class="btnSectionControl" data-action="all">All</button>
+                    <button type="button" class="btnSectionControl" data-action="none">None</button>
+                  </div>
+                </div>
+                <div class="collapsibleContent">
+                  <div class="reportGroup">
+                    <div class="reportOptions">
+                      <label class="optionCheckbox"><input type="checkbox" id="chkSalesByConsignor" /> Sales Summary by Consignor</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkSalesByBuyer" /> Sales Summary by Buyer</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkSalesByRep" /> Sales Summary by Rep</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkCompleteBuyer" /> Complete Buyer Summary</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkCompleteConsignor" /> Complete Consignor Summary</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkCompleteRep" /> Complete Rep Summary</label>
+                      <label class="optionCheckbox"><input type="checkbox" id="chkAuctionRecap" /> Auction Recap Summary</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="muted small" style="margin-top: 16px; line-height: 1.6;">
+                Rep PDFs ignore rows where <strong>Representative</strong> or <strong>Rep</strong> is blank.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="builderError" class="error hidden"></div>
+
+        <!-- STICKY GENERATE BUTTON -->
+        <button id="buildBtn" class="btnGenerate" disabled>
+          <span style="font-size: 16px;">⚡</span>
+          <span>Generate PDFs</span>
+        </button>
+      </section>
+
+      <!-- PAGE 3: RESULTS -->
+      <section id="pageResults" class="card hidden">
+        <div class="cardHeader">
+          <h1>Generated PDFs</h1>
+          <p class="muted">Download individually or as ZIPs. Nothing persists after refresh or exit.</p>
+        </div>
+
+        <div class="resultsGrid">
+
+          <!-- PRE-AUCTION DOWNLOADS -->
+          <div class="sectionDivider">
+            <h2>Pre-Auction Downloads</h2>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Consignor Listing Confirmations</h3>
+              <div class="resultsHeaderRight">
+                <button id="zipPreConsignorReports" class="btn btnSmall btnGhost" disabled>ZIP</button>
+                <button id="togPreConsignorReports" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listPreConsignorReports" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listPreConsignorReports" class="list collapsible collapsed"></div>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Rep Listing Confirmations</h3>
+              <div class="resultsHeaderRight">
+                <button id="zipPreRepReports" class="btn btnSmall btnGhost" disabled>ZIP</button>
+                <button id="togPreRepReports" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listPreRepReports" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listPreRepReports" class="list collapsible collapsed"></div>
+          </div>
+
+          <!-- POST-AUCTION DOWNLOADS -->
+          <div class="sectionDivider">
+            <h2>Post-Auction Downloads</h2>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Buyer Reports</h3>
+              <div class="resultsHeaderRight">
+                <button id="zipBuyerReports" class="btn btnSmall btnGhost" disabled>ZIP</button>
+                <button id="togBuyerReports" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listBuyerReports" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listBuyerReports" class="list collapsible collapsed"></div>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Contract Details (Lot-by-lot)</h3>
+              <div class="resultsHeaderRight">
+                <button id="zipLotByLot" class="btn btnSmall btnGhost" disabled>ZIP</button>
+                <button id="togLotByLot" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listLotByLot" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listLotByLot" class="list collapsible collapsed"></div>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Consignor Trade Confirmations</h3>
+              <div class="resultsHeaderRight">
+                <button id="zipConsignorReports" class="btn btnSmall btnGhost" disabled>ZIP</button>
+                <button id="togConsignorReports" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listConsignorReports" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listConsignorReports" class="list collapsible collapsed"></div>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Rep Trade Confirmations</h3>
+              <div class="resultsHeaderRight">
+                <button id="zipRepReports" class="btn btnSmall btnGhost" disabled>ZIP</button>
+                <button id="togRepReports" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listRepReports" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listRepReports" class="list collapsible collapsed"></div>
+          </div>
+
+          <!-- CONTRACTS -->
+          <div class="sectionDivider">
+            <h2>Contracts</h2>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Buyer Contracts</h3>
+              <div class="resultsHeaderRight">
+                <button id="zipBuyerContracts" class="btn btnSmall btnGhost" disabled>ZIP</button>
+                <button id="togBuyerContracts" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listBuyerContracts" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listBuyerContracts" class="list collapsible collapsed"></div>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Seller Contracts</h3>
+              <div class="resultsHeaderRight">
+                <button id="zipSellerContracts" class="btn btnSmall btnGhost" disabled>ZIP</button>
+                <button id="togSellerContracts" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listSellerContracts" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listSellerContracts" class="list collapsible collapsed"></div>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Buyer Contracts (Grouped)</h3>
+              <div class="resultsHeaderRight">
+                <button id="zipBuyerContractsGrouped" class="btn btnSmall btnGhost" disabled>ZIP</button>
+                <button id="togBuyerContractsGrouped" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listBuyerContractsGrouped" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listBuyerContractsGrouped" class="list collapsible collapsed"></div>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Consignor Contracts (Grouped)</h3>
+              <div class="resultsHeaderRight">
+                <button id="zipConsignorContractsGrouped" class="btn btnSmall btnGhost" disabled>ZIP</button>
+                <button id="togConsignorContractsGrouped" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listConsignorContractsGrouped" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listConsignorContractsGrouped" class="list collapsible collapsed"></div>
+          </div>
+
+          <!-- SPECIAL REPORTS -->
+          <div class="sectionDivider">
+            <h2>Special Reports</h2>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Sales Summaries by Consignor</h3>
+              <div class="resultsHeaderRight">
+                <button id="zipSalesByConsignor" class="btn btnSmall btnGhost" disabled>ZIP</button>
+                <button id="togSalesByConsignor" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listSalesByConsignor" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listSalesByConsignor" class="list collapsible collapsed"></div>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Sales Summaries by Buyer</h3>
+              <div class="resultsHeaderRight">
+                <button id="zipSalesByBuyer" class="btn btnSmall btnGhost" disabled>ZIP</button>
+                <button id="togSalesByBuyer" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listSalesByBuyer" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listSalesByBuyer" class="list collapsible collapsed"></div>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Sales Summaries by Rep</h3>
+              <div class="resultsHeaderRight">
+                <button id="zipSalesByRep" class="btn btnSmall btnGhost" disabled>ZIP</button>
+                <button id="togSalesByRep" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listSalesByRep" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listSalesByRep" class="list collapsible collapsed"></div>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Complete Buyer Summary</h3>
+              <div class="resultsHeaderRight">
+                <button id="togCompleteBuyer" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listCompleteBuyer" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listCompleteBuyer" class="list collapsible collapsed"></div>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Complete Consignor Summary</h3>
+              <div class="resultsHeaderRight">
+                <button id="togCompleteConsignor" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listCompleteConsignor" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listCompleteConsignor" class="list collapsible collapsed"></div>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Complete Rep Summary</h3>
+              <div class="resultsHeaderRight">
+                <button id="togCompleteRep" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listCompleteRep" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listCompleteRep" class="list collapsible collapsed"></div>
+          </div>
+
+          <div class="resultsCol">
+            <div class="resultsHeader">
+              <h3>Auction Recap Summary</h3>
+              <div class="resultsHeaderRight">
+                <button id="togAuctionRecap" class="toggleBtn" type="button" aria-expanded="false" aria-controls="listAuctionRecap" title="Expand/Collapse">
+                  <span class="chev">▾</span>
+                </button>
+              </div>
+            </div>
+            <div id="listAuctionRecap" class="list collapsible collapsed"></div>
+          </div>
+
+        </div>
+
+        <hr class="divider" />
+
+        <div class="spaceBetween">
+          <button id="backBtn" class="btn btnGhost">Back</button>
+          <div style="display: flex; gap: 12px;">
+            <button id="zipSpecialReports" class="btn btnGhost" disabled>Download Special Reports ZIP</button>
+            <button id="zipAll" class="btn" disabled>Download ALL as ZIP</button>
+          </div>
+        </div>
+
+        <div id="resultsMeta" class="muted small" style="margin-top: 16px;"></div>
+      </section>
+
+    </main>
+
+    <footer class="footer">
+      Client-only app. No CSVs or PDFs are uploaded or stored.
+    </footer>
+  </div>
+
+  <!-- App -->
+  <script src="app.js"></script>
+
+  <script>
+    // ========== UI IMPROVEMENTS JAVASCRIPT ==========
+    
+    // Make drop zone clickable
+    document.addEventListener("DOMContentLoaded", () => {
+      const dz = document.getElementById("dropZone");
+      const fi = document.getElementById("fileInput");
+      if(dz && fi){
+        dz.addEventListener("click", () => fi.click());
+      }
+      
+      // Initialize new UI
+      setTimeout(initNewUI, 100);
+    });
+
+    // Workflow Presets
+    function setupWorkflowPresets() {
+      const presetButtons = {
+        presetFullPostAuction: document.getElementById('presetFullPostAuction'),
+        presetPreAuction: document.getElementById('presetPreAuction'),
+        presetContracts: document.getElementById('presetContracts'),
+        presetSpecialReports: document.getElementById('presetSpecialReports'),
+        presetCustom: document.getElementById('presetCustom')
+      };
+      
+      if (!presetButtons.presetFullPostAuction) return;
+      
+      presetButtons.presetFullPostAuction.addEventListener('click', () => {
+        clearAllSelections();
+        if (typeof chkBuyer !== 'undefined') {
+          chkBuyer.checked = true;
+          chkBuyerCondensed.checked = true;
+          chkLotByLot.checked = true;
+          chkConsignor.checked = true;
+          chkShowConsignorCmsNotes.checked = true;
+          chkConsignorCondensed.checked = true;
+          chkShowConsignorCondensedCmsNotes.checked = true;
+          chkRep.checked = true;
+          chkShowCmsNotes.checked = true;
+          chkRepCondensed.checked = true;
+          chkShowRepCondensedCmsNotes.checked = true;
+          chkBuyerContracts.checked = true;
+          chkSellerContracts.checked = true;
+          chkBuyerContractsGrouped.checked = true;
+          chkConsignorContractsGrouped.checked = true;
+          chkSalesByConsignor.checked = true;
+          chkSalesByBuyer.checked = true;
+          chkSalesByRep.checked = true;
+          chkCompleteBuyer.checked = true;
+          chkCompleteConsignor.checked = true;
+          chkCompleteRep.checked = true;
+          chkAuctionRecap.checked = true;
+        }
+        expandSection('post');
+        expandSection('contracts');
+        expandSection('special');
+        collapseSection('pre');
+        updateAllCountsAndSummary();
+      });
+      
+      presetButtons.presetPreAuction.addEventListener('click', () => {
+        clearAllSelections();
+        if (typeof chkPreConsignor !== 'undefined') {
+          chkPreConsignor.checked = true;
+          chkShowPreConsignorCmsNotes.checked = true;
+          chkPreConsignorCondensed.checked = true;
+          chkShowPreConsignorCondensedCmsNotes.checked = true;
+          chkPreRep.checked = true;
+          chkShowPreRepCmsNotes.checked = true;
+          chkPreRepCondensed.checked = true;
+          chkShowPreRepCondensedCmsNotes.checked = true;
+        }
+        expandSection('pre');
+        collapseSection('post');
+        collapseSection('contracts');
+        collapseSection('special');
+        updateAllCountsAndSummary();
+      });
+      
+      presetButtons.presetContracts.addEventListener('click', () => {
+        clearAllSelections();
+        if (typeof chkBuyerContracts !== 'undefined') {
+          chkBuyerContracts.checked = true;
+          chkSellerContracts.checked = true;
+          chkBuyerContractsGrouped.checked = true;
+          chkConsignorContractsGrouped.checked = true;
+          chkLotByLot.checked = true;
+        }
+        expandSection('contracts');
+        expandSection('post');
+        collapseSection('pre');
+        collapseSection('special');
+        updateAllCountsAndSummary();
+      });
+      
+      presetButtons.presetSpecialReports.addEventListener('click', () => {
+        clearAllSelections();
+        if (typeof chkSalesByConsignor !== 'undefined') {
+          chkSalesByConsignor.checked = true;
+          chkSalesByBuyer.checked = true;
+          chkSalesByRep.checked = true;
+          chkCompleteBuyer.checked = true;
+          chkCompleteConsignor.checked = true;
+          chkCompleteRep.checked = true;
+          chkAuctionRecap.checked = true;
+        }
+        expandSection('special');
+        collapseSection('pre');
+        collapseSection('post');
+        collapseSection('contracts');
+        updateAllCountsAndSummary();
+      });
+      
+      presetButtons.presetCustom.addEventListener('click', () => {
+        clearAllSelections();
+        collapseSection('pre');
+        collapseSection('post');
+        collapseSection('contracts');
+        collapseSection('special');
+        updateAllCountsAndSummary();
+      });
+    }
+
+    function clearAllSelections() {
+      document.querySelectorAll('input[type="checkbox"][id^="chk"]').forEach(cb => cb.checked = false);
+    }
+
+    // Collapsible Sections
+    function setupCollapsibleSections() {
+      document.querySelectorAll('.collapsibleSection').forEach(section => {
+        const header = section.querySelector('.collapsibleHeader');
+        if (!header) return;
+        
+        header.addEventListener('click', (e) => {
+          if (e.target.classList.contains('btnSectionControl')) return;
+          section.classList.toggle('collapsed');
+        });
+      });
+      
+      document.querySelectorAll('.btnSectionControl').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const section = btn.closest('.collapsibleSection');
+          const action = btn.dataset.action;
+          const sectionName = section.dataset.section;
+          
+          handleSectionAction(sectionName, action);
+          updateSectionCount(section);
+          updateGenerationSummary();
+        });
+      });
+    }
+
+    function expandSection(sectionName) {
+      const section = document.querySelector(`.collapsibleSection[data-section="${sectionName}"]`);
+      if (section) section.classList.remove('collapsed');
+    }
+
+    function collapseSection(sectionName) {
+      const section = document.querySelector(`.collapsibleSection[data-section="${sectionName}"]`);
+      if (section) section.classList.add('collapsed');
+    }
+
+    function handleSectionAction(sectionName, action) {
+      const checkboxIds = getSectionCheckboxes(sectionName);
+      
+      checkboxIds.forEach(id => {
+        const checkbox = document.getElementById(id);
+        if (!checkbox) return;
+        
+        if (action === 'all') {
+          checkbox.checked = true;
+        } else if (action === 'none') {
+          checkbox.checked = false;
+        } else if (action === 'standard') {
+          const isSubOption = id.includes('Show') && id.includes('CmsNotes');
+          const isCondensed = id.includes('Condensed');
+          checkbox.checked = !isSubOption && !isCondensed;
+        }
+      });
+    }
+
+    function getSectionCheckboxes(sectionName) {
+      const mapping = {
+        'pre': ['chkPreConsignor', 'chkShowPreConsignorCmsNotes', 'chkPreConsignorCondensed', 'chkShowPreConsignorCondensedCmsNotes',
+                'chkPreRep', 'chkShowPreRepCmsNotes', 'chkPreRepCondensed', 'chkShowPreRepCondensedCmsNotes'],
+        'post': ['chkBuyer', 'chkBuyerCondensed', 'chkLotByLot',
+                 'chkConsignor', 'chkShowConsignorCmsNotes', 'chkConsignorCondensed', 'chkShowConsignorCondensedCmsNotes',
+                 'chkRep', 'chkShowCmsNotes', 'chkRepCondensed', 'chkShowRepCondensedCmsNotes'],
+        'contracts': ['chkBuyerContracts', 'chkSellerContracts', 'chkBuyerContractsGrouped', 'chkConsignorContractsGrouped'],
+        'special': ['chkSalesByConsignor', 'chkSalesByBuyer', 'chkSalesByRep', 
+                    'chkCompleteBuyer', 'chkCompleteConsignor', 'chkCompleteRep', 'chkAuctionRecap']
+      };
+      
+      return mapping[sectionName] || [];
+    }
+
+    function updateSectionCount(section) {
+      const checkboxes = section.querySelectorAll('input[type="checkbox"]');
+      const checked = Array.from(checkboxes).filter(cb => cb.checked).length;
+      const countEl = section.querySelector('.sectionCount');
+      if (countEl) {
+        countEl.textContent = `${checked} selected`;
+      }
+    }
+
+    function updateAllSectionCounts() {
+      document.querySelectorAll('.collapsibleSection').forEach(updateSectionCount);
+    }
+
+    // Generation Summary
+    function updateGenerationSummary() {
+      const summaryEl = document.getElementById('generationSummary');
+      const contentEl = document.getElementById('generationSummaryContent');
+      
+      if (!summaryEl || !contentEl) return;
+      
+      const totalChecked = document.querySelectorAll('input[type="checkbox"][id^="chk"]:checked').length;
+      
+      if (totalChecked === 0 || !csvRows || csvRows.length === 0) {
+        summaryEl.classList.add('hidden');
+        return;
+      }
+      
+      contentEl.innerHTML = `
+        <div style="font-size: 16px; font-weight: 600; margin-bottom: 4px;">• Approximately ${totalChecked * 10}-${totalChecked * 50} PDFs</div>
+        <div style="font-size: 13px; color: var(--text-secondary);">• ${totalChecked} report types selected</div>
+        <div style="font-size: 13px; color: var(--text-secondary);">• ZIP downloads available for each type</div>
+      `;
+      
+      summaryEl.classList.remove('hidden');
+    }
+
+    // CSV Upload UI
+    function setupCsvUploadUI() {
+      const dropZone = document.getElementById('dropZone');
+      const fileInput = document.getElementById('fileInput');
+      const csvRemove = document.getElementById('csvRemove');
+      const dropzoneContent = document.getElementById('dropzoneContent');
+      const csvConfirmation = document.getElementById('csvConfirmation');
+      
+      if (!dropZone || !fileInput) return;
+      
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      });
+      
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+      });
+      
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          fileInput.files = files;
+          handleCsvUpload(files[0]);
+        }
+      });
+      
+      if (csvRemove) {
+        csvRemove.addEventListener('click', (e) => {
+          e.stopPropagation();
+          fileInput.value = '';
+          csvRows = [];
+          if (dropzoneContent) dropzoneContent.classList.remove('hidden');
+          if (csvConfirmation) csvConfirmation.classList.add('hidden');
+          document.getElementById('csvPreview')?.classList.add('hidden');
+          document.getElementById('generationSummary')?.classList.add('hidden');
+          if (typeof buildBtn !== 'undefined') buildBtn.disabled = true;
+        });
+      }
+    }
+
+    function handleCsvUpload(file) {
+      const csvFileName = document.getElementById('csvFileName');
+      const csvRowCount = document.getElementById('csvRowCount');
+      const dropzoneContent = document.getElementById('dropzoneContent');
+      const csvConfirmation = document.getElementById('csvConfirmation');
+      
+      if (csvFileName) csvFileName.textContent = file.name;
+      if (csvRowCount) csvRowCount.textContent = `Uploaded ${new Date().toLocaleString()}`;
+      
+      if (dropzoneContent) dropzoneContent.classList.add('hidden');
+      if (csvConfirmation) csvConfirmation.classList.remove('hidden');
+    }
+
+    // Live Updates
+    function setupLiveUpdates() {
+      document.querySelectorAll('input[type="checkbox"][id^="chk"]').forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+          updateAllCountsAndSummary();
+        });
+      });
+    }
+
+    function updateAllCountsAndSummary() {
+      updateAllSectionCounts();
+      updateGenerationSummary();
+      if (typeof buildBtn !== 'undefined' && typeof anyChecked === 'function') {
+        buildBtn.disabled = !anyChecked() || !csvRows || csvRows.length === 0;
+      }
+    }
+
+    // Initialize new UI
+    function initNewUI() {
+      document.querySelectorAll('.collapsibleSection').forEach(section => {
+        section.classList.add('collapsed');
+      });
+      
+      setupWorkflowPresets();
+      setupCollapsibleSections();
+      setupCsvUploadUI();
+      setupLiveUpdates();
+    }
+  </script>
+</body>
+</html>

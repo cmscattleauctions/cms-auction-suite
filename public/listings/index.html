@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CMS Livestock Auction — Listing Builder</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ============ APP SHELL (hidden on print) ============
+     Brand block removed in Phase 2 — the suite shell owns the
+     brand bar now. Only functional toolbar remains here. -->
+<header class="app-header no-print">
+  <div class="app-actions">
+    <label class="btn btn-primary">
+      <input type="file" id="csvFile" accept=".csv" hidden />
+      📁 Upload CSV
+    </label>
+    <button class="btn" id="regenBtn" disabled>🔄 Regenerate</button>
+    <button class="btn" id="resetBtn" disabled>↺ Reset Edits</button>
+    <button class="btn btn-accent" id="exportPdfBtn" disabled>🖨 Export PDF</button>
+    <button class="btn" id="exportHtmlBtn" disabled>⬇ Export HTML</button>
+  </div>
+</header>
+
+<div class="app-body no-print">
+  <!-- ================ SIDEBAR ================ -->
+  <aside class="sidebar">
+    <section class="panel">
+      <h3>Header Info</h3>
+      <label>Sale Title <input type="text" id="h_title" /></label>
+      <label>Subtitle <input type="text" id="h_subtitle" /></label>
+      <label>Date / Time <input type="text" id="h_datetime" /></label>
+      <label>Website <input type="text" id="h_website" /></label>
+      <label>Phone <input type="text" id="h_phone" /></label>
+      <label>Fax <input type="text" id="h_fax" /></label>
+      <label>Address Line 1 <input type="text" id="h_addr1" /></label>
+      <label>Address Line 2 <input type="text" id="h_addr2" /></label>
+      <label>Address Line 3 <input type="text" id="h_addr3" /></label>
+    </section>
+
+    <section class="panel">
+      <h3>Display Options</h3>
+      <label class="check"><input type="checkbox" id="opt_video" checked /> Show video icon</label>
+      <label class="check"><input type="checkbox" id="opt_external_notes" checked /> Show CMS External Notes</label>
+      <label class="check"><input type="checkbox" id="opt_internal_notes" /> Show CMS Internal Notes</label>
+      <label class="check"><input type="checkbox" id="opt_zebra" checked /> Zebra striping</label>
+    </section>
+
+    <section class="panel">
+      <h3>Logo</h3>
+      <label>Upload logo image (PNG/JPG)
+        <input type="file" id="logoFile" accept="image/*" />
+      </label>
+      <button class="btn btn-ghost" id="clearLogoBtn">Remove Logo</button>
+    </section>
+
+    <section class="panel">
+      <h3>Section Colors</h3>
+      <div id="colorList"></div>
+      <button class="btn btn-ghost" id="resetColorsBtn">Reset Default Colors</button>
+    </section>
+
+    <section class="panel">
+      <h3>Sections</h3>
+      <div id="sectionNav" class="section-nav"></div>
+    </section>
+
+    <section class="panel">
+      <h3>Tips</h3>
+      <p class="muted">Click any text in the preview to edit it. Changes update live. Click a price cell to edit it — it can be <b>$xxx.xx</b>, <b>PO</b>, <b>SCRATCH</b>, or blank.</p>
+    </section>
+  </aside>
+
+  <!-- ================ PREVIEW AREA ================ -->
+  <main class="preview-area">
+    <div id="emptyState" class="empty-state">
+      <div class="empty-icon">📄</div>
+      <h2>Upload your master data CSV to begin</h2>
+      <p class="muted">The app will parse, group, sort and render your auction listing. All fields become editable.</p>
+      <label class="btn btn-primary">
+        <input type="file" id="csvFile2" accept=".csv" hidden />
+        Choose CSV File
+      </label>
+    </div>
+    <div id="docRoot" class="doc-root"></div>
+  </main>
+</div>
+
+<!-- ================ PRINT-ONLY DOC ================ -->
+<div id="printRoot" class="print-only"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

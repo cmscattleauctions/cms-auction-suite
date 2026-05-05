@@ -1,0 +1,2140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMS Auction Builder</title>
+<link rel="icon" type="image/svg+xml" href="./favicon.svg">
+<link rel="shortcut icon" href="./favicon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --blue: #35679a; --blue-light: #4385c8;
+  --bg: #111820; --surface: #1b2433; --surface2: #222f42;
+  --border: #2a3a52; --text: #e4eaf3; --muted: #7a95b8;
+  --green: #2ea85a; --red: #c03; --yellow:#d9a441;
+}
+body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+nav { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 32px; height: 56px; position: sticky; top: 0; z-index: 100; }
+.nav-brand { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 18px; color: var(--text); margin-right: 32px; display: flex; align-items: center; gap: 10px; }
+.nav-brand .mark { background: var(--blue); color: white; font-size: 13px; font-weight: 900; padding: 3px 8px; border-radius: 5px; }
+.nav-tab { height: 56px; padding: 0 20px; display: flex; align-items: center; font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; background: none; border-top: none; border-left: none; border-right: none; font-family: 'Barlow', sans-serif; transition: all 0.15s; }
+.nav-tab:hover { color: var(--text); }
+.nav-tab.active { color: var(--blue-light); border-bottom-color: var(--blue-light); }
+.page { display: none; padding: 32px; max-width: 1440px; margin: 0 auto; }
+.page.active { display: block; }
+.section-title { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 14px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 24px; }
+.btn { padding: 10px 20px; border-radius: 7px; border: none; font-family: 'Barlow', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: all 0.15s; white-space: nowrap; }
+.btn-primary { background: var(--blue); color: white; }
+.btn-primary:hover { background: #2a5580; }
+.btn-success { background: var(--green); color: white; }
+.btn-success:hover { filter: brightness(0.9); }
+.btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--border); }
+.btn-danger { background: #742727; color: white; }
+.btn-danger:hover { background: #5f1d1d; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-sm { padding: 6px 14px; font-size: 12px; }
+.btn-lg { padding: 14px 28px; font-size: 15px; }
+.toggle-label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; }
+.toggle-btn { padding: 8px 18px; border-radius: 7px; border: 2px solid var(--border); background: var(--surface); color: var(--muted); font-family: 'Barlow', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.15s; }
+.toggle-btn:hover { border-color: var(--blue-light); color: var(--text); }
+.toggle-btn.active { border-color: var(--blue-light); background: rgba(67,133,200,0.12); color: var(--blue-light); }
+.divider { width: 1px; height: 24px; background: var(--border); margin: 0 6px; }
+.upload-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--surface); position: relative; margin-bottom: 24px; }
+.upload-zone:hover, .upload-zone.drag-over { border-color: var(--blue-light); background: rgba(67,133,200,0.07); }
+.upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.upload-zone h2 { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700; margin: 10px 0 6px; }
+.upload-zone p { color: var(--muted); font-size: 13px; }
+.upload-icon { margin: 0 auto 4px; }
+.upload-icon svg { width: 38px; height: 38px; stroke: var(--muted); fill: none; }
+.stats-row { display: flex; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 14px 20px; flex: 1; min-width: 140px; }
+.stat-num { font-family: 'Barlow Condensed', sans-serif; font-size: 30px; font-weight: 800; color: var(--blue-light); line-height: 1; }
+.stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+.progress-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 18px 22px; margin-bottom: 22px; display: none; }
+.progress-wrap.active { display: block; }
+.progress-header { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+.progress-track { height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--blue-light); border-radius: 3px; transition: width 0.15s; width: 0; }
+.controls-row { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+.search-box { background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 9px 14px; color: var(--text); font-size: 13px; width: 220px; font-family: 'Barlow', sans-serif; }
+.search-box:focus, .form-input:focus, .form-textarea:focus { outline: none; border-color: var(--blue-light); }
+.count-label { font-size: 12px; color: var(--muted); margin-left: auto; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(600px, 1fr)); gap: 14px; }
+.banner-card { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+.banner-preview-shell { background: #0e1620; padding: 14px; }
+.banner-canvas-wrap { width: 100%; position: relative; border-radius: 3px; overflow: hidden; }
+.banner-canvas-wrap canvas { width: 100%; height: auto; display: block; }
+.banner-card-foot { padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); gap: 10px; flex-wrap: wrap; }
+.banner-card-foot .lot-tag { font-size: 12px; color: var(--muted); font-weight: 600; }
+.banner-kind-chip { display:inline-block; font-size:10px; font-weight:700; padding:3px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:0.5px; margin-right:6px; }
+.banner-kind-chip.transition { background:rgba(67,133,200,0.18); color:var(--blue-light); }
+.banner-kind-chip.option { background:rgba(46,168,90,0.18); color:#4fd080; }
+.missing-badge { font-size: 11px; background: #3a2200; color: #ffaa44; border: 1px solid #6a3a00; border-radius: 4px; padding: 2px 8px; font-weight: 600; }
+.alert-banner { display: none; background: #2a1a00; border: 1px solid #6a3e00; border-radius: 9px; padding: 14px 18px; margin-bottom: 20px; color: #ffbb55; font-size: 13px; line-height: 1.5; }
+.info-banner { background: rgba(67,133,200,0.08); border: 1px solid rgba(67,133,200,0.25); border-radius: 9px; padding: 14px 18px; margin-bottom: 20px; color: var(--text); font-size: 13px; line-height: 1.6; }
+.info-banner strong { color: var(--blue-light); }
+.info-banner code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: var(--text); }
+.empty { text-align: center; padding: 60px; color: var(--muted); }
+.empty svg { width: 48px; height: 48px; stroke: var(--muted); fill: none; margin-bottom: 12px; display: block; margin-left: auto; margin-right: auto; }
+.admin-grid { display: grid; grid-template-columns: 420px 1fr; gap: 24px; align-items: start; }
+.form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.form-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.form-input, .form-textarea { background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 10px 14px; color: var(--text); font-size: 14px; font-family: 'Barlow', sans-serif; width: 100%; }
+.form-textarea { min-height: 90px; resize: vertical; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+.img-drop { border: 2px dashed var(--border); border-radius: 9px; padding: 28px; text-align: center; cursor: pointer; transition: all 0.15s; position: relative; background: var(--surface2); }
+.img-drop:hover, .img-drop.drag-over { border-color: var(--blue-light); }
+.img-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.img-drop p { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.img-drop svg { width: 32px; height: 32px; stroke: var(--muted); fill: none; }
+.img-preview-thumb { max-height: 80px; max-width: 100%; border-radius: 5px; display: none; margin: 8px auto 0; border: 1px solid var(--border); background:#0e1620; }
+.state-library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.state-lib-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.state-lib-card img { width: 100%; height: 100px; object-fit: contain; background: var(--blue); display: block; padding: 6px; }
+.state-lib-label { padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.state-abbr { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 15px; }
+.del-btn { background: none; border: none; color: #cc4444; cursor: pointer; font-size: 16px; padding: 2px 4px; line-height: 1; }
+.no-states { color: var(--muted); font-size: 13px; padding: 20px 0; }
+.helper { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.status-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background: rgba(67,133,200,0.12); color: var(--blue-light); font-size:12px; font-weight:600; }
+.status-chip.warn { background: rgba(217,164,65,0.12); color: var(--yellow); }
+.status-chip.good { background: rgba(46,168,90,0.15); color: #4fd080; }
+.secret-box { max-width: 420px; margin: 50px auto; }
+.two-col { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.toast { position: fixed; bottom: 28px; right: 28px; background: #1a3020; border: 1px solid #2a5030; color: #5fcc80; padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; transform: translateY(80px); opacity: 0; transition: all 0.25s; z-index: 9999; max-width: 420px; }
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.error { background: #3a1515; border-color: #5a2020; color: #ff8080; }
+.flow-steps { display:flex; align-items:center; gap:10px; margin-bottom:28px; flex-wrap:wrap; }
+.flow-step { display:flex; align-items:center; gap:10px; padding:8px 14px; border-radius:999px; background:var(--surface); border:1px solid var(--border); font-size:12px; font-weight:600; color:var(--muted); }
+.flow-step.active { border-color: var(--blue-light); color: var(--blue-light); background: rgba(67,133,200,0.10); }
+.flow-step.done { border-color: var(--green); color: #4fd080; background: rgba(46,168,90,0.10); }
+.flow-step .step-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:var(--surface2); font-family:'Barlow Condensed', sans-serif; font-weight:800; font-size:12px; color:inherit; border:1px solid currentColor; }
+.flow-arrow { color: var(--border); font-size: 16px; }
+.style-pick-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top:14px; }
+.style-pick-card { background: var(--surface2); border: 2px solid var(--border); border-radius: 10px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
+.style-pick-card:hover { border-color: var(--blue-light); }
+.style-pick-card.active { border-color: var(--blue-light); background: rgba(67,133,200,0.08); }
+.style-pick-preview { background: #0e1620; padding: 14px; }
+.style-pick-preview canvas { width:100%; height:auto; display:block; border-radius:3px; }
+.style-pick-footer { padding: 10px 14px; border-top: 1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.style-pick-name { font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:15px; letter-spacing:0.5px; }
+.style-pick-badge { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; }
+.action-row { display: flex; gap: 12px; justify-content: space-between; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+@media (max-width: 980px) {
+  .admin-grid { grid-template-columns: 1fr; }
+  .grid { grid-template-columns: 1fr; }
+  .style-pick-grid { grid-template-columns: 1fr; }
+}
+</style>
+<link rel="stylesheet" href="./light-theme.css">
+</head>
+<body>
+<nav>
+  <!-- nav-brand removed in Phase 2 — suite shell owns the brand bar -->
+  <button class="nav-tab active" onclick="showPage('flow', this)">Builder</button>
+  <button class="nav-tab" onclick="showPage('admin', this)">State Library</button>
+</nav>
+
+<!-- ============================================================
+     BUILDER FLOW — 3 panels (Upload, Style Picker, Review)
+     ============================================================ -->
+<div class="page active" id="page-flow">
+
+  <div class="flow-steps">
+    <div class="flow-step active" id="flowStep1"><span class="step-num">1</span> Upload CSV</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step" id="flowStep2"><span class="step-num">2</span> Pick Styles</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step" id="flowStep3"><span class="step-num">3</span> Download</div>
+  </div>
+
+  <!-- Panel 1: Upload -->
+  <div id="panelUpload">
+    <div class="card" style="margin-bottom:20px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center;">
+      <div>
+        <div class="section-title" style="margin-bottom:8px;">Repository Source</div>
+        <div id="repoStatus" class="status-chip warn">Repo settings not configured yet</div>
+      </div>
+      <div class="helper">State images come from <span class="mono">assets/states</span>. OBS template comes from <span class="mono">template.json</span>.</div>
+    </div>
+
+    <div class="upload-zone" id="csvDrop">
+      <input type="file" accept=".csv" id="csvInput">
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+        </svg>
+      </div>
+      <h2>Drop Working On CSV here</h2>
+      <p>One CSV drives both the banner generator and the OBS scene collection.</p>
+    </div>
+
+    <div id="uploadStatsRow" class="stats-row" style="display:none">
+      <div class="stat"><div class="stat-num" id="sTotalLots">0</div><div class="stat-label">Lots</div></div>
+      <div class="stat"><div class="stat-num" id="sStdLots">0</div><div class="stat-label">Standard Lots</div></div>
+      <div class="stat"><div class="stat-num" id="sOptLots">0</div><div class="stat-label">Option Lots</div></div>
+      <div class="stat"><div class="stat-num" id="sOptGroups">0</div><div class="stat-label">Option Groups</div></div>
+      <div class="stat"><div class="stat-num" id="sBreedMarkers">0</div><div class="stat-label">Breed Transitions</div></div>
+    </div>
+
+    <div class="action-row" id="uploadActions" style="display:none">
+      <button class="btn btn-ghost" id="btnResetUpload">Upload different CSV</button>
+      <button class="btn btn-primary btn-lg" id="btnToStyles">Continue to Style Picker →</button>
+    </div>
+  </div>
+
+  <!-- Panel 2: Style Picker -->
+  <div id="panelStyles" style="display:none">
+    <div class="info-banner" style="margin-bottom:24px;">
+      Choose the style for your <strong>standard lot transition banners</strong> and <strong>option lot banners</strong>. Previews use data from your first option group.
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="section-title">Transition Banner Style <span style="color:var(--muted);font-weight:500;text-transform:none;letter-spacing:0;">· bottom-center on screen</span></div>
+      <div class="style-pick-grid">
+        <div class="style-pick-card active" id="pickStd1" onclick="pickStandardStyle(1)">
+          <div class="style-pick-preview"><canvas id="pickStd1Canvas"></canvas></div>
+          <div class="style-pick-footer">
+            <span class="style-pick-name">Style 1 — Diagonal</span>
+            <span class="style-pick-badge">Angled panels</span>
+          </div>
+        </div>
+        <div class="style-pick-card" id="pickStd2" onclick="pickStandardStyle(2)">
+          <div class="style-pick-preview"><canvas id="pickStd2Canvas"></canvas></div>
+          <div class="style-pick-footer">
+            <span class="style-pick-name">Style 2 — Clean</span>
+            <span class="style-pick-badge">Flat blocks</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="section-title">Option Banner Style <span style="color:var(--muted);font-weight:500;text-transform:none;letter-spacing:0;">· top-center on screen, shared per option group</span></div>
+      <div class="style-pick-grid">
+        <div class="style-pick-card active" id="pickOpt1" onclick="pickOptionStyle(1)">
+          <div class="style-pick-preview"><canvas id="pickOpt1Canvas"></canvas></div>
+          <div class="style-pick-footer">
+            <span class="style-pick-name">Style 1 — Diagonal</span>
+            <span class="style-pick-badge">Angled panels</span>
+          </div>
+        </div>
+        <div class="style-pick-card" id="pickOpt2" onclick="pickOptionStyle(2)">
+          <div class="style-pick-preview"><canvas id="pickOpt2Canvas"></canvas></div>
+          <div class="style-pick-footer">
+            <span class="style-pick-name">Style 2 — Clean</span>
+            <span class="style-pick-badge">Flat blocks</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button class="btn btn-ghost" id="btnBackToUpload">← Back to Upload</button>
+      <button class="btn btn-primary btn-lg" id="btnGenerate">Generate Banners →</button>
+    </div>
+  </div>
+
+  <!-- Panel 3: Review & Download -->
+  <div id="panelReview" style="display:none">
+    <div class="info-banner">
+      <strong>Next steps:</strong> Download banners first, then drop them into <code>/Users/brysonmurray/Library/CloudStorage/Dropbox/Auction OBS/Lot Banners/</code> — keep the filenames exactly as exported. Then download the OBS JSON and import it in OBS (<em>Scene Collection → Import</em>).
+    </div>
+
+    <div id="statsRow" class="stats-row" style="display:none">
+      <div class="stat"><div class="stat-num" id="sBanners">0</div><div class="stat-label">Banners</div></div>
+      <div class="stat"><div class="stat-num" id="sTransitions">0</div><div class="stat-label">Transition Banners</div></div>
+      <div class="stat"><div class="stat-num" id="sOptionBanners">0</div><div class="stat-label">Option Banners</div></div>
+      <div class="stat"><div class="stat-num" id="sStates">0</div><div class="stat-label">States</div></div>
+      <div class="stat"><div class="stat-num" id="sMissing" style="color:#ffaa44">0</div><div class="stat-label">Missing State Images</div></div>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-header"><span id="progressText">Processing...</span><span id="progressPct">0%</span></div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <div class="alert-banner" id="missingAlert"></div>
+
+    <div id="ctrlRow" class="controls-row" style="display:none">
+      <button class="btn btn-success btn-lg" id="btnZip">1 · Download All Banners (ZIP)</button>
+      <button class="btn btn-primary btn-lg" id="btnDownloadObs" disabled title="Download banners first">2 · Download OBS Scene Collection</button>
+      <div class="divider"></div>
+      <button class="btn btn-ghost" id="btnBackToStyles">← Change Styles</button>
+      <button class="btn btn-ghost" id="btnResetAll">Start Over</button>
+      <input type="text" class="search-box" id="searchBox" placeholder="Search lot, consignor, state...">
+      <span class="count-label" id="countLabel"></span>
+    </div>
+
+    <div class="grid" id="bannerGrid">
+      <div class="empty">
+        <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+        </svg>
+        <p>No banners yet</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============================================================
+     ADMIN PAGE — State Library (unchanged from original)
+     ============================================================ -->
+<div class="page" id="page-admin">
+  <div id="adminGate" class="secret-box">
+    <div class="card">
+      <div class="section-title">Admin Access</div>
+      <div class="form-row">
+        <label class="form-label">Secret Code</label>
+        <input type="password" class="form-input" id="pinInput" placeholder="Enter code">
+      </div>
+      <button class="btn btn-primary" id="btnPinEnter">Enter</button>
+      <p id="pinMsg" class="helper" style="margin-top:10px;min-height:18px;">Enter the admin code to manage shared state images.</p>
+    </div>
+  </div>
+
+  <div id="adminContent" style="display:none;">
+    <div class="admin-grid">
+      <div style="display:grid;gap:20px;">
+        <div class="card">
+          <div class="section-title">Repository Settings</div>
+          <div class="form-row">
+            <label class="form-label">GitHub Owner</label>
+            <input type="text" class="form-input" id="ghOwner" placeholder="your-github-username">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Repository Name</label>
+            <input type="text" class="form-input" id="ghRepo" placeholder="cms-auction-builder">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Branch</label>
+            <input type="text" class="form-input" id="ghBranch" placeholder="main">
+          </div>
+          <div class="two-col">
+            <button class="btn btn-primary" id="btnSaveRepoConfig">Save Repo Settings</button>
+            <button class="btn btn-ghost" id="btnTestRepo">Test Repo</button>
+          </div>
+          <p class="helper" style="margin-top:10px;">State images are stored in <span class="mono">assets/states</span>; OBS template is read from <span class="mono">template.json</span>.</p>
+        </div>
+
+        <div class="card">
+          <div class="section-title">GitHub Token</div>
+          <div class="form-row">
+            <label class="form-label">Fine-Grained Personal Access Token</label>
+            <textarea class="form-textarea mono" id="ghToken" placeholder="Paste token here for this browser session only"></textarea>
+          </div>
+          <div class="two-col">
+            <button class="btn btn-primary" id="btnSaveToken">Use Token</button>
+            <button class="btn btn-ghost" id="btnClearToken">Clear Token</button>
+          </div>
+          <p id="tokenStatus" class="helper" style="margin-top:10px;">Token is not stored until you click Use Token.</p>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Add / Replace State Image</div>
+          <div class="form-row">
+            <label class="form-label">State Abbreviation</label>
+            <input type="text" class="form-input" id="stateAbbrInput" placeholder="TX" maxlength="2" style="text-transform:uppercase;width:90px">
+          </div>
+          <div class="form-row">
+            <label class="form-label">State Image</label>
+            <div class="img-drop" id="imgDrop">
+              <input type="file" accept=".png,.svg,image/png,image/svg+xml" id="imgInput">
+              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+                <path d="M21 15l-5-5L5 21"/>
+              </svg>
+              <p>Drop PNG or SVG or click to browse</p>
+              <img id="imgThumb" class="img-preview-thumb">
+            </div>
+          </div>
+          <div class="two-col">
+            <button class="btn btn-success" id="btnSaveState">Upload / Replace</button>
+            <button class="btn btn-ghost" id="btnRefreshLibrary">Refresh Library</button>
+          </div>
+          <p id="adminMsg" class="helper" style="margin-top:10px;min-height:18px">PNG and SVG are supported. One file per state.</p>
+        </div>
+      </div>
+
+      <div>
+        <div class="card" style="margin-bottom:20px;">
+          <div class="section-title">Current Session</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <div id="adminSessionChip" class="status-chip warn">Admin unlocked · token not loaded</div>
+            <button class="btn btn-ghost btn-sm" id="btnLockAdmin">Lock Admin</button>
+          </div>
+        </div>
+
+        <div class="section-title">State Image Library (<span id="libCount">0</span> states)</div>
+        <div class="state-library-grid" id="stateLibGrid">
+          <p class="no-states">No state images found in the repository yet.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════
+const DEFAULT_REPO_OWNER  = 'cmscattleauctions';
+const DEFAULT_REPO_NAME   = 'banner-generator';
+const DEFAULT_REPO_BRANCH = 'main';
+
+const ADMIN_PIN = '0623';
+const GITHUB_API = 'https://api.github.com';
+const STATES_DIR = 'assets/states';
+const REPO_CFG_KEY = 'cms_github_repo_config_v1';
+const TOKEN_KEY = 'cms_github_pat_session_v1';
+const PIN_KEY = 'cms_admin_pin_ok_v1';
+const LOCATION_OVERRIDE_KEY = 'cms_location_state_overrides_v1';
+
+// Dropbox path banners will live at (hardcoded per user request)
+const DROPBOX_BANNER_PATH = '/Users/brysonmurray/Library/CloudStorage/Dropbox/Auction OBS/Lot Banners/';
+
+// OBS canvas (4K)
+const CANVAS_W = 3840, CANVAS_H = 2160;
+
+// Transition banner dimensions (full-width 4K, proportional height)
+const TBW = 3840, TBH = 400;
+
+// Option banner dimensions (1500x380, transparent background, centered content)
+const OBW = 1500, OBH = 380;
+
+// Generic draw-surface constants — most drawing code was written against
+// "BW" / "BH" for the rectangular 1920x200 style. We keep those aliases for
+// backwards-compat in the Style 1 Standard / Style 2 drawing code.
+const BW = 1920, BH = 200;
+
+// Where on the canvas each banner is placed.
+// Transition: full-width (3840x400), bottom flush.      pos = (0, 1760)
+// Option:     1500x380, top-left aligned.               pos = (0, 0)
+const TRANSITION_POS_X = 0;
+const TRANSITION_POS_Y = CANVAS_H - TBH;     // 1760 — bottom flush
+const OPTION_POS_X = 0;                       // 0 — left flush
+const OPTION_POS_Y = 0;                       // 0 — top flush
+
+// ═══════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.toggle('error', isError);
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+function deepClone(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+// uuid v4 (for new OBS source uuids)
+function uuidv4() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGE / FLOW NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  if (btn) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+  }
+}
+
+function setFlowStep(n) {
+  for (let i = 1; i <= 3; i++) {
+    const el = document.getElementById('flowStep' + i);
+    el.classList.remove('active', 'done');
+    if (i < n) el.classList.add('done');
+    else if (i === n) el.classList.add('active');
+  }
+}
+
+function showPanel(name) {
+  document.getElementById('panelUpload').style.display  = (name === 'upload'  ? '' : 'none');
+  document.getElementById('panelStyles').style.display  = (name === 'styles'  ? '' : 'none');
+  document.getElementById('panelReview').style.display  = (name === 'review'  ? '' : 'none');
+  if (name === 'upload') setFlowStep(1);
+  if (name === 'styles') setFlowStep(2);
+  if (name === 'review') setFlowStep(3);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REPO / GITHUB (shared with admin)
+// ═══════════════════════════════════════════════════════════════
+function loadRepoConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(REPO_CFG_KEY) || '{}');
+    return {
+      owner: saved.owner || DEFAULT_REPO_OWNER,
+      repo: saved.repo || DEFAULT_REPO_NAME,
+      branch: saved.branch || DEFAULT_REPO_BRANCH
+    };
+  } catch {
+    return { owner: DEFAULT_REPO_OWNER, repo: DEFAULT_REPO_NAME, branch: DEFAULT_REPO_BRANCH };
+  }
+}
+function saveRepoConfig(cfg) {
+  localStorage.setItem(REPO_CFG_KEY, JSON.stringify(cfg));
+  syncRepoForm();
+  updateRepoStatus();
+}
+function getSessionToken() { return sessionStorage.getItem(TOKEN_KEY) || ''; }
+function setSessionToken(token) {
+  if (token) sessionStorage.setItem(TOKEN_KEY, token);
+  else sessionStorage.removeItem(TOKEN_KEY);
+  updateTokenStatus();
+}
+function repoIsConfigured() {
+  const cfg = loadRepoConfig();
+  return !!cfg.owner && !!cfg.repo && !cfg.owner.startsWith('REPLACE_') && !cfg.repo.startsWith('REPLACE_');
+}
+function syncRepoForm() {
+  const cfg = loadRepoConfig();
+  document.getElementById('ghOwner').value = cfg.owner || '';
+  document.getElementById('ghRepo').value = cfg.repo || '';
+  document.getElementById('ghBranch').value = cfg.branch || 'main';
+}
+function updateRepoStatus() {
+  const cfg = loadRepoConfig();
+  const el = document.getElementById('repoStatus');
+  if (!repoIsConfigured()) {
+    el.className = 'status-chip warn';
+    el.textContent = 'Repo settings not configured yet';
+    return;
+  }
+  el.className = 'status-chip';
+  el.textContent = `${cfg.owner}/${cfg.repo} · ${cfg.branch}`;
+}
+function updateTokenStatus() {
+  const tokenLoaded = !!getSessionToken();
+  const tokenStatus = document.getElementById('tokenStatus');
+  const chip = document.getElementById('adminSessionChip');
+  if (tokenLoaded) {
+    tokenStatus.textContent = 'Token loaded for this browser session.';
+    chip.className = 'status-chip';
+    chip.textContent = 'Admin unlocked · token loaded';
+  } else {
+    tokenStatus.textContent = 'Token is not stored until you click Use Token.';
+    chip.className = 'status-chip warn';
+    chip.textContent = 'Admin unlocked · token not loaded';
+  }
+}
+function githubHeaders(authRequired = false) {
+  const headers = { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+  const token = getSessionToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (authRequired && !token) throw new Error('GitHub token required for this action.');
+  return headers;
+}
+function buildContentsUrl(path, includeRef = true) {
+  const cfg = loadRepoConfig();
+  let url = `${GITHUB_API}/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/contents/${path}`;
+  if (includeRef) url += `?ref=${encodeURIComponent(cfg.branch)}`;
+  return url;
+}
+function rawFileUrl(path) {
+  const cfg = loadRepoConfig();
+  return `https://raw.githubusercontent.com/${cfg.owner}/${cfg.repo}/${cfg.branch}/${path}`;
+}
+async function githubFetchJson(url, options = {}) {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    let msg = `${res.status} ${res.statusText}`;
+    try {
+      const body = await res.json();
+      if (body && body.message) msg = `${msg} — ${body.message}`;
+    } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATE INDEX (GITHUB-BACKED)
+// ═══════════════════════════════════════════════════════════════
+let stateIndex = {};
+let stateIndexLoaded = false;
+
+async function fetchStateIndex() {
+  if (!repoIsConfigured()) {
+    stateIndex = {}; stateIndexLoaded = true;
+    renderLibrary();
+    return stateIndex;
+  }
+  const url = buildContentsUrl(STATES_DIR, true);
+  try {
+    const data = await githubFetchJson(url, { headers: githubHeaders(false) });
+    const next = {};
+    if (Array.isArray(data)) {
+      data.forEach(item => {
+        if (item.type !== 'file') return;
+        const m = item.name.match(/^([A-Za-z]{2})\.(png|svg)$/i);
+        if (!m) return;
+        const abbr = m[1].toUpperCase();
+        next[abbr] = {
+          name: item.name, path: item.path, sha: item.sha,
+          ext: m[2].toLowerCase(),
+          download_url: item.download_url || rawFileUrl(item.path)
+        };
+      });
+    }
+    stateIndex = next;
+  } catch (err) {
+    if (String(err.message).includes('404')) stateIndex = {};
+    else throw err;
+  }
+  stateIndexLoaded = true;
+  renderLibrary();
+  return stateIndex;
+}
+function getStateImageInfo(abbr) { return stateIndex[(abbr || '').toUpperCase()] || null; }
+function getStateImageUrl(abbr) {
+  const info = getStateImageInfo(abbr);
+  if (!info) return null;
+  return `${info.download_url}?v=${encodeURIComponent(info.sha || Date.now())}`;
+}
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+    img.src = src;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOCATION OVERRIDES
+// ═══════════════════════════════════════════════════════════════
+function loadLocationOverrides() {
+  try { return JSON.parse(localStorage.getItem(LOCATION_OVERRIDE_KEY) || '{}'); } catch { return {}; }
+}
+function saveLocationOverrides(map) {
+  localStorage.setItem(LOCATION_OVERRIDE_KEY, JSON.stringify(map || {}));
+}
+function normalizeLocationKey(str) {
+  return String(str || '').trim().replace(/\s+/g, ' ').toUpperCase();
+}
+function getLocationOverride(rawLocation) {
+  const key = normalizeLocationKey(rawLocation);
+  if (!key) return '';
+  const map = loadLocationOverrides();
+  return (map[key] || '').toUpperCase();
+}
+function setLocationOverride(rawLocation, stateAbbr) {
+  const key = normalizeLocationKey(rawLocation);
+  if (!key) return;
+  const map = loadLocationOverrides();
+  const clean = String(stateAbbr || '').trim().toUpperCase();
+  if (clean) map[key] = clean;
+  else delete map[key];
+  saveLocationOverrides(map);
+}
+async function promptForMissingStates() {
+  if (!allBanners.length) return;
+  const needsPrompt = [];
+  const seen = new Set();
+  for (const banner of allBanners) {
+    if (banner.kind !== 'transition') continue; // option banners don't use state
+    const rawKey = normalizeLocationKey(banner.rawLocation);
+    if (!rawKey || seen.has(rawKey)) continue;
+    const hasUsableState = !!banner.stateAbbr && !!getStateImageInfo(banner.stateAbbr);
+    if (!hasUsableState) {
+      seen.add(rawKey);
+      needsPrompt.push({
+        rawLocation: banner.rawLocation || '(blank)',
+        currentState: banner.stateAbbr || '',
+        reason: banner.stateAbbr ? `No uploaded image exists for ${banner.stateAbbr}.` : 'No state could be detected from the location.',
+      });
+    }
+  }
+  if (!needsPrompt.length) return;
+  for (const item of needsPrompt) {
+    const exampleLots = allBanners
+      .filter(b => b.kind === 'transition' && normalizeLocationKey(b.rawLocation) === normalizeLocationKey(item.rawLocation))
+      .slice(0, 5).map(b => b.lotNumber).filter(Boolean);
+    const current = getLocationOverride(item.rawLocation) || item.currentState || '';
+    const promptMsg =
+`Choose a state for this location:
+
+Location:
+${item.rawLocation}
+
+Reason:
+${item.reason}
+
+Example lots:
+${exampleLots.join(', ') || 'N/A'}
+
+Enter a 2-letter state abbreviation like TX or NM.
+Leave blank and press OK to skip this location for now.`;
+    const answer = window.prompt(promptMsg, current);
+    if (answer === null) continue;
+    const clean = String(answer).trim().toUpperCase();
+    if (!clean) continue;
+    if (!/^[A-Z]{2}$/.test(clean)) {
+      showToast(`Skipped "${item.rawLocation}" because "${answer}" is not a valid 2-letter state.`, true);
+      continue;
+    }
+    setLocationOverride(item.rawLocation, clean);
+    allBanners.forEach(b => {
+      if (b.kind === 'transition' && normalizeLocationKey(b.rawLocation) === normalizeLocationKey(item.rawLocation)) {
+        b.stateAbbr = clean;
+        b.locationDisplay = b.city ? `${b.city}, ${clean}` : clean;
+      }
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CANVAS DRAWING — kept identical to original banner generator
+// ═══════════════════════════════════════════════════════════════
+const SKEW = Math.tan(29 * Math.PI / 180) * BH;
+const C_BG = '#dce4ef';
+const C_DARK = '#35679a';
+const C_LIGHT = '#4385c8';
+const C_WHITE = '#ffffff';
+const C_TEXT = '#4385c8';
+const C_SHADOW = 'rgba(67,133,200,0.28)';
+const SDX = 4, SDY = 5;
+const OF = (wt, sz) => `${wt} ${sz}px Oswald, "Arial Narrow", Arial, sans-serif`;
+
+function para(ctx, x0, w, color) {
+  ctx.beginPath();
+  ctx.moveTo(x0 + SKEW, 0); ctx.lineTo(x0 + SKEW + w, 0);
+  ctx.lineTo(x0 + w, BH); ctx.lineTo(x0, BH);
+  ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+}
+
+function drawStyle1Standard(ctx, banner, img) {
+  ctx.fillStyle = C_BG; ctx.fillRect(0, 0, BW, BH);
+  const s1x = 1420, s1w = 180;
+  para(ctx, s1x, s1w, C_DARK);
+  para(ctx, s1x + 22, 6, C_WHITE);
+  para(ctx, s1x + 36, 3, C_WHITE);
+  const s2x = s1x + s1w, s2w = 140;
+  para(ctx, s2x, s2w, C_LIGHT);
+  const s3x = s2x + s2w;
+  para(ctx, s3x, BW - s3x + SKEW + 60, C_WHITE);
+  if (img) {
+    const stH = Math.round(BH * 0.9), stW = Math.round(270 * 0.9);
+    ctx.drawImage(img, s2x, Math.round((BH - stH) / 2), stW, stH);
+  } else {
+    ctx.save();
+    ctx.font = 'bold 18px Arial'; ctx.fillStyle = '#999';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(`[${banner.stateAbbr}]`, s2x + 120, BH / 2);
+    ctx.restore();
+  }
+  const lotStr = `LOT ${banner.lotNumber}`;
+  const textY = BH / 2, textX = 48;
+  const fontSize = banner.lotNumber.length > 5 ? 108 : 130;
+  ctx.save();
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.font = OF(700, fontSize);
+  ctx.fillStyle = C_SHADOW; ctx.fillText(lotStr, textX + SDX, textY + SDY);
+  ctx.fillStyle = C_TEXT; ctx.fillText(lotStr, textX, textY);
+  const lotW = ctx.measureText(lotStr).width;
+  const infoX = textX + lotW + 55;
+  const maxInfoW = (s1x + SKEW * 0.5) - infoX - 40;
+  let cSz = 64;
+  ctx.font = OF(600, cSz);
+  while (ctx.measureText(banner.consignor).width > maxInfoW && cSz > 36) { cSz -= 2; ctx.font = OF(600, cSz); }
+  let cStr = banner.consignor;
+  if (ctx.measureText(cStr).width > maxInfoW) {
+    while (ctx.measureText(cStr + '…').width > maxInfoW && cStr.length > 4) cStr = cStr.slice(0, -1);
+    cStr += '…';
+  }
+  const gap = Math.max(cSz * 0.95, 52);
+  const cY = textY - gap * 0.5, lY = textY + gap * 0.5;
+  ctx.fillStyle = C_SHADOW; ctx.fillText(cStr, infoX + SDX, cY + SDY);
+  ctx.fillStyle = C_TEXT; ctx.fillText(cStr, infoX, cY);
+  const lSz = Math.min(52, cSz - 6);
+  ctx.font = OF(500, lSz);
+  ctx.fillStyle = C_SHADOW; ctx.fillText(banner.locationDisplay, infoX + SDX, lY + SDY);
+  ctx.fillStyle = C_TEXT; ctx.fillText(banner.locationDisplay, infoX, lY);
+  ctx.restore();
+}
+
+function drawStyle1Option(ctx, banner) {
+  // Transparent PNG — leave canvas clear. Banner is OBW x OBH (1500 x 380).
+  ctx.clearRect(0, 0, OBW, OBH);
+
+  // Navy color — slightly deeper than C_DARK to match the reference image
+  const NAVY = '#2e4a6b';
+
+  // Layout: two EQUAL-WIDTH panels side-by-side, filling the full 1500x380.
+  // Divider sits exactly at horizontal center (x = 750).
+  const halfW  = OBW / 2;       // 750
+  const blockH = OBH;           // 380
+  const topY   = 0;
+
+  // --- Left panel: solid navy rectangle (0..750) ---
+  ctx.fillStyle = NAVY;
+  ctx.fillRect(0, topY, halfW, blockH);
+
+  // "OPTION" + "THROUGH LOT" stacked, centered in the left panel
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = C_WHITE;
+  // Font size proportional to height (was 58 on a 200-tall canvas → ~110 on 380-tall)
+  const labelFont = 96;
+  const lineOffset = labelFont * 0.62;  // half the distance between the two lines
+  ctx.font = OF(700, labelFont);
+  const leftCX = halfW / 2;
+  ctx.fillText('OPTION', leftCX, blockH / 2 - lineOffset);
+  ctx.fillText('THROUGH LOT', leftCX, blockH / 2 + lineOffset);
+  ctx.restore();
+
+  // --- Right panel: white fill with navy outline (750..1500) ---
+  const rightX = halfW;
+  const rightW = halfW;
+  ctx.fillStyle = C_WHITE;
+  ctx.fillRect(rightX, topY, rightW, blockH);
+  // Navy outline around the right panel (inset slightly so stroke is fully visible)
+  ctx.strokeStyle = NAVY;
+  const strokeWidth = 10;
+  ctx.lineWidth = strokeWidth;
+  const inset = strokeWidth / 2;
+  ctx.strokeRect(rightX + inset, topY + inset, rightW - strokeWidth, blockH - strokeWidth);
+
+  // Lot number inside right panel — ~65% of panel height (user requested "60-70% of height")
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // Target ~65% of block height => ~247px font. Auto-shrink if it gets too wide.
+  let fontSz = Math.round(blockH * 0.65);
+  ctx.font = OF(700, fontSz);
+  const maxTextW = rightW - 80;
+  while (ctx.measureText(banner.lotNumber).width > maxTextW && fontSz > 80) {
+    fontSz -= 6;
+    ctx.font = OF(700, fontSz);
+  }
+  ctx.fillStyle = NAVY;
+  ctx.fillText(banner.lotNumber, rightX + rightW / 2, topY + blockH / 2);
+  ctx.restore();
+}
+
+function drawStyle2Standard(ctx, banner, img) {
+  ctx.fillStyle = '#f0f4f8'; ctx.fillRect(0, 0, BW, BH);
+  ctx.fillStyle = '#c8d6e8';
+  ctx.fillRect(0, 0, BW, 4);
+  ctx.fillRect(0, BH - 4, BW, 4);
+  const lotStr = `LOT ${banner.lotNumber}`;
+  const textY = BH / 2, textX = 60;
+  const fontSize = banner.lotNumber.length > 5 ? 110 : 132;
+  ctx.save();
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.font = OF(700, fontSize);
+  ctx.fillStyle = C_SHADOW; ctx.fillText(lotStr, textX + SDX, textY + SDY);
+  ctx.fillStyle = C_DARK; ctx.fillText(lotStr, textX, textY);
+  const lotW = ctx.measureText(lotStr).width;
+  const divX = textX + lotW + 50;
+  ctx.fillStyle = '#c0d0e4';
+  ctx.fillRect(divX, 28, 4, BH - 56);
+  const infoX = divX + 50;
+  const stateZoneW = 310;
+  const maxInfoW = BW - infoX - stateZoneW - 40;
+  let cSz = 68;
+  ctx.font = OF(700, cSz);
+  while (ctx.measureText(banner.consignor).width > maxInfoW && cSz > 36) { cSz -= 2; ctx.font = OF(700, cSz); }
+  let cStr = banner.consignor;
+  if (ctx.measureText(cStr).width > maxInfoW) {
+    while (ctx.measureText(cStr + '…').width > maxInfoW && cStr.length > 4) cStr = cStr.slice(0, -1);
+    cStr += '…';
+  }
+  const gap = Math.max(cSz * 0.95, 54);
+  const cY = textY - gap * 0.5, lY = textY + gap * 0.5;
+  ctx.fillStyle = C_DARK; ctx.fillText(cStr, infoX, cY);
+  const lSz = Math.min(52, cSz - 10);
+  ctx.font = OF(400, lSz);
+  ctx.fillStyle = '#6a8ab8'; ctx.fillText(banner.locationDisplay, infoX, lY);
+  if (img) {
+    const stH = Math.round(BH * 0.82), stW = Math.round(stateZoneW * 0.85);
+    ctx.drawImage(img, BW - stW - 30, (BH - stH) / 2, stW, stH);
+  } else {
+    ctx.font = 'bold 18px Arial'; ctx.fillStyle = '#aaa';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText(`[${banner.stateAbbr}]`, BW - 50, BH / 2);
+  }
+  ctx.restore();
+}
+
+function drawStyle2Option(ctx, banner) {
+  ctx.fillStyle = '#f0f4f8'; ctx.fillRect(0, 0, BW, BH);
+  ctx.fillStyle = '#c8d6e8';
+  ctx.fillRect(0, 0, BW, 4);
+  ctx.fillRect(0, BH - 4, BW, 4);
+  const panelW = 580;
+  ctx.fillStyle = C_DARK;
+  ctx.fillRect(0, 0, panelW, BH);
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = C_WHITE;
+  ctx.font = OF(700, 74);
+  ctx.fillText('OPTION', panelW / 2, BH / 2 - 42);
+  ctx.fillText('THROUGH LOT', panelW / 2, BH / 2 + 42);
+  ctx.restore();
+  ctx.fillStyle = '#c0d0e4';
+  ctx.fillRect(panelW, 0, 4, BH);
+  const rightCX = panelW + 4 + (BW - panelW - 4) / 2;
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = OF(700, 140);
+  ctx.fillStyle = C_SHADOW; ctx.fillText(banner.lotNumber, rightCX + SDX, BH / 2 + SDY);
+  ctx.fillStyle = C_DARK; ctx.fillText(banner.lotNumber, rightCX, BH / 2);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRAW DISPATCH
+// ═══════════════════════════════════════════════════════════════
+let currentStandardStyle = 1;
+let currentOptionStyle = 1;
+let allBanners = [];             // combined list of all banners to render/download
+let parsedCsvState = null;       // { rows, stats, tokens, groups }
+let banners_downloaded = false;  // gates the OBS JSON download
+
+async function drawBannerAsync(banner) {
+  const canvas = document.createElement('canvas');
+
+  if (banner.kind === 'option') {
+    // Option banner: 1500x380, transparent background
+    canvas.width = OBW;
+    canvas.height = OBH;
+    const ctx = canvas.getContext('2d');
+    if (currentOptionStyle === 1) {
+      // Style 1 is drawn natively in OBW x OBH (the new reference-image layout)
+      drawStyle1Option(ctx, banner);
+    } else {
+      // Style 2 is an older 1920x200 design — scale its draw code to fit the new canvas.
+      ctx.save();
+      ctx.scale(OBW / BW, OBH / BH);
+      drawStyle2Option(ctx, banner);
+      ctx.restore();
+    }
+    return canvas;
+  }
+
+  // Transition banner: render at 3840x400 by scaling the 1920-based draw code 2x in both axes.
+  // The draw funcs use BW=1920 / BH=200 internally; we upscale proportionally for sharp text.
+  canvas.width = TBW;
+  canvas.height = TBH;
+  const ctx = canvas.getContext('2d');
+  // Scale both axes proportionally (2x horizontal, 2x vertical) so the 1920x200 design fills 3840x400
+  ctx.scale(TBW / BW, TBH / BH);
+
+  const url = getStateImageUrl(banner.stateAbbr);
+  if (!url) {
+    if (currentStandardStyle === 1) drawStyle1Standard(ctx, banner, null);
+    else drawStyle2Standard(ctx, banner, null);
+    return canvas;
+  }
+  try {
+    const img = await loadImage(url);
+    if (currentStandardStyle === 1) drawStyle1Standard(ctx, banner, img);
+    else drawStyle2Standard(ctx, banner, img);
+  } catch {
+    if (currentStandardStyle === 1) drawStyle1Standard(ctx, banner, null);
+    else drawStyle2Standard(ctx, banner, null);
+  }
+  return canvas;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CSV PARSING — reads Working On CSV and produces:
+//   - tokens:  sequential list of (lot | breed_transition) for the scene renamer
+//   - groups:  normalized option groups with base numbers
+//   - banners: list of all banners to generate (transitions + option per group)
+// ═══════════════════════════════════════════════════════════════
+const STATE_MAP = {
+  'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA',
+  'Colorado':'CO','Connecticut':'CT','Delaware':'DE','Florida':'FL','Georgia':'GA',
+  'Hawaii':'HI','Idaho':'ID','Illinois':'IL','Indiana':'IN','Iowa':'IA','Kansas':'KS',
+  'Kentucky':'KY','Louisiana':'LA','Maine':'ME','Maryland':'MD','Massachusetts':'MA',
+  'Michigan':'MI','Minnesota':'MN','Mississippi':'MS','Missouri':'MO','Montana':'MT',
+  'Nebraska':'NE','Nevada':'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM',
+  'New York':'NY','North Carolina':'NC','North Dakota':'ND','Ohio':'OH','Oklahoma':'OK',
+  'Oregon':'OR','Pennsylvania':'PA','Rhode Island':'RI','South Carolina':'SC',
+  'South Dakota':'SD','Tennessee':'TN','Texas':'TX','Utah':'UT','Vermont':'VT',
+  'Virginia':'VA','Washington':'WA','West Virginia':'WV','Wisconsin':'WI','Wyoming':'WY'
+};
+
+function parseLocation(str) {
+  if (!str) return { city:'', stateAbbr:'' };
+  const first = str.split('\n')[0].trim();
+  const comma = first.lastIndexOf(',');
+  if (comma === -1) return { city: first, stateAbbr:'' };
+  const city = first.slice(0, comma).trim();
+  const raw = first.slice(comma + 1).trim();
+  const abbr = STATE_MAP[raw] || raw.toUpperCase().slice(0, 2);
+  return { city, stateAbbr: abbr };
+}
+
+function cleanCell(value) {
+  return String(value || '')
+    .replace(/^\uFEFF/, '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/\u2007/g, ' ')
+    .replace(/\u202F/g, ' ')
+    .trim()
+    .replace(/^"|"$/g, '');
+}
+
+// Detect breed transition marker from Reference # cell (column B)
+function getBreedTransitionName(value) {
+  const t = cleanCell(value).toLowerCase();
+  if (t === 'char x' || t === 'charx') return 'Charloais Transition';
+  if (t === 'natives') return 'Native Transition';
+  if (t === 'holstein steers') return 'Hosltein Transition';
+  return null;
+}
+
+// Convert a raw Lot Number (e.g. "401A", "402", "410B") to normalized form.
+// Option lots → "401-A".  Standard lots → "402".
+function normalizeLotFromField(rawLot, rawOption) {
+  let lot = cleanCell(rawLot);
+  if (!lot) return null;
+  lot = lot.replace(/^'+/, '');
+  lot = lot.replace(/[–—−]/g, '-');
+  lot = lot.replace(/\s+/g, ' ').trim();
+  if (/\d+\.\d+\.\d+\.\d+/.test(lot)) return null;
+  lot = lot.replace(/,/g, '').trim();
+  if (/^\d+\.0+$/.test(lot)) lot = lot.replace(/\.0+$/, '');
+  // Match: "401A", "401-A", "401 A", or "401"
+  const match = lot.match(/^(\d+)\s*[- ]?\s*([A-Za-z])?$/);
+  if (!match) return null;
+  const num = match[1];
+  let suffix = match[2] ? match[2].toUpperCase() : '';
+  // Fallback: if Option column has a letter and lot number has none, use Option column
+  if (!suffix && rawOption) {
+    const opt = cleanCell(rawOption).toUpperCase();
+    if (/^[A-Z]$/.test(opt)) suffix = opt;
+  }
+  if (!num || num === '0') return null;
+  return suffix ? `${num}-${suffix}` : num;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Main CSV parser
+// ═══════════════════════════════════════════════════════════════
+function parseWorkingOnCSV(text) {
+  const { data } = Papa.parse(text, { header: true, skipEmptyLines: false });
+
+  // Find header keys case-insensitively
+  const sampleKeys = data.length ? Object.keys(data[0]) : [];
+  const findKey = (re) => sampleKeys.find(k => re.test(String(k).trim())) || '';
+  const K = {
+    reference: findKey(/^reference\s*#?$/i),
+    option:    findKey(/^option$/i),
+    lot:       findKey(/^lot\s*number$/i),
+    consignor: findKey(/^consignor$/i),
+    location:  findKey(/^location$/i),
+  };
+  if (!K.lot) throw new Error('Could not find "Lot Number" column in CSV.');
+
+  const tokens = [];   // sequential tokens (lot / breed_transition) for scene renamer
+  const lotRows = [];  // all valid lot rows with metadata for banner generation
+  const stats = {
+    lotRows: 0,
+    breedMarkers: 0,
+    rejected: 0,
+  };
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    const ref = cleanCell(row[K.reference] || '');
+    const breedScene = getBreedTransitionName(ref);
+
+    if (breedScene) {
+      const last = tokens[tokens.length - 1];
+      if (!last || last.kind !== 'breed_transition' || last.name !== breedScene) {
+        tokens.push({ kind: 'breed_transition', name: breedScene });
+        stats.breedMarkers++;
+      }
+      continue;
+    }
+
+    const rawLot = row[K.lot] || '';
+    const rawOption = K.option ? (row[K.option] || '') : '';
+    const lot = normalizeLotFromField(rawLot, rawOption);
+
+    if (!lot) {
+      const raw = cleanCell(rawLot);
+      if (raw === '0' || raw === '0.0') stats.rejected++;
+      continue;
+    }
+
+    // Parse location/state
+    const locationRaw = String(row[K.location] || '').trim();
+    const loc = parseLocation(locationRaw);
+    const override = getLocationOverride(locationRaw);
+    const finalState = override || loc.stateAbbr;
+
+    // Detect whether this lot is an option lot (has "-X" suffix)
+    const optMatch = lot.match(/^(\d+)-([A-Z])$/);
+    const isOption = !!optMatch;
+    const optionBase = isOption ? optMatch[1] : null;
+    const optionLetter = isOption ? optMatch[2] : null;
+
+    const lotRow = {
+      lot,                 // normalized e.g. "401-A" or "402"
+      rawLot: cleanCell(rawLot),
+      isOption,
+      optionBase,
+      optionLetter,
+      consignor: cleanCell(row[K.consignor] || ''),
+      rawLocation: locationRaw,
+      city: loc.city,
+      stateAbbr: finalState,
+      locationDisplay: loc.city && finalState ? `${loc.city}, ${finalState}` : (loc.city || finalState || locationRaw),
+    };
+
+    // Dedupe — if same lot appears twice, ignore later occurrence
+    const lastTok = tokens[tokens.length - 1];
+    if (lastTok && lastTok.kind === 'lot' && lastTok.lot === lot) continue;
+
+    tokens.push({ kind: 'lot', lot });
+    lotRows.push(lotRow);
+    stats.lotRows++;
+  }
+
+  // Build option groups: run-length groups of consecutive option lots with same base
+  // Mirrors the renamer's own groupTokens logic
+  const groups = [];
+  let i = 0;
+  while (i < lotRows.length) {
+    const r = lotRows[i];
+    if (!r.isOption) { i++; continue; }
+    const base = r.optionBase;
+    const start = i;
+    while (i < lotRows.length && lotRows[i].isOption && lotRows[i].optionBase === base) i++;
+    const members = lotRows.slice(start, i);
+    if (members.length >= 2) {
+      groups.push({ base, letters: members.map(m => m.optionLetter), members });
+    }
+    // If only 1 option lot with a unique base, it's effectively a standard lot — no option banner needed.
+  }
+
+  return { tokens, lotRows, groups, stats, headerKeys: K };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Build the banner list from parsed CSV state.
+// Transition banner per lot, option banner per group (shared), attached to all members
+// EXCEPT the last one.
+// ═══════════════════════════════════════════════════════════════
+function buildBanners(parsed) {
+  const banners = [];
+
+  // Transition banners — one per lot
+  for (const row of parsed.lotRows) {
+    banners.push({
+      kind: 'transition',
+      lot: row.lot,
+      lotNumber: row.lot,  // display value on banner
+      consignor: row.consignor,
+      rawLocation: row.rawLocation,
+      city: row.city,
+      stateAbbr: row.stateAbbr,
+      locationDisplay: row.locationDisplay,
+      fileName: `Lot_${row.lot}_Transition.png`,
+    });
+  }
+
+  // Option banners — one per group
+  for (const group of parsed.groups) {
+    const lastLetter = group.letters[group.letters.length - 1];
+    const displayLot = `${group.base}-${lastLetter}`;  // e.g. "401-B" (hyphenated, matches scene names)
+    const groupKey = `${group.base}-Option`;
+    const attachedTo = group.members.slice(0, -1).map(m => m.lot); // all except last
+    banners.push({
+      kind: 'option',
+      lot: groupKey,
+      lotNumber: displayLot,      // shown on the banner
+      base: group.base,
+      attachedTo,                 // lot ids (e.g. ["401-A"]) whose Video scenes point at this banner
+      fileName: `Lot_${group.base}-Option.png`,
+      // no state/consignor needed for option banners
+      consignor: '',
+      rawLocation: '',
+      stateAbbr: '',
+      locationDisplay: '',
+    });
+  }
+
+  return banners;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// OBS SCENE COLLECTION BUILDER
+// Preserves the original scene renamer's behavior exactly,
+// then adds banner image sources and scene items.
+// ═══════════════════════════════════════════════════════════════
+function normalizeSceneName(name) { return String(name).replace(/\s+/g, ' ').trim(); }
+function isLotTransitionScene(name) { return /^\d+(-[A-Z])? Transition$/i.test(normalizeSceneName(name)); }
+function isLotVideoScene(name) { return /^\d+(-[A-Z])? Video$/i.test(normalizeSceneName(name)); }
+function isOptionLot(lot) { return /^\d+-[A-Z]$/i.test(String(lot).trim()); }
+function getOptionBase(lot) {
+  const m = String(lot).trim().toUpperCase().match(/^(\d+)-[A-Z]$/);
+  return m ? m[1] : null;
+}
+function isBreedTransitionScene(name) {
+  return ['Charloais Transition', 'Native Transition', 'Hosltein Transition'].includes(name);
+}
+function isOptionInterludeScene(name) {
+  return normalizeSceneName(name).startsWith('Option Lot Interlude');
+}
+
+function getSourceMap(templateData) {
+  const map = new Map();
+  for (const source of (templateData.sources || [])) {
+    if (source && source.name) map.set(normalizeSceneName(source.name), deepClone(source));
+  }
+  return map;
+}
+
+// Replicates the original renamer's groupTokens()
+function groupTokens(tokens) {
+  const groups = [];
+  let i = 0;
+  while (i < tokens.length) {
+    const token = tokens[i];
+    if (token.kind === 'breed_transition') { groups.push(token); i++; continue; }
+    if (token.kind !== 'lot') { i++; continue; }
+    if (!isOptionLot(token.lot)) {
+      groups.push({ kind: 'single_lot', rows: [token] });
+      i++; continue;
+    }
+    const base = getOptionBase(token.lot);
+    const optionRows = [token];
+    let j = i + 1;
+    while (j < tokens.length) {
+      const next = tokens[j];
+      if (next.kind !== 'lot') break;
+      if (!isOptionLot(next.lot)) break;
+      if (getOptionBase(next.lot) !== base) break;
+      optionRows.push(next); j++;
+    }
+    if (optionRows.length >= 2) {
+      groups.push({ kind: 'option_group', rows: optionRows });
+      i = j;
+    } else {
+      groups.push({ kind: 'single_lot', rows: [token] });
+      i++;
+    }
+  }
+  return groups;
+}
+
+function removeInterludesTouchingBreedTransitions(sceneNames) {
+  return sceneNames.filter((name, index, arr) => {
+    if (!isOptionInterludeScene(name)) return true;
+    const prev = index > 0 ? arr[index - 1] : null;
+    const next = index < arr.length - 1 ? arr[index + 1] : null;
+    if (prev && isBreedTransitionScene(prev)) return false;
+    if (next && isBreedTransitionScene(next)) return false;
+    return true;
+  });
+}
+
+// Build a sceneitem entry that OBS understands — modeled after an existing item in the template.
+// position and scale place the 1920x200 banner either at top or bottom of the 1920x1080 canvas.
+function makeBannerSceneItem(sourceName, sourceUuid, itemId, isOption) {
+  // Transition banner:  3840x200 PNG, placed at (0, CANVAS_H - 200) = (0, 1960) — bottom flush, full width.
+  // Option banner:      1920x200 PNG (transparent), placed centered at x=960, y=0 — top, centered.
+  const posX = isOption ? OPTION_POS_X     : TRANSITION_POS_X;
+  const posY = isOption ? OPTION_POS_Y     : TRANSITION_POS_Y;
+
+  // OBS pos_rel convention (observed in the existing template):
+  //   pos_rel_x = (pos_x - CANVAS_W/2) / (CANVAS_H/2)
+  //   pos_rel_y = (pos_y - CANVAS_H/2) / (CANVAS_H/2)
+  const halfH  = CANVAS_H / 2;
+  const posRelX = (posX - CANVAS_W / 2) / halfH;
+  const posRelY = (posY - CANVAS_H / 2) / halfH;
+
+  return {
+    name: sourceName,
+    source_uuid: sourceUuid,
+    visible: true,
+    locked: false,
+    rot: 0.0,
+    scale_ref: { x: CANVAS_W, y: CANVAS_H },  // 3840 x 2160
+    align: 5,             // top-left anchor
+    bounds_type: 0,
+    bounds_align: 0,
+    bounds_crop: false,
+    crop_left: 0, crop_top: 0, crop_right: 0, crop_bottom: 0,
+    id: itemId,
+    group_item_backup: false,
+    pos: { x: posX, y: posY },
+    pos_rel: { x: posRelX, y: posRelY },
+    scale: { x: 1.0, y: 1.0 },                // PNG is at native canvas resolution (1:1)
+    scale_rel: { x: 1.0, y: 1.0 },
+    bounds: { x: 0, y: 0 },
+    bounds_rel: { x: 0, y: 0 },
+    scale_filter: 'disable',
+    blend_method: 'default',
+    blend_type: 'normal',
+    show_transition: { duration: 0 },
+    hide_transition: { duration: 0 },
+    private_settings: {},
+  };
+}
+
+// Build a fresh image_source object pointing at the Dropbox path
+function makeBannerImageSource(fileName, sourceName) {
+  return {
+    prev_ver: 536936449,
+    name: sourceName,
+    uuid: uuidv4(),
+    id: 'image_source',
+    versioned_id: 'image_source',
+    settings: { file: DROPBOX_BANNER_PATH + fileName },
+    mixers: 0,
+    sync: 0,
+    flags: 0,
+    volume: 1.0,
+    balance: 0.5,
+    enabled: true,
+    muted: false,
+    'push-to-mute': false,
+    'push-to-mute-delay': 0,
+    'push-to-talk': false,
+    'push-to-talk-delay': 0,
+    hotkeys: {},
+    deinterlace_mode: 0,
+    deinterlace_field_order: 0,
+    monitoring_type: 0,
+    private_settings: {},
+  };
+}
+
+// Main: rebuild the OBS scene collection from the template + parsed tokens,
+// then attach banner image sources to every Transition and non-last-option Video scene.
+function buildObsJson(templateData, parsed) {
+  const sourceMap = getSourceMap(templateData);
+  const originalSceneNames = (templateData.scene_order || []).map(s => s.name);
+
+  const fixedStartScenes = ['CMS Logo','Waiting Room Scene','Intro Video','CMS Name Panel'];
+  const fixedEndScenes   = ['CMS Name Panel END','End Scene','THIS IS THE END','STOPPPPP','I AM SERIOUS'];
+  const breedTransitionScenes = ['Charloais Transition','Native Transition','Hosltein Transition'];
+
+  const optionInterludePool = originalSceneNames.filter(n => normalizeSceneName(n).startsWith('Option Lot Interlude'));
+  if (!optionInterludePool.length) throw new Error('No Option Lot Interlude scenes found in template.json.');
+
+  const lotTransitionPool = originalSceneNames.filter(n => isLotTransitionScene(n));
+  const lotVideoPool = originalSceneNames.filter(n => isLotVideoScene(n));
+  if (!lotTransitionPool.length || !lotVideoPool.length) throw new Error('Could not find lot Transition/Video scenes in template.json.');
+
+  const groups = groupTokens(parsed.tokens);
+  const finalSceneNames = [...fixedStartScenes];
+
+  // Which lot ids are option lots that should get option banners attached to their Video scenes
+  // (i.e. all members of each option group EXCEPT the last)
+  const optionBannerTargetsByLot = new Map(); // lot id -> { base, displayLot }
+  for (const g of parsed.groups) {
+    const lastLetter = g.letters[g.letters.length - 1];
+    const displayLot = `${g.base}-${lastLetter}`;
+    for (let k = 0; k < g.members.length - 1; k++) {
+      optionBannerTargetsByLot.set(g.members[k].lot, { base: g.base, displayLot });
+    }
+  }
+
+  let previousWasOptionGroup = false;
+  let interludePtr = 0;
+
+  for (const group of groups) {
+    if (group.kind === 'breed_transition') {
+      finalSceneNames.push(group.name);
+      previousWasOptionGroup = false;
+      continue;
+    }
+    if (group.kind === 'option_group') {
+      if (!previousWasOptionGroup) {
+        if (interludePtr >= optionInterludePool.length) throw new Error('Not enough Option Lot Interlude scenes in template.json.');
+        finalSceneNames.push(optionInterludePool[interludePtr++]);
+      }
+      for (const row of group.rows) {
+        finalSceneNames.push(row.lot + ' Transition');
+        finalSceneNames.push(row.lot + ' Video');
+      }
+      if (interludePtr >= optionInterludePool.length) throw new Error('Not enough Option Lot Interlude scenes in template.json.');
+      finalSceneNames.push(optionInterludePool[interludePtr++]);
+      previousWasOptionGroup = true;
+      continue;
+    }
+    if (group.kind === 'single_lot') {
+      for (const row of group.rows) {
+        finalSceneNames.push(row.lot + ' Transition');
+        finalSceneNames.push(row.lot + ' Video');
+      }
+      previousWasOptionGroup = false;
+    }
+  }
+
+  // Collapse consecutive interludes, strip interludes that touch breed transitions
+  let finalCompressed = [];
+  for (let i = 0; i < finalSceneNames.length; i++) {
+    const current = finalSceneNames[i];
+    const prev = finalCompressed[finalCompressed.length - 1];
+    if (isOptionInterludeScene(current) && prev && isOptionInterludeScene(prev)) continue;
+    finalCompressed.push(current);
+  }
+  finalCompressed = removeInterludesTouchingBreedTransitions(finalCompressed);
+  finalCompressed.push(...fixedEndScenes);
+
+  // Build cloned scenes from template
+  const newSceneOrder = [];
+  const newSceneSources = [];
+  const usedExactSceneNames = new Set();
+
+  let transitionPtr = 0;
+  let videoPtr = 0;
+
+  for (const targetName of finalCompressed) {
+    let templateSceneName = null;
+    const normalizedTarget = normalizeSceneName(targetName);
+
+    if (
+      fixedStartScenes.includes(targetName) ||
+      fixedEndScenes.includes(targetName) ||
+      breedTransitionScenes.includes(targetName) ||
+      normalizedTarget.startsWith('Option Lot Interlude')
+    ) {
+      templateSceneName = targetName;
+    } else if (isLotTransitionScene(targetName)) {
+      templateSceneName = transitionPtr < lotTransitionPool.length
+        ? lotTransitionPool[transitionPtr++]
+        : lotTransitionPool[lotTransitionPool.length - 1];
+    } else if (isLotVideoScene(targetName)) {
+      templateSceneName = videoPtr < lotVideoPool.length
+        ? lotVideoPool[videoPtr++]
+        : lotVideoPool[lotVideoPool.length - 1];
+    } else {
+      throw new Error('Unhandled target scene: ' + targetName);
+    }
+
+    if (usedExactSceneNames.has(normalizedTarget)) throw new Error('Duplicate scene name would be created: ' + targetName);
+    usedExactSceneNames.add(normalizedTarget);
+
+    const sourceTemplate = sourceMap.get(normalizeSceneName(templateSceneName));
+    if (!sourceTemplate) throw new Error('Could not find source template for: ' + templateSceneName);
+
+    const clonedSource = deepClone(sourceTemplate);
+    clonedSource.name = targetName;
+
+    newSceneOrder.push({ name: targetName });
+    newSceneSources.push(clonedSource);
+  }
+
+  // --- Attach banner image sources / scene items ---
+  // Create one image_source per transition banner and one per option group (shared).
+  const optionImageSourceByBase = new Map(); // base -> image_source object
+  for (const g of parsed.groups) {
+    const fileName = `Lot_${g.base}-Option.png`;
+    const sourceName = `Lot_${g.base}-Option`;
+    const imgSrc = makeBannerImageSource(fileName, sourceName);
+    optionImageSourceByBase.set(g.base, imgSrc);
+  }
+
+  const transitionImageSources = [];     // one per lot row
+  const transitionImageSourceByLot = new Map(); // lot id -> image_source
+  for (const row of parsed.lotRows) {
+    const fileName = `Lot_${row.lot}_Transition.png`;
+    const sourceName = `Lot_${row.lot}_Transition`;
+    const imgSrc = makeBannerImageSource(fileName, sourceName);
+    transitionImageSources.push(imgSrc);
+    transitionImageSourceByLot.set(row.lot, imgSrc);
+  }
+
+  // Walk each cloned scene and append banner items where appropriate
+  for (const scene of newSceneSources) {
+    const name = normalizeSceneName(scene.name);
+    const settings = scene.settings = scene.settings || {};
+    const items = settings.items = settings.items || [];
+
+    // compute next item id, and bump id_counter
+    let nextId = (settings.id_counter || items.length + 1);
+    nextId = Math.max(nextId, ...items.map(it => Number(it.id) || 0)) + 1;
+
+    // Is this a Transition scene for a lot we know about?
+    if (isLotTransitionScene(name)) {
+      const lot = name.replace(/ Transition$/i, '').trim();
+      const imgSrc = transitionImageSourceByLot.get(lot);
+      if (imgSrc) {
+        items.push(makeBannerSceneItem(imgSrc.name, imgSrc.uuid, nextId++, false));
+      }
+    }
+    // Is this a Video scene that should get an option banner?
+    else if (isLotVideoScene(name)) {
+      const lot = name.replace(/ Video$/i, '').trim();
+      const opt = optionBannerTargetsByLot.get(lot);
+      if (opt) {
+        const imgSrc = optionImageSourceByBase.get(opt.base);
+        if (imgSrc) {
+          items.push(makeBannerSceneItem(imgSrc.name, imgSrc.uuid, nextId++, true));
+        }
+      }
+    }
+
+    settings.id_counter = nextId;
+  }
+
+  // Non-scene sources from the original template (audio, video capture, existing image sources)
+  const nonSceneSources = (templateData.sources || [])
+    .filter(source => source.id !== 'scene')
+    .map(source => deepClone(source));
+
+  const output = deepClone(templateData);
+  output.scene_order = newSceneOrder;
+  output.sources = [
+    ...newSceneSources,
+    ...nonSceneSources,
+    ...transitionImageSources,
+    ...Array.from(optionImageSourceByBase.values()),
+  ];
+  output.current_scene = 'STOPPPPP';
+  output.current_program_scene = 'End Scene';
+
+  // ── Rename the old "25th Name slide.png" image source to "CMS Name Panel.png" ──
+  // Also update its file path from .../Random/25th Name slide.png
+  //                               to   .../Random/CMS Name Panel.png
+  // And update every scene item that references it by name.
+  const OLD_NAME = '25th Name slide.png';
+  const NEW_NAME = 'CMS Name Panel.png';
+  const OLD_FILE_SUFFIX = '/25th Name slide.png';
+  const NEW_FILE_SUFFIX = '/CMS Name Panel.png';
+  for (const src of output.sources) {
+    if (src && src.id === 'image_source' && src.name === OLD_NAME) {
+      src.name = NEW_NAME;
+      if (src.settings && typeof src.settings.file === 'string' && src.settings.file.endsWith(OLD_FILE_SUFFIX)) {
+        src.settings.file = src.settings.file.slice(0, -OLD_FILE_SUFFIX.length) + NEW_FILE_SUFFIX;
+      }
+    }
+    if (src && src.id === 'scene') {
+      const items = (src.settings && src.settings.items) || [];
+      for (const it of items) {
+        if (it && it.name === OLD_NAME) it.name = NEW_NAME;
+      }
+    }
+  }
+
+  return output;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UPLOAD / UI — step 1
+// ═══════════════════════════════════════════════════════════════
+async function loadCSV(file) {
+  const text = await file.text();
+  let parsed;
+  try {
+    parsed = parseWorkingOnCSV(text);
+  } catch (err) {
+    showToast(err.message, true);
+    return;
+  }
+  if (!parsed.lotRows.length) {
+    showToast('No valid lot rows found in that CSV.', true);
+    return;
+  }
+  parsedCsvState = parsed;
+  banners_downloaded = false;
+
+  const numOptLots = parsed.groups.reduce((s, g) => s + g.members.length, 0);
+  const numStdLots = parsed.lotRows.length - numOptLots;
+
+  document.getElementById('sTotalLots').textContent = parsed.lotRows.length;
+  document.getElementById('sStdLots').textContent = numStdLots;
+  document.getElementById('sOptLots').textContent = numOptLots;
+  document.getElementById('sOptGroups').textContent = parsed.groups.length;
+  document.getElementById('sBreedMarkers').textContent = parsed.stats.breedMarkers;
+
+  document.getElementById('uploadStatsRow').style.display = 'flex';
+  document.getElementById('uploadActions').style.display = 'flex';
+
+  showToast(`Parsed ${parsed.lotRows.length} lots (${parsed.groups.length} option groups)`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STYLE PICKER — step 2
+// ═══════════════════════════════════════════════════════════════
+function sampleBannerForStyle() {
+  // Pick a realistic example lot for the previews
+  if (parsedCsvState && parsedCsvState.groups.length) {
+    const g = parsedCsvState.groups[0];
+    const first = g.members[0];
+    const lastLetter = g.letters[g.letters.length - 1];
+    return {
+      std: {
+        kind: 'transition',
+        lotNumber: first.lot,
+        consignor: first.consignor || 'Example Consignor',
+        stateAbbr: first.stateAbbr || 'TX',
+        locationDisplay: first.locationDisplay || 'City, ST',
+      },
+      opt: {
+        kind: 'option',
+        lotNumber: `${g.base}-${lastLetter}`,  // hyphenated per spec
+      }
+    };
+  }
+  return {
+    std: { kind:'transition', lotNumber: '402', consignor: 'Example Consignor', stateAbbr: 'TX', locationDisplay: 'Hereford, TX' },
+    opt: { kind:'option', lotNumber: '401-B' },
+  };
+}
+
+async function renderStylePreviews() {
+  const samples = sampleBannerForStyle();
+
+  // Standard (transition) style previews: draw at 1920x200 design size — gets CSS-scaled in the card.
+  for (const [canvasId, styleNum] of [['pickStd1Canvas', 1], ['pickStd2Canvas', 2]]) {
+    const canvas = document.getElementById(canvasId);
+    canvas.width = BW; canvas.height = BH;
+    const ctx = canvas.getContext('2d');
+    let img = null;
+    try {
+      const url = getStateImageUrl(samples.std.stateAbbr);
+      if (url) img = await loadImage(url);
+    } catch {}
+    if (styleNum === 1) drawStyle1Standard(ctx, samples.std, img);
+    else drawStyle2Standard(ctx, samples.std, img);
+  }
+
+  // Option style previews: Style 1 is native OBWxOBH (1500x380), Style 2 is an older 1920x200 design.
+  for (const [canvasId, styleNum] of [['pickOpt1Canvas', 1], ['pickOpt2Canvas', 2]]) {
+    const canvas = document.getElementById(canvasId);
+    if (styleNum === 1) {
+      canvas.width = OBW; canvas.height = OBH;
+      const ctx = canvas.getContext('2d');
+      drawStyle1Option(ctx, samples.opt);
+    } else {
+      canvas.width = BW; canvas.height = BH;
+      const ctx = canvas.getContext('2d');
+      drawStyle2Option(ctx, samples.opt);
+    }
+  }
+}
+
+function pickStandardStyle(n) {
+  currentStandardStyle = n;
+  document.getElementById('pickStd1').classList.toggle('active', n === 1);
+  document.getElementById('pickStd2').classList.toggle('active', n === 2);
+}
+function pickOptionStyle(n) {
+  currentOptionStyle = n;
+  document.getElementById('pickOpt1').classList.toggle('active', n === 1);
+  document.getElementById('pickOpt2').classList.toggle('active', n === 2);
+}
+
+async function goToStyles() {
+  if (!parsedCsvState) { showToast('Upload a CSV first.', true); return; }
+  showPanel('styles');
+  await ensureStateIndex();
+  await renderStylePreviews();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GENERATE / REVIEW — step 3
+// ═══════════════════════════════════════════════════════════════
+async function ensureStateIndex() {
+  if (!stateIndexLoaded) await fetchStateIndex();
+}
+
+async function generateAndReview() {
+  if (!parsedCsvState) { showToast('Upload a CSV first.', true); return; }
+  allBanners = buildBanners(parsedCsvState);
+  await ensureStateIndex();
+  await promptForMissingStates();
+  showPanel('review');
+  await renderAllBanners();
+  updateStats();
+  banners_downloaded = false;
+  updateDownloadGates();
+  document.getElementById('statsRow').style.display = 'flex';
+  document.getElementById('ctrlRow').style.display = 'flex';
+}
+
+async function renderAllBanners() {
+  const wrap = document.getElementById('progressWrap');
+  wrap.classList.add('active');
+  const fill = document.getElementById('progressFill');
+  const ptxt = document.getElementById('progressText');
+  const ppct = document.getElementById('progressPct');
+  const grid = document.getElementById('bannerGrid');
+  grid.innerHTML = '';
+  if (!allBanners.length) {
+    grid.innerHTML = `<div class="empty"><p>No banners to render</p></div>`;
+    wrap.classList.remove('active'); fill.style.width = '0';
+    return;
+  }
+  for (let i = 0; i < allBanners.length; i++) {
+    const b = allBanners[i];
+    const pct = Math.round((i / allBanners.length) * 100);
+    fill.style.width = pct + '%'; ppct.textContent = pct + '%';
+    ptxt.textContent = `Rendering ${b.fileName}...`;
+    await new Promise(r => setTimeout(r, 0));
+    grid.appendChild(await makeCard(b));
+  }
+  fill.style.width = '100%'; ppct.textContent = '100%'; ptxt.textContent = 'Done';
+  setTimeout(() => { wrap.classList.remove('active'); fill.style.width = '0'; }, 250);
+  updateCountLabel(allBanners.length);
+}
+
+async function makeCard(banner) {
+  const card = document.createElement('div');
+  card.className = 'banner-card';
+  const canvas = await drawBannerAsync(banner);
+  card.dataset.lot = (banner.lot || '').toLowerCase();
+  card.dataset.consignor = (banner.consignor || '').toLowerCase();
+  card.dataset.state = (banner.stateAbbr || '').toLowerCase();
+  card.dataset.kind = banner.kind;
+  const needsState = banner.kind === 'transition' && !getStateImageInfo(banner.stateAbbr);
+  const chipClass = banner.kind === 'transition' ? 'transition' : 'option';
+  const chipLabel = banner.kind === 'transition' ? 'TRANSITION' : 'OPTION';
+  const footRight = banner.kind === 'option'
+    ? `attaches to ${esc((banner.attachedTo || []).join(', ') || '(none)')}`
+    : '';
+  card.innerHTML = `
+    <div class="banner-preview-shell"><div class="banner-canvas-wrap"></div></div>
+    <div class="banner-card-foot">
+      <div>
+        <span class="banner-kind-chip ${chipClass}">${chipLabel}</span>
+        <span class="lot-tag">${esc(banner.fileName)}${footRight ? ' · ' + footRight : ''}</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        ${needsState ? `<span class="missing-badge">No state image</span>` : ''}
+        <button class="btn btn-ghost btn-sm" data-lot="${esc(banner.lot)}" onclick="dlSingleFromCard(this)">Download PNG</button>
+      </div>
+    </div>`;
+  card.querySelector('.banner-canvas-wrap').appendChild(canvas);
+  return card;
+}
+
+function updateStats() {
+  const transitions = allBanners.filter(b => b.kind === 'transition');
+  const options = allBanners.filter(b => b.kind === 'option');
+  const missing = [...new Set(transitions.map(b => b.stateAbbr).filter(Boolean))].filter(s => !stateIndex[s]);
+  document.getElementById('sBanners').textContent = allBanners.length;
+  document.getElementById('sTransitions').textContent = transitions.length;
+  document.getElementById('sOptionBanners').textContent = options.length;
+  document.getElementById('sStates').textContent = new Set(transitions.map(b => b.stateAbbr).filter(Boolean)).size;
+  document.getElementById('sMissing').textContent = missing.length;
+  const el = document.getElementById('missingAlert');
+  if (missing.length > 0) {
+    el.style.display = 'block';
+    el.innerHTML = `<strong>Missing state images:</strong> ${missing.join(', ')} — upload these in the State Library tab before downloading.`;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function updateCountLabel(n) {
+  document.getElementById('countLabel').textContent = `${n} banner${n !== 1 ? 's' : ''}`;
+}
+
+function applySearch() {
+  const q = document.getElementById('searchBox').value.toLowerCase();
+  let vis = 0;
+  document.querySelectorAll('.banner-card').forEach(c => {
+    const match = !q || c.dataset.lot.includes(q) || c.dataset.consignor.includes(q) || c.dataset.state.includes(q);
+    c.style.display = match ? '' : 'none';
+    if (match) vis++;
+  });
+  updateCountLabel(vis);
+}
+
+function updateDownloadGates() {
+  const btn = document.getElementById('btnDownloadObs');
+  btn.disabled = !banners_downloaded;
+  btn.title = banners_downloaded ? '' : 'Download banners first';
+  if (banners_downloaded) {
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-success');
+  } else {
+    btn.classList.add('btn-primary');
+    btn.classList.remove('btn-success');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DOWNLOADS
+// ═══════════════════════════════════════════════════════════════
+function canvasToPNGBlob(canvas) {
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+function canvasToPNG(canvas, filename) {
+  const url = canvas.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+}
+
+async function dlSingleFromCard(btn) {
+  const lot = btn.getAttribute('data-lot');
+  const b = allBanners.find(x => x.lot === lot);
+  if (!b) return;
+  const canvas = await drawBannerAsync(b);
+  canvasToPNG(canvas, b.fileName);
+}
+
+async function dlAllBanners() {
+  const btn = document.getElementById('btnZip');
+  btn.disabled = true;
+  const origText = btn.textContent;
+  btn.textContent = 'Generating...';
+  const wrap = document.getElementById('progressWrap');
+  wrap.classList.add('active');
+  const fill = document.getElementById('progressFill');
+  const ptxt = document.getElementById('progressText');
+  const ppct = document.getElementById('progressPct');
+  const zip = new JSZip();
+  const list = allBanners.filter(b => {
+    const c = document.querySelector(`.banner-card[data-lot="${CSS.escape(b.lot.toLowerCase())}"]`);
+    return !c || c.style.display !== 'none';
+  });
+  for (let i = 0; i < list.length; i++) {
+    const b = list[i];
+    const pct = Math.round((i / list.length) * 100);
+    fill.style.width = pct + '%'; ppct.textContent = pct + '%';
+    ptxt.textContent = `Generating ${b.fileName}...`;
+    await new Promise(r => setTimeout(r, 0));
+    const canvas = await drawBannerAsync(b);
+    const blob = await canvasToPNGBlob(canvas);
+    zip.file(b.fileName, blob);
+  }
+  ppct.textContent = '100%'; ptxt.textContent = 'Zipping...';
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'CMS_Auction_Banners.zip'; a.click();
+  URL.revokeObjectURL(url);
+  wrap.classList.remove('active'); fill.style.width = '0';
+  btn.disabled = false; btn.textContent = origText;
+  banners_downloaded = true;
+  updateDownloadGates();
+  showToast(`${list.length} banners downloaded — now download the OBS scene collection`);
+}
+
+async function dlObsJson() {
+  if (!parsedCsvState) { showToast('No parsed CSV in memory.', true); return; }
+  const btn = document.getElementById('btnDownloadObs');
+  btn.disabled = true;
+  const origText = btn.textContent;
+  btn.textContent = 'Building OBS JSON...';
+  try {
+    const templateResp = await fetch('./template.json', { cache: 'no-store' });
+    if (!templateResp.ok) throw new Error('Could not load template.json.');
+    const templateData = await templateResp.json();
+    const output = buildObsJson(templateData, parsedCsvState);
+    const blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'CMS_Auction_Scene_Collection.json'; a.click();
+    URL.revokeObjectURL(url);
+    showToast('OBS scene collection downloaded');
+  } catch (err) {
+    console.error(err);
+    showToast(err.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = origText;
+    updateDownloadGates();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RESET FLOWS
+// ═══════════════════════════════════════════════════════════════
+function resetUpload() {
+  parsedCsvState = null;
+  allBanners = [];
+  banners_downloaded = false;
+  document.getElementById('csvInput').value = '';
+  document.getElementById('uploadStatsRow').style.display = 'none';
+  document.getElementById('uploadActions').style.display = 'none';
+}
+function resetAll() {
+  resetUpload();
+  document.getElementById('bannerGrid').innerHTML = `<div class="empty"><p>No banners yet</p></div>`;
+  document.getElementById('statsRow').style.display = 'none';
+  document.getElementById('ctrlRow').style.display = 'none';
+  document.getElementById('missingAlert').style.display = 'none';
+  showPanel('upload');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN — State Library (unchanged behavior)
+// ═══════════════════════════════════════════════════════════════
+let pendingImgFile = null;
+
+function unlockAdmin() {
+  document.getElementById('adminGate').style.display = 'none';
+  document.getElementById('adminContent').style.display = 'block';
+  sessionStorage.setItem(PIN_KEY, '1');
+  updateTokenStatus(); syncRepoForm();
+  fetchStateIndex().catch(err => showToast(err.message, true));
+}
+function lockAdmin() {
+  sessionStorage.removeItem(PIN_KEY);
+  setSessionToken('');
+  document.getElementById('adminGate').style.display = 'block';
+  document.getElementById('adminContent').style.display = 'none';
+  document.getElementById('pinInput').value = '';
+  document.getElementById('ghToken').value = '';
+  document.getElementById('pinMsg').textContent = 'Enter the admin code to manage shared state images.';
+}
+function checkAdminPin() {
+  const val = document.getElementById('pinInput').value.trim();
+  const pinMsg = document.getElementById('pinMsg');
+  if (val === ADMIN_PIN) { pinMsg.textContent = 'Code accepted.'; unlockAdmin(); }
+  else { pinMsg.textContent = 'Invalid code.'; showToast('Invalid admin code', true); }
+}
+async function testRepoConnection() {
+  if (!repoIsConfigured()) throw new Error('Save valid repo settings first.');
+  const cfg = loadRepoConfig();
+  const url = `${GITHUB_API}/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}`;
+  return githubFetchJson(url, { headers: githubHeaders(false) });
+}
+async function getExistingFile(path) {
+  try { return await githubFetchJson(buildContentsUrl(path, true), { headers: githubHeaders(true) }); }
+  catch (err) { if (String(err.message).includes('404')) return null; throw err; }
+}
+function fileToBase64Content(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const r = String(reader.result || '');
+      const comma = r.indexOf(',');
+      resolve(comma >= 0 ? r.slice(comma + 1) : r);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+async function putFileToGitHub(path, base64Content, message, sha = null) {
+  const cfg = loadRepoConfig();
+  const body = { message, content: base64Content, branch: cfg.branch };
+  if (sha) body.sha = sha;
+  return githubFetchJson(buildContentsUrl(path, false), {
+    method: 'PUT',
+    headers: { ...githubHeaders(true), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+}
+async function deleteGitHubFile(path, sha, message) {
+  const cfg = loadRepoConfig();
+  return githubFetchJson(buildContentsUrl(path, false), {
+    method: 'DELETE',
+    headers: { ...githubHeaders(true), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, sha, branch: cfg.branch })
+  });
+}
+
+async function saveStateToGitHub() {
+  const abbr = document.getElementById('stateAbbrInput').value.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(abbr)) { showToast('State abbreviation must be 2 letters.', true); return; }
+  if (!pendingImgFile) { showToast('Drop a PNG or SVG file first.', true); return; }
+  if (!repoIsConfigured()) { showToast('Save repo settings first.', true); return; }
+  if (!getSessionToken()) { showToast('Load a GitHub token first.', true); return; }
+  const ext = pendingImgFile.name.toLowerCase().endsWith('.svg') ? 'svg' : 'png';
+  const msg = document.getElementById('adminMsg');
+  msg.textContent = 'Uploading...';
+  try {
+    // Remove any existing file for this abbr with the OTHER extension
+    const otherExt = ext === 'png' ? 'svg' : 'png';
+    const otherPath = `${STATES_DIR}/${abbr}.${otherExt}`;
+    const existingOther = await getExistingFile(otherPath);
+    if (existingOther && existingOther.sha) {
+      await deleteGitHubFile(otherPath, existingOther.sha, `Remove ${abbr}.${otherExt}`);
+    }
+    const path = `${STATES_DIR}/${abbr}.${ext}`;
+    const existing = await getExistingFile(path);
+    const base64 = await fileToBase64Content(pendingImgFile);
+    await putFileToGitHub(path, base64, `Update ${abbr}.${ext}`, existing ? existing.sha : null);
+    msg.textContent = `Uploaded ${abbr}.${ext}.`;
+    showToast(`${abbr}.${ext} uploaded`);
+    pendingImgFile = null;
+    document.getElementById('imgInput').value = '';
+    document.getElementById('imgThumb').style.display = 'none';
+    document.getElementById('stateAbbrInput').value = '';
+    await fetchStateIndex();
+  } catch (err) {
+    console.error(err);
+    msg.textContent = 'Upload failed.';
+    showToast(err.message, true);
+  }
+}
+
+async function deleteState(abbr) {
+  const info = getStateImageInfo(abbr);
+  if (!info) return;
+  if (!confirm(`Delete ${info.name} from the repository?`)) return;
+  try {
+    await deleteGitHubFile(info.path, info.sha, `Remove ${info.name}`);
+    showToast(`${info.name} deleted`);
+    await fetchStateIndex();
+  } catch (err) {
+    console.error(err);
+    showToast(err.message, true);
+  }
+}
+
+function renderLibrary() {
+  const grid = document.getElementById('stateLibGrid');
+  const count = document.getElementById('libCount');
+  const abbrs = Object.keys(stateIndex).sort();
+  count.textContent = abbrs.length;
+  if (!abbrs.length) {
+    grid.innerHTML = `<p class="no-states">No state images found in the repository yet.</p>`;
+    return;
+  }
+  grid.innerHTML = abbrs.map(a => {
+    const info = stateIndex[a];
+    return `<div class="state-lib-card">
+      <img src="${info.download_url}?v=${encodeURIComponent(info.sha || '')}" alt="${a}">
+      <div class="state-lib-label">
+        <span class="state-abbr">${a}</span>
+        <button class="del-btn" onclick="deleteState('${a}')" title="Delete">×</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EVENT WIRING
+// ═══════════════════════════════════════════════════════════════
+const csvDrop = document.getElementById('csvDrop');
+const csvInput = document.getElementById('csvInput');
+csvInput.addEventListener('change', e => {
+  if (e.target.files[0]) loadCSV(e.target.files[0]).catch(err => showToast(err.message, true));
+});
+csvDrop.addEventListener('dragover', e => { e.preventDefault(); csvDrop.classList.add('drag-over'); });
+csvDrop.addEventListener('dragleave', () => csvDrop.classList.remove('drag-over'));
+csvDrop.addEventListener('drop', e => {
+  e.preventDefault(); csvDrop.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) loadCSV(e.dataTransfer.files[0]).catch(err => showToast(err.message, true));
+});
+
+document.getElementById('btnResetUpload').addEventListener('click', resetUpload);
+document.getElementById('btnToStyles').addEventListener('click', () => goToStyles().catch(err => showToast(err.message, true)));
+
+document.getElementById('btnBackToUpload').addEventListener('click', () => showPanel('upload'));
+document.getElementById('btnGenerate').addEventListener('click', () => generateAndReview().catch(err => showToast(err.message, true)));
+
+document.getElementById('btnBackToStyles').addEventListener('click', () => showPanel('styles'));
+document.getElementById('btnResetAll').addEventListener('click', resetAll);
+document.getElementById('btnZip').addEventListener('click', () => dlAllBanners().catch(err => showToast(err.message, true)));
+document.getElementById('btnDownloadObs').addEventListener('click', () => dlObsJson().catch(err => showToast(err.message, true)));
+document.getElementById('searchBox').addEventListener('input', applySearch);
+
+document.getElementById('btnPinEnter').addEventListener('click', checkAdminPin);
+document.getElementById('pinInput').addEventListener('keypress', e => { if (e.key === 'Enter') checkAdminPin(); });
+document.getElementById('btnLockAdmin').addEventListener('click', lockAdmin);
+document.getElementById('btnSaveRepoConfig').addEventListener('click', () => {
+  const owner = document.getElementById('ghOwner').value.trim();
+  const repo = document.getElementById('ghRepo').value.trim();
+  const branch = document.getElementById('ghBranch').value.trim() || 'main';
+  saveRepoConfig({ owner, repo, branch });
+  showToast('Repo settings saved');
+  stateIndexLoaded = false;
+});
+document.getElementById('btnTestRepo').addEventListener('click', async () => {
+  try { const data = await testRepoConnection(); showToast(`Connected to ${data.full_name}`); }
+  catch (err) { showToast(err.message, true); }
+});
+document.getElementById('btnSaveToken').addEventListener('click', () => {
+  const token = document.getElementById('ghToken').value.trim();
+  if (!token) { showToast('Paste a GitHub token first.', true); return; }
+  setSessionToken(token);
+  document.getElementById('ghToken').value = '';
+  showToast('Token loaded for this session');
+});
+document.getElementById('btnClearToken').addEventListener('click', () => {
+  setSessionToken('');
+  document.getElementById('ghToken').value = '';
+  showToast('Token cleared');
+});
+document.getElementById('btnRefreshLibrary').addEventListener('click', async () => {
+  try { await fetchStateIndex(); showToast('Library refreshed'); }
+  catch (err) { showToast(err.message, true); }
+});
+document.getElementById('btnSaveState').addEventListener('click', saveStateToGitHub);
+document.getElementById('stateAbbrInput').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+
+const imgDrop = document.getElementById('imgDrop');
+const imgInput = document.getElementById('imgInput');
+function handleImgFile(file) {
+  const name = file.name.toLowerCase();
+  if (!name.endsWith('.png') && !name.endsWith('.svg')) { showToast('Only PNG or SVG files are allowed.', true); return; }
+  pendingImgFile = file;
+  document.getElementById('adminMsg').textContent = `Ready: ${file.name}`;
+  if (name.endsWith('.svg')) {
+    const blobUrl = URL.createObjectURL(file);
+    const th = document.getElementById('imgThumb');
+    th.src = blobUrl; th.style.display = 'block';
+  } else {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const th = document.getElementById('imgThumb');
+      th.src = e.target.result; th.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+}
+imgInput.addEventListener('change', e => { if (e.target.files[0]) handleImgFile(e.target.files[0]); });
+imgDrop.addEventListener('dragover', e => { e.preventDefault(); imgDrop.classList.add('drag-over'); });
+imgDrop.addEventListener('dragleave', () => imgDrop.classList.remove('drag-over'));
+imgDrop.addEventListener('drop', e => {
+  e.preventDefault(); imgDrop.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleImgFile(e.dataTransfer.files[0]);
+});
+
+window.dlSingleFromCard = dlSingleFromCard;
+window.deleteState = deleteState;
+window.showPage = showPage;
+window.pickStandardStyle = pickStandardStyle;
+window.pickOptionStyle = pickOptionStyle;
+
+// ═══════════════════════════════════════════════════════════════
+// INITIALIZE
+// ═══════════════════════════════════════════════════════════════
+(function init() {
+  syncRepoForm();
+  updateRepoStatus();
+  updateTokenStatus();
+  // Phase 3: PIN gate removed. Suite shell now provides auth.
+  // Auto-unlock admin on every load.
+  unlockAdmin();
+  fetchStateIndex().catch(err => { console.warn(err); renderLibrary(); });
+  showPanel('upload');
+})();
+</script>
+</body>
+</html>

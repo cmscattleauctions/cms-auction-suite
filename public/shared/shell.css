@@ -1,0 +1,301 @@
+/* =============================================================
+ * CMS Auction Suite — Shell layout
+ * -------------------------------------------------------------
+ * Owns the outer chrome: brand bar, sidebar nav (desktop),
+ * bottom nav (mobile), and the iframe container that hosts
+ * each sub-app.
+ *
+ * Sub-apps render INSIDE an <iframe> so their existing CSS
+ * doesn't leak into the shell, and the shell's CSS doesn't
+ * disturb their internal layout. This is a deliberate choice:
+ *  - keeps each sub-app's working state intact during migration
+ *  - lets us migrate apps to a non-iframe approach later if
+ *    we want to, without redesigning the shell
+ * ============================================================= */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* =============================================================
+ * Sidebar (desktop)
+ * ============================================================= */
+
+.sidebar {
+  background: var(--sidebar-bg);
+  color: var(--sidebar-fg);
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--sidebar-divider);
+  overflow-y: auto;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-4);
+  border-bottom: 1px solid var(--sidebar-divider);
+}
+
+.sidebar-brand-mark {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--accent-soft);
+  flex-shrink: 0;
+}
+
+.sidebar-brand-mark svg { width: 22px; height: 22px; }
+
+.sidebar-brand-text {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sidebar-fg);
+}
+
+.sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-3);
+  gap: 2px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px var(--space-3);
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--sidebar-fg-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
+}
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--sidebar-fg);
+}
+.nav-item.active {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-active-fg);
+  border-color: var(--sidebar-active-border);
+}
+
+.nav-item-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+/* User area pinned to bottom of sidebar */
+.sidebar-user {
+  padding: var(--space-3);
+  border-top: 1px solid var(--sidebar-divider);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.user-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 11px;
+  color: var(--sidebar-fg-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.user-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+}
+
+.signout-btn {
+  width: 100%;
+  padding: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.signout-btn:hover { background: var(--bg-surface-hover); }
+
+/* =============================================================
+ * Main content area + iframe host
+ * ============================================================= */
+
+.content {
+  position: relative;
+  background: var(--bg-canvas);
+  overflow: hidden;
+}
+
+.app-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: var(--bg-canvas);
+}
+
+/* Loading state shown briefly while iframe is empty / changing */
+.app-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.app-loading.visible { opacity: 1; }
+
+/* Placeholder shown for tabs whose app isn't wired up yet (Phase 1) */
+.placeholder {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: var(--space-7);
+}
+
+.placeholder-card {
+  max-width: 520px;
+  text-align: center;
+}
+
+.placeholder-card .card-title {
+  margin-bottom: var(--space-3);
+}
+
+.placeholder-card h2 {
+  font-size: 24px;
+  margin-bottom: var(--space-3);
+}
+
+.placeholder-card p {
+  color: var(--text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.placeholder-card .phase-tag {
+  display: inline-block;
+  margin-top: var(--space-4);
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-radius: var(--radius-sm);
+}
+
+/* =============================================================
+ * Mobile layout: sidebar collapses to bottom nav
+ * ============================================================= */
+
+@media (max-width: 768px) {
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr var(--mobile-nav-height);
+  }
+
+  .sidebar {
+    grid-row: 2;
+    flex-direction: row;
+    border-right: none;
+    border-top: 1px solid var(--sidebar-divider);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .sidebar-brand,
+  .sidebar-user {
+    display: none;     /* surfaced via a topbar on mobile, not bottom */
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    width: 100%;
+    padding: var(--space-2);
+    gap: var(--space-1);
+  }
+
+  .nav-item {
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 4px;
+    font-size: 10px;
+    text-align: center;
+    min-width: 0;
+  }
+
+  .content {
+    grid-row: 1;
+  }
+
+  /* Mobile gets a thin top bar with brand + sign-out */
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    background: var(--sidebar-bg);
+    color: var(--sidebar-fg);
+    border-bottom: 1px solid var(--sidebar-divider);
+    height: 52px;
+    flex-shrink: 0;
+  }
+
+  .mobile-topbar .sidebar-brand-text {
+    color: var(--sidebar-fg);
+  }
+
+  .mobile-topbar .signout-btn {
+    width: auto;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .app-frame, .placeholder {
+    flex: 1;
+  }
+}
+
+/* Hide mobile-only elements on desktop */
+@media (min-width: 769px) {
+  .mobile-topbar { display: none; }
+}

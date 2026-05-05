@@ -1,0 +1,27 @@
+# Netlify configuration for CMS Auction Suite
+#
+# This is a static site with no build step. Netlify just serves the
+# contents of `public/` directly.
+#
+# To change the publish directory later, edit `publish` below.
+
+[build]
+  publish = "public"
+  command = ""
+
+# SPA-style fallback for the shell. If a user reloads at /listings,
+# /banners, etc. and there's no exact file match, fall through to
+# index.html so the shell can route them to the right tab.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+
+# Sensible default headers. Tighten CSP later if needed.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
