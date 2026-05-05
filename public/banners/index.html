@@ -421,8 +421,9 @@ const BW = 1920, BH = 200;
 // Option:     1500x380, top-left aligned.               pos = (0, 0)
 const TRANSITION_POS_X = 0;
 const TRANSITION_POS_Y = CANVAS_H - TBH;     // 1760 — bottom flush
-const OPTION_POS_X = 0;                       // 0 — left flush
-const OPTION_POS_Y = 0;                       // 0 — top flush
+const OPTION_POS_X = 45;                      // 45 — inset from left
+const OPTION_POS_Y = 45;                      // 45 — inset from top
+const OPTION_SCALE = 0.7;                     // 70% scale; PNG stays full-res
 
 // ═══════════════════════════════════════════════════════════════
 // UTILITIES
@@ -1295,8 +1296,12 @@ function makeBannerSceneItem(sourceName, sourceUuid, itemId, isOption) {
     group_item_backup: false,
     pos: { x: posX, y: posY },
     pos_rel: { x: posRelX, y: posRelY },
-    scale: { x: 1.0, y: 1.0 },                // PNG is at native canvas resolution (1:1)
-    scale_rel: { x: 1.0, y: 1.0 },
+    scale: isOption
+      ? { x: OPTION_SCALE, y: OPTION_SCALE }
+      : { x: 1.0, y: 1.0 },
+    scale_rel: isOption
+      ? { x: OPTION_SCALE, y: OPTION_SCALE }
+      : { x: 1.0, y: 1.0 },
     bounds: { x: 0, y: 0 },
     bounds_rel: { x: 0, y: 0 },
     scale_filter: 'disable',
