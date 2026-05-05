@@ -1,21 +1,26 @@
 /* =============================================================
  * CMS Auction Suite — Auth module
  * -------------------------------------------------------------
- * Wraps Firebase Auth. Handles:
+ * Wraps Firebase Auth + Firestore. Handles:
  *   - Email/password login
- *   - Email/password sign-up (creates pending account)
- *   - Approval gate: checks `approved === true` custom claim
+ *   - Email/password sign-up (creates pending account + Firestore doc)
+ *   - Approval gate: checks Firestore doc field `approved === true`
  *   - Sign-out
- *   - Initial state resolution (waits for Firebase to know who
- *     you are before showing any UI — prevents flicker)
+ *   - Initial state resolution
  *
  * Approval flow:
  *   1. User signs up → Firebase creates account → user is signed in
- *   2. App checks token claims for `approved`
- *   3. If approved: shows the suite shell
- *   4. If not: shows pending screen with sign-out
- *   5. Owner approves via Firebase Console (sets custom claim)
- *   6. User refreshes → token refreshes → claim seen → admitted
+ *   2. We create users/{uid} in Firestore with { approved: false, ... }
+ *   3. App reads users/{uid} on every load
+ *   4. If approved: shows the suite shell
+ *   5. If not: shows pending screen with sign-out
+ *   6. Owner approves via Firebase Console (toggles `approved: true`)
+ *   7. User refreshes → doc re-read → admitted
+ *
+ * Why Firestore not custom claims:
+ *   Custom claims require the Firebase Admin SDK, which requires a
+ *   service account key. Some Google Workspace org policies block
+ *   service account key creation. Firestore needs no admin SDK.
  * ============================================================= */
 
 import {
@@ -26,15 +31,20 @@ import {
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
   signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+import {
+  getFirestore, doc, getDoc, setDoc, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
 import { firebaseConfig, FIREBASE_CONFIGURED } from './firebase-config.js';
 
 /* ----- Initialize ----- */
 let app = null;
 let auth = null;
+let db = null;
 if (FIREBASE_CONFIGURED) {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
+  db = getFirestore(app);
 }
 
 /* =============================================================
@@ -48,8 +58,6 @@ if (FIREBASE_CONFIGURED) {
  *   { state: 'pending',  user }      — signed in but not approved
  *   { state: 'approved', user }      — full access
  *   { state: 'demo' }                — Firebase not configured
- *
- * The shell uses this on boot to decide what to show.
  */
 export function resolveAuthState() {
   if (!FIREBASE_CONFIGURED) {
@@ -81,15 +89,14 @@ export async function login(email, password) {
 
 export async function signup(email, password) {
   if (!FIREBASE_CONFIGURED) throw new Error('Firebase not configured');
-  await createUserWithEmailAndPassword(auth, email, password);
-  // The new user is signed in immediately but has no `approved` claim.
-  // The approval gate in resolveAuthState() will route them to the
-  // pending screen until you set the claim in Firebase Console.
+  const cred = await createUserWithEmailAndPassword(auth, email, password);
+  // Create the pending user doc immediately. Security rules ensure
+  // the user can only create their OWN doc, and only with approved:false.
+  await ensureUserDoc(cred.user);
 }
 
 export async function logout() {
   if (!FIREBASE_CONFIGURED) {
-    // Demo mode: just reload to "reset" state
     location.reload();
     return;
   }
@@ -102,19 +109,38 @@ export async function resetPassword(email) {
 }
 
 /* =============================================================
- * Internal: check approved claim
+ * Internal: check approved doc
  * -------------------------------------------------------------
- * We force-refresh the ID token so newly-set claims are seen
- * without requiring the user to log out and back in.
+ * Reads users/{uid} from Firestore. If the doc doesn't exist yet
+ * (e.g. user signed up before this version of the code shipped),
+ * we create it with approved:false so the admin can find it.
  * ============================================================= */
 async function checkApproved(user) {
   try {
-    const token = await user.getIdTokenResult(/* forceRefresh */ true);
-    return token.claims.approved === true;
+    const ref = doc(db, 'users', user.uid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      // Backfill: legacy account with no doc yet
+      await ensureUserDoc(user);
+      return false;
+    }
+    return snap.data().approved === true;
   } catch (err) {
-    console.error('[auth] Failed to read claims:', err);
+    console.error('[auth] Failed to read approval doc:', err);
     return false;
   }
+}
+
+async function ensureUserDoc(user) {
+  if (!user) return;
+  const ref = doc(db, 'users', user.uid);
+  const snap = await getDoc(ref);
+  if (snap.exists()) return;
+  await setDoc(ref, {
+    email:     user.email || '',
+    approved:  false,
+    createdAt: serverTimestamp(),
+  });
 }
 
 /* =============================================================
