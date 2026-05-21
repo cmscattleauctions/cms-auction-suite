@@ -89,6 +89,8 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .ed-tools .grp{display:flex;gap:6px;align-items:center}
 .ed-tools .vr{width:1px;height:22px;background:#333d68;margin:0 4px}
 .ed-tools .lbl{font-size:11px;color:var(--dim);letter-spacing:.6px;text-transform:uppercase}
+.ed-tools select{height:31px;background:#0e1330;border:1.5px solid #2c3563;color:var(--txt);border-radius:6px;padding:0 8px;font-family:inherit;font-size:12.5px}
+.ed-tools .col-w-val{min-width:42px;text-align:center}
 .ed-canvas{flex:1;overflow:auto;padding:30px;background:#0c1024;text-align:center}
 .zoomwrap{display:inline-block;transform-origin:top center}
 
@@ -252,6 +254,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .thumb .tlabel{background:rgba(19,24,32,.9);color:#f5d491;}
 .ed-tools{background:#fff;border-bottom:1px solid #e6e0d4;}
 .ed-tools .vr{background:#e6e0d4;}
+.ed-tools select{background:#fff;border:1px solid #d4cdbd;color:#1a1d23;}
 .ed-canvas{background:#f5f1ea;}
 .sheet{box-shadow:0 10px 28px rgba(19,24,32,.18);}
 .s-title h1{color:#131820;}
@@ -398,6 +401,15 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
             <button class="btn ghost sm" id="txtPlus">A+</button>
           </div>
           <div class="vr"></div>
+          <div class="grp">
+            <span class="lbl">Column</span>
+            <select id="colPick"></select>
+            <button class="btn ghost sm" id="colMinus">−</button>
+            <span class="lbl col-w-val" id="colWVal">—</span>
+            <button class="btn ghost sm" id="colPlus">+</button>
+            <button class="btn ghost sm" id="colReset">Reset</button>
+          </div>
+          <div class="vr"></div>
           <div class="grp"><button class="btn ghost sm" id="autofit">Auto-fit Pages</button></div>
           <div class="vr"></div>
           <div class="grp">
@@ -438,7 +450,8 @@ const S = {
     email:'info@cattlemarketingservices.com',web:'www.CattleMarketingServices.com',
     addr:'6900 I40 West, Ste 135, Amarillo, TX 79106'},
   issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:''},
-  sections:[], zoom:.70, rowStep:14, textScale:1
+  sections:[], zoom:.70, rowStep:14, textScale:1,
+  colWidths:{lot:52,seller:138,head:40,desc:146,sex:82,basewt:54,delivery:82,shrink:54,slide:82,notes:250,price:44}
 };
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const MONTHS=['January','February','March','April','May','June','July','August',
@@ -620,13 +633,49 @@ function allPages(){
 /* ===== render one sheet ===== */
 const COLS=['lot','seller','head','desc','sex','basewt','delivery','shrink',
   'slide','notes','price'];
-const GRID='52px 118px 40px 146px 82px 54px 82px 54px 82px 1fr 78px';
 const HEADLABELS={lot:'Lot',seller:'Seller / Location',head:'Head',desc:'Description',
   sex:'Sex',basewt:'Base WT',delivery:'Delivery',shrink:'Shrink',slide:'Slide',
   notes:'Notes',price:'Price'};
+const DEFAULT_COL_WIDTHS={lot:52,seller:138,head:40,desc:146,sex:82,basewt:54,delivery:82,shrink:54,slide:82,notes:250,price:44};
+const MIN_COL_WIDTHS={lot:38,seller:90,head:32,desc:90,sex:56,basewt:44,delivery:58,shrink:42,slide:58,notes:110,price:34};
+const TABLE_W=1024;
+function gridTemplate(){return COLS.map(c=>Math.round(S.colWidths[c])+'px').join(' ');}
+function normalizeColWidths(){
+  COLS.forEach(c=>{if(!Number.isFinite(S.colWidths[c]))S.colWidths[c]=DEFAULT_COL_WIDTHS[c];});
+  let total=COLS.reduce((sum,c)=>sum+S.colWidths[c],0);
+  S.colWidths.notes+=TABLE_W-total;
+  if(S.colWidths.notes<MIN_COL_WIDTHS.notes){
+    const need=MIN_COL_WIDTHS.notes-S.colWidths.notes;
+    S.colWidths.notes=MIN_COL_WIDTHS.notes;
+    S.colWidths.desc=Math.max(MIN_COL_WIDTHS.desc,S.colWidths.desc-need);
+  }
+}
+function changeColumnWidth(col,delta){
+  if(!COLS.includes(col))return;
+  const target=S.colWidths[col];
+  const next=Math.max(MIN_COL_WIDTHS[col],target+delta);
+  const actual=next-target;
+  if(!actual)return;
+  let donor=col==='notes'?'desc':'notes';
+  if(S.colWidths[donor]-actual<MIN_COL_WIDTHS[donor])donor=donor==='notes'?'desc':'notes';
+  if(S.colWidths[donor]-actual<MIN_COL_WIDTHS[donor]){toast('No room to adjust that column more.');return;}
+  S.colWidths[col]=next;
+  S.colWidths[donor]-=actual;
+  updateColControls();
+  renderEditor();
+}
+function updateColControls(){
+  const pick=$('#colPick'), val=$('#colWVal');
+  if(!pick||!val)return;
+  if(!pick.options.length){
+    pick.innerHTML=COLS.map(c=>`<option value="${c}">${HEADLABELS[c]}</option>`).join('');
+    pick.value='notes';
+  }
+  val.textContent=Math.round(S.colWidths[pick.value]||0)+'px';
+}
 
 function sheetHTML(page,pageNum,totalPages){
-  const cols=COLS, grid=GRID;
+  const cols=COLS, grid=gridTemplate();
   const sec=page.sec;
   const hasHeader=pageNum===1;
   const I=S.issue,G=S.global;
@@ -718,6 +767,8 @@ function sheetHTML(page,pageNum,totalPages){
 
 /* ===== render editor ===== */
 function renderEditor(){
+  normalizeColWidths();
+  updateColControls();
   const pages=allPages();
   const wrap=$('#zoomwrap');
   wrap.innerHTML=pages.map((p,i)=>sheetHTML(p,i+1,pages.length)).join('');
@@ -871,6 +922,10 @@ $('#txtPlus').onclick=()=>{S.textScale=Math.min(1.5,+(S.textScale+.06).toFixed(2
   renderEditor();toast('Text size '+Math.round(S.textScale*100)+'%');};
 $('#txtMinus').onclick=()=>{S.textScale=Math.max(.7,+(S.textScale-.06).toFixed(2));
   renderEditor();toast('Text size '+Math.round(S.textScale*100)+'%');};
+$('#colPick').onchange=updateColControls;
+$('#colMinus').onclick=()=>changeColumnWidth($('#colPick').value,-8);
+$('#colPlus').onclick=()=>changeColumnWidth($('#colPick').value,8);
+$('#colReset').onclick=()=>{S.colWidths={...DEFAULT_COL_WIDTHS};updateColControls();renderEditor();toast('Column widths reset.');};
 $('#autofit').onclick=()=>{autofit();renderEditor();toast('Pages re-fitted.');};
 $('#exportBtn').onclick=exportPDF;
 $('#zIn').onclick=()=>{S.zoom=Math.min(1.3,S.zoom+.1);renderEditor();};
@@ -882,5 +937,5 @@ $$('.crumb').forEach(c=>c.onclick=()=>{
 });
 
 /* ===== init ===== */
-loadGlobal().then(()=>{go('upload');});
+loadGlobal().then(()=>{updateColControls();go('upload');});
 </script>
