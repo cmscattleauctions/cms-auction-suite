@@ -110,7 +110,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
   color:#4a5578;text-transform:uppercase;margin-top:3px}
 .s-meta{margin-top:9px;display:flex;flex-direction:column;gap:3px}
 .s-meta .row{display:flex;align-items:center;gap:7px;font-size:13.5px;color:#1f2a4a}
-.s-meta .row b{font-family:'Oswald';font-weight:600;letter-spacing:.6px;color:var(--blue)}
+.s-meta .row b{font-family:'Oswald';font-weight:600;letter-spacing:.6px;color:#1f2a4a}
 .s-meta svg{width:15px;height:15px;flex-shrink:0}
 .cal-box{width:236px;border:1.5px solid #c7ccd6;border-radius:12px;padding:0;
   display:flex;flex-direction:column;overflow:hidden;background:#f4f5f8}
@@ -119,14 +119,14 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .cal-box .body{flex:1;display:flex;flex-direction:column;align-items:center;
   justify-content:center;padding:8px 6px;gap:2px;background:#f8f9fb}
 .cal-box .body .nx{font-size:12.5px;color:#5e6675;letter-spacing:.5px}
-.cal-box .body .dt{font-family:'Oswald';font-weight:700;font-size:21px;color:var(--blue);
+.cal-box .body .dt{font-family:'Oswald';font-weight:700;font-size:21px;color:#3f4653;
   letter-spacing:.5px;display:flex;align-items:center;gap:6px}
 .cal-box .body .dt svg{width:17px;height:17px}
 .cal-box .body .nm{font-family:'Kaushan Script',cursive;font-style:normal;
   font-size:18px;line-height:1.15;color:#424b5d;font-weight:400}
 
 /* section bar */
-.s-section{background:linear-gradient(90deg,#fff 0%,#f7f9fd 45%,#dbe7f5 100%);
+.s-section{background:#fff;
   height:40px;display:flex;align-items:center;position:relative;margin:2px 0 0;
   border-top:2px solid var(--blue);border-bottom:2px solid var(--blue)}
 .s-section .nm{font-family:'Oswald';font-weight:700;color:#3a3f48;font-size:20px;
@@ -137,7 +137,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 /* table */
 .s-tbl{flex:1;display:flex;flex-direction:column;min-height:0}
 .trow{display:grid;align-items:stretch}
-.s-thead{background:#fff;color:var(--deepblue);flex-shrink:0;border-bottom:1.5px solid var(--line)}
+.s-thead{background:#eef4fb;color:var(--deepblue);flex-shrink:0;border-bottom:1.5px solid var(--line)}
 .s-thead .cell{font-family:'Oswald';font-weight:700;font-size:9.8px;letter-spacing:.45px;
   text-transform:uppercase;padding:8px 3px;text-align:center;display:flex;
   align-items:center;justify-content:center;border-right:1px solid var(--line);min-height:34px;
@@ -257,7 +257,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .s-title h1{color:#131820;}
 .cal-box{border-color:#b8860b;}
 .cal-box .cap,.s-section .chev{background:#b8860b;}
-.cal-box .body .dt,.s-meta .row b,.s-foot .web{color:#9a7209;}
+.cal-box .body .dt,.s-meta .row b,.s-foot .web{color:inherit;font-weight:500}
 .s-section{background:#131820;}
 .s-section .lots{color:#d4cdbd;}
 .s-thead{background:#313844;}
@@ -282,7 +282,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .cal-box .cap{background:#2a4fc4;color:#fff;}
 .sheet .cal-box .body .dt,
 .sheet .s-meta .row b,
-.sheet .s-foot .web{color:#2a4fc4;}
+.sheet .s-foot .web{color:inherit;font-weight:500}
 .sheet .s-section{
   background:linear-gradient(90deg,#071a4a 0%,#0d2f79 100%);
   min-height:38px;
