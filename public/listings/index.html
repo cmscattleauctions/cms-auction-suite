@@ -151,12 +151,13 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .lotrow .cc{width:100%;hyphens:none;-webkit-hyphens:none;overflow-wrap:break-word}
 .lotrow .cell.ctr{align-items:center}
 .lotrow .cell.ctr .cc{text-align:center}
-.lotrow .cell.lot{align-items:center;position:relative;overflow:hidden}
-.lotrow .cell.lot .lot-state{position:absolute;left:6px;top:50%;transform:translateY(-50%);
-  width:calc(100% - 12px);height:calc(100% - 12px);object-fit:contain;object-position:left center;
-  opacity:.5;pointer-events:none;user-select:none;-webkit-user-drag:none;z-index:0}
+.lotrow .cell.lot{align-items:stretch;position:relative;overflow:hidden}
+.lotrow .cell.lot .lot-state{position:absolute;left:8px;top:50%;transform:translateY(-50%);
+  width:56px;height:56px;object-fit:contain;object-position:left center;
+  opacity:.75;pointer-events:none;user-select:none;-webkit-user-drag:none;z-index:0}
 .lotrow .cell.lot .cc{font-family:'Oswald';font-weight:700;font-size:1.5em;
-  color:var(--deepblue);white-space:nowrap;text-align:center;position:relative;z-index:1}
+  color:var(--deepblue);white-space:nowrap;text-align:left;position:relative;z-index:1;
+  width:100%;max-width:100%;padding-left:52px;padding-right:6px;overflow:hidden;text-overflow:ellipsis}
 .lotrow .cell.seller b{display:block;font-family:'Oswald';font-weight:600;font-size:1.2em;
   color:#10193a;letter-spacing:.2px}
 .lotrow .cell.seller i{display:block;font-style:italic;color:#5a6488;font-size:.95em}
