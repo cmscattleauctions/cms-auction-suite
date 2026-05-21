@@ -106,11 +106,11 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .s-title{flex:1;display:flex;flex-direction:column;justify-content:center;padding-top:4px}
 .s-title h1{font-family:'Archivo Black',sans-serif;font-size:33px;font-weight:400;
   letter-spacing:-.5px;line-height:1;color:#0c1430;white-space:nowrap}
-.s-title .sub{font-family:'Oswald';font-weight:600;font-size:19px;letter-spacing:1.15px;
-  color:#34405c;text-transform:uppercase;margin-top:4px}
-.s-meta{margin-top:10px;display:flex;flex-direction:column;gap:3px}
-.s-meta .row{display:flex;align-items:center;gap:7px;font-size:16px;color:#1f2a4a}
-.s-meta .row b{font-family:'Oswald';font-weight:700;letter-spacing:.6px;color:var(--blue);font-size:17px}
+.s-title .sub{font-family:'Oswald';font-weight:500;font-size:14.5px;letter-spacing:1.3px;
+  color:#4a5578;text-transform:uppercase;margin-top:3px}
+.s-meta{margin-top:9px;display:flex;flex-direction:column;gap:3px}
+.s-meta .row{display:flex;align-items:center;gap:7px;font-size:13.5px;color:#1f2a4a}
+.s-meta .row b{font-family:'Oswald';font-weight:600;letter-spacing:.6px;color:var(--blue)}
 .s-meta svg{width:15px;height:15px;flex-shrink:0}
 .cal-box{width:236px;border:1.5px solid #c7ccd6;border-radius:12px;padding:0;
   display:flex;flex-direction:column;overflow:hidden;background:#f4f5f8}
@@ -126,8 +126,9 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
   font-size:18px;line-height:1.15;color:#424b5d;font-weight:400}
 
 /* section bar */
-.s-section{background:#fff;height:40px;display:flex;align-items:center;
-  position:relative;margin:2px 0 0;border-top:2px solid var(--blue);border-bottom:2px solid var(--blue)}
+.s-section{background:linear-gradient(90deg,#fff 0%,#f7f9fd 45%,#dbe7f5 100%);
+  height:40px;display:flex;align-items:center;position:relative;margin:2px 0 0;
+  border-top:2px solid var(--blue);border-bottom:2px solid var(--blue)}
 .s-section .nm{font-family:'Oswald';font-weight:700;color:#3a3f48;font-size:20px;
   letter-spacing:1.5px;padding-left:16px;text-transform:uppercase}
 .s-section .lots{color:#687184;font-size:13px;margin-left:14px;letter-spacing:.4px}
@@ -137,9 +138,10 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .s-tbl{flex:1;display:flex;flex-direction:column;min-height:0}
 .trow{display:grid;align-items:stretch}
 .s-thead{background:#fff;color:var(--deepblue);flex-shrink:0;border-bottom:1.5px solid var(--line)}
-.s-thead .cell{font-family:'Oswald';font-weight:700;font-size:10.5px;letter-spacing:.7px;
-  text-transform:uppercase;padding:8px 5px;text-align:center;display:flex;
-  align-items:center;justify-content:center;border-right:1px solid var(--line);min-height:34px}
+.s-thead .cell{font-family:'Oswald';font-weight:700;font-size:9.8px;letter-spacing:.45px;
+  text-transform:uppercase;padding:8px 3px;text-align:center;display:flex;
+  align-items:center;justify-content:center;border-right:1px solid var(--line);min-height:34px;
+  white-space:nowrap;overflow:hidden}
 .s-thead .cell:last-child{border-right:0}
 .lotrow{border-bottom:4px solid #9aa0b4;position:relative;flex-shrink:0;
   display:grid;align-items:stretch;font-size:calc(11px * var(--ts,1))}
@@ -177,7 +179,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .s-foot .ftrow{display:flex;align-items:center;gap:5px}
 .s-foot svg{width:13px;height:13px}
 .s-foot .sp{flex:1}
-.s-foot .web{color:var(--blue);font-weight:600}
+.s-foot .web{color:inherit;font-weight:500}
 
 /* editing affordances */
 .editing [contenteditable]{outline:0}
@@ -616,7 +618,7 @@ function allPages(){
 /* ===== render one sheet ===== */
 const COLS=['lot','seller','head','desc','sex','basewt','delivery','shrink',
   'slide','notes','price'];
-const GRID='52px 120px 40px 150px 82px 50px 84px 42px 86px 1fr 78px';
+const GRID='52px 118px 40px 146px 82px 54px 82px 54px 82px 1fr 78px';
 const HEADLABELS={lot:'Lot',seller:'Seller / Location',head:'Head',desc:'Description',
   sex:'Sex',basewt:'Base WT',delivery:'Delivery',shrink:'Shrink',slide:'Slide',
   notes:'Notes',price:'Price'};
@@ -636,6 +638,7 @@ function sheetHTML(page,pageNum,totalPages){
         <div class="sub" contenteditable data-f="issName">${esc(I.name||'')}</div>
         <div class="s-meta">
           <div class="row">${IC.cal}<b>${fmtDate(I.date)}${I.time?' @ '+esc(I.time):''}</b></div>
+          <div class="row">${IC.globe}<span>${esc(G.web||'')}</span></div>
         </div>
       </div>
       <div class="cal-box">
