@@ -109,7 +109,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
   position:relative;font-family:'Barlow';box-shadow:0 10px 40px rgba(0,0,0,.5);
   display:flex;flex-direction:column;text-align:left}
 .sheet.over{outline:3px solid #e0483c}
-.s-pad{padding:18px 24px 48px;display:flex;flex-direction:column;flex:1;min-height:0}
+.s-pad{padding:24px 24px 48px;display:flex;flex-direction:column;flex:1;min-height:0}
 
 /* header band */
 .s-head{display:flex;align-items:stretch;gap:16px;padding-bottom:12px}
@@ -302,13 +302,13 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .s-title .sub{font-size:18px !important;line-height:1.12 !important;}
 .sheet .cal-box{border-color:var(--calendar-grey) !important;}
 .sheet .cal-box .cap{background:var(--calendar-grey) !important;color:#fff !important;}
-.sheet .cal-box{width:178px !important;border-radius:10px !important;}
-.sheet .cal-box .cap{font-size:10px !important;letter-spacing:1px !important;padding:4px !important;}
-.sheet .cal-box .body{padding:5px 4px !important;gap:1px !important;}
-.sheet .cal-box .body .nx{font-size:10.5px !important;}
-.sheet .cal-box .body .dt{font-size:15.5px !important;gap:4px !important;}
-.sheet .cal-box .body .dt svg{width:13px !important;height:13px !important;}
-.sheet .cal-box .body .nm{font-size:13px !important;line-height:1.05 !important;}
+.sheet .cal-box{width:168px !important;max-height:82px !important;border-radius:9px !important;}
+.sheet .cal-box .cap{font-size:9px !important;letter-spacing:.9px !important;padding:3px !important;line-height:1 !important;}
+.sheet .cal-box .body{padding:3px 4px !important;gap:0 !important;}
+.sheet .cal-box .body .nx{font-size:9.5px !important;line-height:1.05 !important;}
+.sheet .cal-box .body .dt{font-size:14px !important;gap:3px !important;line-height:1.05 !important;}
+.sheet .cal-box .body .dt svg{width:11px !important;height:11px !important;}
+.sheet .cal-box .body .nm{font-size:11.5px !important;line-height:1 !important;}
 
 .sheet .cal-box .body .dt,
 .sheet .s-meta .row b,
@@ -349,6 +349,15 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .lotrow.supplemental,.sheet .lotrow.supplemental.altrow{background:#fff !important;box-shadow:none !important;}
 .sheet .lotrow.supplemental .cell.lot{background-color:var(--supp-bg) !important;background-image:none !important;border-left:5px solid var(--supp-accent) !important;box-shadow:none !important;}
 .sheet .lotrow.supplemental .cell.price{border-right:5px solid var(--supp-accent) !important;}
+
+.sheet .lotrow.supplemental .cell.lot{align-items:stretch !important;}
+.sheet .lotrow.supplemental .cell.lot .cc{
+  font-size:1.18em !important;
+  text-align:right !important;
+  padding-right:6px !important;
+  letter-spacing:0 !important;
+}
+
 .sheet .lotrow.supplemental .cell:not(.lot){background-color:#fff !important;background-image:none !important;}
 .sheet .lotrow.supplemental::before,.sheet .lotrow.scratched.supplemental::before{content:none !important;display:none !important;}
 .sheet .supp-tag-row{display:none !important;}
@@ -521,7 +530,7 @@ const S = {
   sections:[], zoom:.70, rowStep:14, textScale:1,
   colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows','Holstein Cow','Holstein Cows'],
-  colWidths:{lot:52,seller:138,head:40,desc:146,sex:58,basewt:48,delivery:82,shrink:40,slide:46,notes:216,price:128}
+  colWidths:{lot:52,seller:138,head:40,desc:146,sex:66,basewt:48,delivery:82,shrink:40,slide:54,notes:226,price:102}
 };
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const MONTHS=['January','February','March','April','May','June','July','August',
@@ -737,13 +746,13 @@ const COLS=['lot','seller','head','desc','sex','basewt','delivery','shrink',
 const HEADLABELS={lot:'Lot',seller:'Seller / Location',head:'Head',desc:'Description',
   sex:'Sex',basewt:'Base WT',delivery:'Delivery',shrink:'Shrink',slide:'Slide',
   notes:'Notes',price:'Price'};
-const DEFAULT_COL_WIDTHS={lot:52,seller:138,head:40,desc:146,sex:58,basewt:48,delivery:82,shrink:40,slide:46,notes:216,price:128};
-const MIN_COL_WIDTHS={lot:38,seller:90,head:32,desc:90,sex:46,basewt:42,delivery:58,shrink:34,slide:38,notes:110,price:84};
+const DEFAULT_COL_WIDTHS={lot:52,seller:138,head:40,desc:146,sex:66,basewt:48,delivery:82,shrink:40,slide:54,notes:226,price:102};
+const MIN_COL_WIDTHS={lot:38,seller:90,head:32,desc:90,sex:50,basewt:42,delivery:58,shrink:34,slide:42,notes:110,price:80};
 const TABLE_W=1008;
 function gridTemplate(){return COLS.map(c=>Math.round(S.colWidths[c])+'px').join(' ');}
 function normalizeColWidths(){
   COLS.forEach(c=>{if(!Number.isFinite(S.colWidths[c]))S.colWidths[c]=DEFAULT_COL_WIDTHS[c];});
-  ['sex','shrink','slide','price'].forEach(c=>{if(S.colWidths[c] < MIN_COL_WIDTHS[c])S.colWidths[c]=DEFAULT_COL_WIDTHS[c];});
+  ['sex','shrink','slide','price','notes'].forEach(c=>{if(S.colWidths[c] < MIN_COL_WIDTHS[c])S.colWidths[c]=DEFAULT_COL_WIDTHS[c];});
   let total=COLS.reduce((sum,c)=>sum+S.colWidths[c],0);
   S.colWidths.notes+=TABLE_W-total;
   if(S.colWidths.notes<MIN_COL_WIDTHS.notes){
