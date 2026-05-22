@@ -95,6 +95,13 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .ed-tools select{height:31px;background:#0e1330;border:1.5px solid #2c3563;color:var(--txt);border-radius:6px;padding:0 8px;font-family:inherit;font-size:12.5px}
 .ed-tools .col-w-val{min-width:42px;text-align:center}
 .ed-canvas{flex:1;overflow:auto;padding:30px;background:#0c1024;text-align:center}
+.color-editor-bar{display:flex;align-items:center;gap:12px;padding:9px 16px;background:#fff;border-bottom:1px solid #e6e0d4;flex-wrap:wrap}
+.color-editor-bar .lbl{font-size:11px;color:#555b66;letter-spacing:.6px;text-transform:uppercase;font-weight:600}
+.color-editor-bar .color-grid{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.color-editor-bar .field{margin:0;display:flex;align-items:center;gap:6px}
+.color-editor-bar .field label{margin:0;font-size:10.5px;color:#555b66;white-space:nowrap}
+.color-editor-bar input[type="color"]{width:38px;height:28px;padding:2px;border:1px solid #d4cdbd;background:#fff;border-radius:6px}
+
 .zoomwrap{display:inline-block;transform-origin:top center}
 
 /* ---------- the printable sheet ---------- */
@@ -102,7 +109,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
   position:relative;font-family:'Barlow';box-shadow:0 10px 40px rgba(0,0,0,.5);
   display:flex;flex-direction:column;text-align:left}
 .sheet.over{outline:3px solid #e0483c}
-.s-pad{padding:18px 16px 0;display:flex;flex-direction:column;flex:1;min-height:0}
+.s-pad{padding:18px 16px 48px;display:flex;flex-direction:column;flex:1;min-height:0}
 
 /* header band */
 .s-head{display:flex;align-items:stretch;gap:16px;padding-bottom:12px}
@@ -248,8 +255,8 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .note{background:#fff;border:1px solid #e6e0d4;border-left:3px solid #b8860b;color:#555b66;}
 .card h3{color:#1a1d23;font-size:12px;letter-spacing:.06em;}
 .card .sub,.field label,.field .hint,.ed-tools .lbl,.empty-rail{color:#555b66;}
-.field input{background:#fff;border:1px solid #d4cdbd;color:#1a1d23;border-radius:6px;}
-.field input:focus{border-color:#131820;box-shadow:0 0 0 3px rgba(184,134,11,.08);}
+.field input,.field textarea{background:#fff;border:1px solid #d4cdbd;color:#1a1d23;border-radius:6px;}
+.field input:focus,.field textarea:focus{border-color:#131820;box-shadow:0 0 0 3px rgba(184,134,11,.08);}
 .ed-wrap{background:#f5f1ea;}
 .ed-rail{background:#131820;border-right:1px solid rgba(255,255,255,.08);}
 .ed-rail h4{color:#8b919c;}
@@ -281,14 +288,14 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
   --blue-bright:#1e3fb8;
   --deepblue:#13235e;
   --line:#d4d8e4;
-  --cat-blue:#2a4fc4;
+  --cat-blue:#162145;
   --section-fade:#ffffff;
   --section-text:#ffffff;
   --table-header-bg:#f2f7ff;
   --calendar-grey:#3f4653;
   --supp-bg:#eaf3ff;
   --supp-bg-alt:#e4f0ff;
-  --supp-accent:#2a4fc4;
+  --supp-accent:#162145;
   box-shadow:0 10px 28px rgba(19,24,32,.18);
 }
 .sheet .s-title h1{color:#0c1430;}
@@ -308,7 +315,8 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .s-section .lots{color:var(--section-text) !important;}
 .sheet .s-section .chev{display:none;}
 .sheet .s-thead{background:var(--table-header-bg) !important;color:#13235e !important;}
-.sheet .s-foot{border-top-color:var(--cat-blue);}
+.sheet .s-foot{border-top-color:var(--cat-blue);} 
+.sheet .s-foot .email,.sheet .s-foot .web{color:#3a4568 !important;font-size:11px !important;font-weight:500;}
 .sheet .lotrow.gtop,.sheet .lotrow.gmid{border-bottom:1px solid #c9cedb;}
 .sheet .lotrow .cell.sex .cc,
 .sheet .lotrow .cell.basewt .cc,
@@ -324,7 +332,6 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .lotrow .cell.desc{font-size:.94em;line-height:1.28;}
 .sheet .lotrow .cell.notes{font-size:.84em;line-height:1.26;}
 .sheet .lotrow .cell.price .cc{min-height:18px;}
-.editing .cc:empty::before{content:attr(data-placeholder);color:#9aa3b6;font-style:italic;font-weight:500;}
 .sheet .lotrow.scratched .cell .cc{text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:#1a1d23;}
 .sheet .lotrow.supplemental{background:var(--supp-bg) !important;box-shadow:inset 5px 0 0 var(--supp-accent), inset -5px 0 0 var(--supp-accent);}
 .sheet .lotrow.supplemental.altrow{background:var(--supp-bg-alt) !important;}
@@ -388,19 +395,6 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
           <div class="hint">Prefilled "{Month} Video Auction".</div></div>
         <div class="field"><label>Next Auction Tagline (optional)</label><input id="i-ntag"
           placeholder="e.g. Anniversary Special"></div>
-      </div>
-      <div class="card">
-        <h3>Catalog Colors</h3>
-        <div class="sub">Controls the printable listing colors. These carry into the PDF.</div>
-        <div class="color-grid">
-          <div class="field"><label>Primary Blue</label><input type="color" id="c-blue"></div>
-          <div class="field"><label>Section Fade End</label><input type="color" id="c-section-end"></div>
-          <div class="field"><label>Section Text</label><input type="color" id="c-section-text"></div>
-          <div class="field"><label>Table Header</label><input type="color" id="c-table-head"></div>
-          <div class="field"><label>Calendar Grey</label><input type="color" id="c-calendar"></div>
-          <div class="field"><label>Supplemental Accent</label><input type="color" id="c-supp-accent"></div>
-          <div class="field"><label>Supplemental Fill</label><input type="color" id="c-supp-bg"></div>
-        </div>
       </div>
       <div class="card">
         <h3>Bold Rules</h3>
@@ -469,6 +463,18 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
           <button class="btn ghost sm" id="backToSettings">Settings</button>
           <button class="btn sm" id="exportBtn">⬇ Download PDF</button>
         </div>
+        <div class="color-editor-bar">
+          <span class="lbl">Catalog Colors</span>
+          <div class="color-grid">
+            <div class="field"><label>Primary Blue</label><input type="color" id="c-blue"></div>
+            <div class="field"><label>Section Fade End</label><input type="color" id="c-section-end"></div>
+            <div class="field"><label>Section Text</label><input type="color" id="c-section-text"></div>
+            <div class="field"><label>Table Header</label><input type="color" id="c-table-head"></div>
+            <div class="field"><label>Calendar Grey</label><input type="color" id="c-calendar"></div>
+            <div class="field"><label>Supplemental Accent</label><input type="color" id="c-supp-accent"></div>
+            <div class="field"><label>Supplemental Fill</label><input type="color" id="c-supp-bg"></div>
+          </div>
+        </div>
         <div class="ed-canvas" id="canvas">
           <div class="zoomwrap" id="zoomwrap"></div>
         </div>
@@ -494,11 +500,11 @@ const IC = {
 const S = {
   lots:[], results:false,
   global:{house:'CMS Livestock Auction',phone:'(806) 355-7505',
-    email:'info@cattlemarketingservices.com',web:'www.CattleMarketingServices.com',
+    email:'info@cmslivestock.com',web:'www.CattleMarketingServices.com',
     addr:'6900 I40 West, Ste 135, Amarillo, TX 79106'},
   issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:''},
   sections:[], zoom:.70, rowStep:14, textScale:1,
-  colors:{blue:'#2a4fc4',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',calendar:'#3f4653',suppAccent:'#2a4fc4',suppBg:'#eaf3ff'},
+  colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows','Holstein Cow','Holstein Cows'],
   colWidths:{lot:52,seller:138,head:40,desc:146,sex:82,basewt:54,delivery:82,shrink:54,slide:82,notes:250,price:44}
 };
@@ -561,7 +567,7 @@ function handleFile(file){
       desc2:(r['Second Description']||'').trim(),
       type:(r['Type']||'Uncategorized').trim(),
       price:priceKey?(r[priceKey]||'').trim():'',
-      h:66, edits:{}, scratched:false, supplemental:false, cellScale:{}
+      h:66, edits:{}, scratched:false, supplemental:/^S/i.test((r['Lot Number']||'').trim()), cellScale:{}
     }));
     prefillIssue();
     syncSettingsUI();
@@ -614,6 +620,13 @@ function applyBoldRules(html){
     html=html.replace(new RegExp(`(?![^<]*>)(${pat})`,'gi'),'<strong>$1</strong>');
   });
   return html;
+}
+
+function displayLotNumber(lot){
+  const raw=(lot.edits.lot!=null?lot.edits.lot:lot.lot)||'';
+  const text=String(raw).replace(/<[^>]*>/g,'').trim();
+  if(lot.supplemental && text && !/^S/i.test(text)) return 'S'+text;
+  return raw;
 }
 function descHTML(lot){
   if(lot.edits.desc!=null) return lot.edits.desc;
@@ -805,7 +818,7 @@ function sheetHTML(page,pageNum,totalPages){
       }
       cols.forEach(c=>{
         let v='',cls='cell';
-        if(c==='lot'){cls+=' lot';v=esc(lot.edits.lot??lot.lot);}
+        if(c==='lot'){cls+=' lot';v=esc(displayLotNumber(lot));}
         else if(c==='seller'){cls+=' seller';v=sellerHTML(lot);}
         else if(c==='head'){cls+=' head ctr';v=esc(lot.edits.head??lot.head);}
         else if(c==='desc'){cls+=' desc';v=descHTML(lot);}
@@ -819,8 +832,7 @@ function sheetHTML(page,pageNum,totalPages){
         else if(c==='price'){cls+=' price ctr';
           v=lot.edits.price??(lot.price?esc(lot.price):'');}
         const cellScale=lot.cellScale&&lot.cellScale[c]&&lot.cellScale[c]!==1?` style="font-size:${lot.cellScale[c]}em"`:'';
-        const placeholder=c==='price'?' data-placeholder="Type price"':'';
-        h+=`<div class="${cls}"><div class="cc" contenteditable${cellScale}${placeholder}
+        h+=`<div class="${cls}"><div class="cc" contenteditable${cellScale}
               data-id="${lot.id}" data-c="${c}">${v}</div></div>`;
       });
       h+=`</div>`;
@@ -998,6 +1010,15 @@ async function exportPDF(){
   toast('PDF downloaded.');
 }
 
+
+function updateColorsFromEditor(){
+  S.colors={blue:$('#c-blue').value,sectionEnd:$('#c-section-end').value,
+    sectionText:$('#c-section-text').value,tableHead:$('#c-table-head').value,
+    calendar:$('#c-calendar').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value};
+  saveGlobal();
+  renderEditor();
+}
+
 /* ===== events ===== */
 const drop=$('#drop'),fi=$('#fileInput');
 $('#browseBtn').onclick=()=>fi.click();
@@ -1050,6 +1071,7 @@ $('#colMinus').onclick=()=>changeColumnWidth($('#colPick').value,-8);
 $('#colPlus').onclick=()=>changeColumnWidth($('#colPick').value,8);
 $('#colReset').onclick=()=>{S.colWidths={...DEFAULT_COL_WIDTHS};updateColControls();renderEditor();toast('Column widths reset.');};
 $('#autofit').onclick=()=>{autofit();renderEditor();toast('Pages re-fitted.');};
+$$('#c-blue,#c-section-end,#c-section-text,#c-table-head,#c-calendar,#c-supp-accent,#c-supp-bg').forEach(el=>el.addEventListener('input',updateColorsFromEditor));
 $('#exportBtn').onclick=exportPDF;
 $('#zIn').onclick=()=>{S.zoom=Math.min(1.3,S.zoom+.1);renderEditor();};
 $('#zOut').onclick=()=>{S.zoom=Math.max(.3,S.zoom-.1);renderEditor();};
