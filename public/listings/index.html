@@ -170,7 +170,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .lotrow .cell.seller b{display:block;font-family:'Oswald';font-weight:600;font-size:1.2em;
   color:#10193a;letter-spacing:.2px}
 .lotrow .cell.seller i{display:block;font-style:italic;color:#5a6488;font-size:.95em}
-.lotrow .cell.head .cc{font-family:'Barlow';font-weight:500;font-size:1.32em;color:#1a2444}
+.lotrow .cell.head .cc{font-family:'Barlow';font-weight:600;font-size:1.3em;color:#1a2444}
 .lotrow .cell.basewt .cc{font-family:'Barlow';font-weight:600;font-size:1.3em;color:#1a2444}
 .lotrow .cell.shrink .cc{font-family:'Barlow';font-weight:600;font-size:1.22em;color:#2a3354}
 .lotrow .cell.price .cc{font-family:'Oswald';font-weight:700;font-size:1.4em;
@@ -338,8 +338,10 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
   line-height:1.28;
 }
 .sheet .lotrow.altrow{background:#fff !important;}
+.sheet .lotrow.page-last{border-bottom:0 !important;}
+
 .sheet .lotrow .cell.lot .cc{font-family:Arial,Helvetica,sans-serif !important;font-weight:800 !important;font-size:1.48em;letter-spacing:.02em;color:#13235e;}
-.sheet .lotrow .cell.head .cc{font-family:'Barlow' !important;font-weight:600 !important;font-size:1.3em !important;color:#1a2444 !important;letter-spacing:0 !important;}
+.sheet .lotrow .cell.head .cc{font-family:'Barlow';font-weight:600;font-size:1.3em;color:#1a2444}
 .sheet .lotrow .cell.slide .cc{font-family:'Barlow',Arial,sans-serif !important;font-weight:400 !important;font-size:.84em !important;color:#2a3354 !important;line-height:1.26 !important;}
 .sheet .lotrow .cell.desc{font-size:.94em;line-height:1.28;}
 .sheet .lotrow .cell.notes{font-size:.84em;line-height:1.26;}
@@ -530,7 +532,7 @@ const S = {
   sections:[], zoom:.70, rowStep:14, textScale:1,
   colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows','Holstein Cow','Holstein Cows'],
-  colWidths:{lot:52,seller:138,head:40,desc:146,sex:66,basewt:48,delivery:82,shrink:40,slide:54,notes:226,price:102}
+  colWidths:{lot:52,seller:130,head:30,desc:146,sex:74,basewt:48,delivery:82,shrink:40,slide:62,notes:258,price:76}
 };
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const MONTHS=['January','February','March','April','May','June','July','August',
@@ -674,7 +676,7 @@ function sellerHTML(lot){
 }
 
 /* ===== build sections & pagination ===== */
-const SHEET_H=816, PAD=18, HEADER_H=130, FOOT_H=34, THEAD_H=24, SECBAR_H=38, SLACK=18;
+const SHEET_H=816, PAD=24, HEADER_H=130, FOOT_H=34, THEAD_H=24, SECBAR_H=38, SLACK=30;
 function rowsAreaH(hasHeader,firstOfSection){
   return SHEET_H-PAD-(hasHeader?HEADER_H:0)-(firstOfSection?SECBAR_H:0)-THEAD_H-FOOT_H-SLACK;
 }
@@ -746,9 +748,9 @@ const COLS=['lot','seller','head','desc','sex','basewt','delivery','shrink',
 const HEADLABELS={lot:'Lot',seller:'Seller / Location',head:'Head',desc:'Description',
   sex:'Sex',basewt:'Base WT',delivery:'Delivery',shrink:'Shrink',slide:'Slide',
   notes:'Notes',price:'Price'};
-const DEFAULT_COL_WIDTHS={lot:52,seller:138,head:40,desc:146,sex:66,basewt:48,delivery:82,shrink:40,slide:54,notes:226,price:102};
-const MIN_COL_WIDTHS={lot:38,seller:90,head:32,desc:90,sex:50,basewt:42,delivery:58,shrink:34,slide:42,notes:110,price:80};
-const TABLE_W=1008;
+const DEFAULT_COL_WIDTHS={lot:52,seller:130,head:30,desc:146,sex:74,basewt:48,delivery:82,shrink:40,slide:62,notes:258,price:76};
+const MIN_COL_WIDTHS={lot:38,seller:90,head:26,desc:90,sex:50,basewt:42,delivery:58,shrink:34,slide:42,notes:110,price:60};
+const TABLE_W=998;
 function gridTemplate(){return COLS.map(c=>Math.round(S.colWidths[c])+'px').join(' ');}
 function normalizeColWidths(){
   COLS.forEach(c=>{if(!Number.isFinite(S.colWidths[c]))S.colWidths[c]=DEFAULT_COL_WIDTHS[c];});
@@ -832,7 +834,8 @@ function sheetHTML(page,pageNum,totalPages){
     b.lots.forEach((lot,li)=>{
       const gpos=b.grouped?(li===0?'gtop':(li===b.lots.length-1?'gbot':'gmid')):'';
       const isFirst=li===0;
-      h+=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lot.scratched?'scratched':''} ${lot.supplemental?'supplemental':''}" data-id="${lot.id}"
+      const isLastOnPage=bi===page.blocks.length-1 && li===b.lots.length-1;
+      h+=`<div class="lotrow ${gpos} ${isLastOnPage?'page-last':''} ${alt%2?'altrow':''} ${lot.scratched?'scratched':''} ${lot.supplemental?'supplemental':''}" data-id="${lot.id}"
             data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}"
             style="grid-template-columns:${grid};min-height:${lot.h}px">`;
       if(li===0){
