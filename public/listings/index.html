@@ -304,11 +304,11 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .cal-box .cap{background:var(--calendar-grey) !important;color:#fff !important;}
 .sheet .cal-box{width:168px !important;max-height:82px !important;border-radius:9px !important;}
 .sheet .cal-box .cap{font-size:9px !important;letter-spacing:.9px !important;padding:3px !important;line-height:1 !important;}
-.sheet .cal-box .body{padding:3px 4px !important;gap:0 !important;}
-.sheet .cal-box .body .nx{font-size:9.5px !important;line-height:1.05 !important;}
-.sheet .cal-box .body .dt{font-size:14px !important;gap:3px !important;line-height:1.05 !important;}
+.sheet .cal-box .body{padding:1px 4px !important;gap:0 !important;justify-content:center !important;}
+.sheet .cal-box .body .nx{font-size:9.5px !important;line-height:1 !important;margin:0 !important;}
+.sheet .cal-box .body .dt{font-size:14px !important;gap:3px !important;line-height:1 !important;margin:0 !important;}
 .sheet .cal-box .body .dt svg{width:11px !important;height:11px !important;}
-.sheet .cal-box .body .nm{font-size:11.5px !important;line-height:1 !important;}
+.sheet .cal-box .body .nm{font-size:11.5px !important;line-height:.95 !important;margin:0 !important;}
 
 .sheet .cal-box .body .dt,
 .sheet .s-meta .row b,
@@ -338,7 +338,6 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
   line-height:1.28;
 }
 .sheet .lotrow.altrow{background:#fff !important;}
-.sheet .lotrow.page-last{border-bottom:0 !important;}
 
 .sheet .lotrow .cell.lot .cc{font-family:Arial,Helvetica,sans-serif !important;font-weight:800 !important;font-size:1.48em;letter-spacing:.02em;color:#13235e;}
 .sheet .lotrow .cell.head .cc{font-family:'Barlow';font-weight:600;font-size:1.3em;color:#1a2444}
@@ -532,7 +531,7 @@ const S = {
   sections:[], zoom:.70, rowStep:14, textScale:1,
   colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows','Holstein Cow','Holstein Cows'],
-  colWidths:{lot:52,seller:130,head:30,desc:146,sex:74,basewt:48,delivery:82,shrink:40,slide:62,notes:258,price:76}
+  colWidths:{lot:52,seller:130,head:46,desc:146,sex:74,basewt:48,delivery:82,shrink:40,slide:62,notes:258,price:60}
 };
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const MONTHS=['January','February','March','April','May','June','July','August',
@@ -748,8 +747,8 @@ const COLS=['lot','seller','head','desc','sex','basewt','delivery','shrink',
 const HEADLABELS={lot:'Lot',seller:'Seller / Location',head:'Head',desc:'Description',
   sex:'Sex',basewt:'Base WT',delivery:'Delivery',shrink:'Shrink',slide:'Slide',
   notes:'Notes',price:'Price'};
-const DEFAULT_COL_WIDTHS={lot:52,seller:130,head:30,desc:146,sex:74,basewt:48,delivery:82,shrink:40,slide:62,notes:258,price:76};
-const MIN_COL_WIDTHS={lot:38,seller:90,head:26,desc:90,sex:50,basewt:42,delivery:58,shrink:34,slide:42,notes:110,price:60};
+const DEFAULT_COL_WIDTHS={lot:52,seller:130,head:46,desc:146,sex:74,basewt:48,delivery:82,shrink:40,slide:62,notes:258,price:60};
+const MIN_COL_WIDTHS={lot:38,seller:90,head:32,desc:90,sex:50,basewt:42,delivery:58,shrink:34,slide:42,notes:110,price:50};
 const TABLE_W=998;
 function gridTemplate(){return COLS.map(c=>Math.round(S.colWidths[c])+'px').join(' ');}
 function normalizeColWidths(){
@@ -834,8 +833,7 @@ function sheetHTML(page,pageNum,totalPages){
     b.lots.forEach((lot,li)=>{
       const gpos=b.grouped?(li===0?'gtop':(li===b.lots.length-1?'gbot':'gmid')):'';
       const isFirst=li===0;
-      const isLastOnPage=bi===page.blocks.length-1 && li===b.lots.length-1;
-      h+=`<div class="lotrow ${gpos} ${isLastOnPage?'page-last':''} ${alt%2?'altrow':''} ${lot.scratched?'scratched':''} ${lot.supplemental?'supplemental':''}" data-id="${lot.id}"
+      h+=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lot.scratched?'scratched':''} ${lot.supplemental?'supplemental':''}" data-id="${lot.id}"
             data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}"
             style="grid-template-columns:${grid};min-height:${lot.h}px">`;
       if(li===0){
