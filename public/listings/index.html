@@ -109,7 +109,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
   position:relative;font-family:'Barlow';box-shadow:0 10px 40px rgba(0,0,0,.5);
   display:flex;flex-direction:column;text-align:left}
 .sheet.over{outline:3px solid #e0483c}
-.s-pad{padding:18px 16px 48px;display:flex;flex-direction:column;flex:1;min-height:0}
+.s-pad{padding:18px 24px 48px;display:flex;flex-direction:column;flex:1;min-height:0}
 
 /* header band */
 .s-head{display:flex;align-items:stretch;gap:16px;padding-bottom:12px}
@@ -181,7 +181,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .lotrow .cell.desc{font-size:1em;line-height:1.32;color:#1f2844}
 .lotrow .cell strong{font-weight:700;color:#0c1430}
 .s-thead .cell:nth-child(1),.lotrow .cell:nth-child(1){border-right:1px solid var(--line)}
-.altrow{background:#f6f7fb}
+.altrow{background:#fff}
 
 /* footer */
 .s-foot{height:34px;border-top:2px solid var(--blue);display:flex;align-items:center;
@@ -329,14 +329,20 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
   color:#2a3354;
   line-height:1.28;
 }
+.sheet .lotrow.altrow{background:#fff !important;}
+.sheet .lotrow .cell.lot .cc{font-family:Arial,Helvetica,sans-serif !important;font-weight:800 !important;font-size:1.48em;letter-spacing:.02em;color:#13235e;}
+.sheet .lotrow .cell.head .cc{font-family:Arial,Helvetica,sans-serif !important;font-weight:800 !important;font-size:1.22em;color:#13235e;letter-spacing:.01em;}
+.sheet .lotrow .cell.slide .cc{font-family:'Barlow' !important;font-weight:600 !important;font-size:1.02em !important;color:#2a3354 !important;line-height:1.28 !important;}
 .sheet .lotrow .cell.desc{font-size:.94em;line-height:1.28;}
 .sheet .lotrow .cell.notes{font-size:.84em;line-height:1.26;}
 .sheet .lotrow .cell.price .cc{min-height:18px;}
-.sheet .lotrow.scratched .cell .cc{text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:#1a1d23;}
-.sheet .lotrow.supplemental{background:var(--supp-bg) !important;box-shadow:inset 5px 0 0 var(--supp-accent), inset -5px 0 0 var(--supp-accent);}
-.sheet .lotrow.supplemental.altrow{background:var(--supp-bg-alt) !important;}
-.sheet .lotrow.supplemental::before{content:'SUPPLEMENTAL';position:absolute;right:9px;top:3px;background:var(--supp-accent);color:#fff;font-family:'Oswald';font-size:8px;letter-spacing:.7px;padding:1px 5px;border-radius:2px;z-index:2;}
-.sheet .lotrow.scratched.supplemental::before{content:'SCRATCHED · SUPPLEMENTAL';background:var(--calendar-grey);}
+.sheet .lotrow.scratched .cell .cc,
+.sheet .lotrow.scratched .cell .cc *{text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:#1a1d23;}
+.sheet .lotrow.supplemental,.sheet .lotrow.supplemental.altrow{background:#fff !important;box-shadow:none !important;}
+.sheet .lotrow.supplemental .cell.lot{background:var(--supp-bg) !important;box-shadow:inset 5px 0 0 var(--supp-accent), inset -5px 0 0 var(--supp-accent);}
+.sheet .lotrow.supplemental::before,.sheet .lotrow.scratched.supplemental::before{content:none !important;display:none !important;}
+.sheet .supp-tag-row{min-height:18px;background:#f1f2f5;border-top:1px solid #9aa0b4;border-bottom:1px solid #c9cedb;display:flex;align-items:center;padding:2px 8px 2px 12px;color:#fff;background:linear-gradient(90deg,var(--supp-accent) 0%,#6f7890 58%,#f1f2f5 100%);font-family:'Oswald';font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;}
+.sheet .supp-tag-row span{background:var(--supp-accent);padding:1px 8px;border-radius:2px;}
 
 @media (max-width: 760px){.view{padding:18px}.settings-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-wrap:wrap}.crumbs{width:100%;overflow:auto}.ed-rail{width:132px}.ed-canvas{padding:18px}}
 </style>
@@ -722,9 +728,9 @@ const COLS=['lot','seller','head','desc','sex','basewt','delivery','shrink',
 const HEADLABELS={lot:'Lot',seller:'Seller / Location',head:'Head',desc:'Description',
   sex:'Sex',basewt:'Base WT',delivery:'Delivery',shrink:'Shrink',slide:'Slide',
   notes:'Notes',price:'Price'};
-const DEFAULT_COL_WIDTHS={lot:52,seller:138,head:40,desc:146,sex:82,basewt:54,delivery:82,shrink:54,slide:82,notes:250,price:44};
-const MIN_COL_WIDTHS={lot:38,seller:90,head:32,desc:90,sex:56,basewt:44,delivery:58,shrink:42,slide:58,notes:110,price:34};
-const TABLE_W=1024;
+const DEFAULT_COL_WIDTHS={lot:52,seller:138,head:40,desc:146,sex:82,basewt:48,delivery:82,shrink:54,slide:70,notes:216,price:80};
+const MIN_COL_WIDTHS={lot:38,seller:90,head:32,desc:90,sex:56,basewt:42,delivery:58,shrink:42,slide:52,notes:110,price:34};
+const TABLE_W=1008;
 function gridTemplate(){return COLS.map(c=>Math.round(S.colWidths[c])+'px').join(' ');}
 function normalizeColWidths(){
   COLS.forEach(c=>{if(!Number.isFinite(S.colWidths[c]))S.colWidths[c]=DEFAULT_COL_WIDTHS[c];});
@@ -807,6 +813,10 @@ function sheetHTML(page,pageNum,totalPages){
     b.lots.forEach((lot,li)=>{
       const gpos=b.grouped?(li===0?'gtop':(li===b.lots.length-1?'gbot':'gmid')):'';
       const isFirst=li===0;
+      const needsSuppTag=lot.supplemental && !(b.lots[li-1]&&b.lots[li-1].supplemental);
+      if(needsSuppTag){
+        h+=`<div class="supp-tag-row"><span>SUPPLEMENTAL LOTS</span></div>`;
+      }
       h+=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lot.scratched?'scratched':''} ${lot.supplemental?'supplemental':''}" data-id="${lot.id}"
             data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}"
             style="grid-template-columns:${grid};min-height:${lot.h}px">`;
