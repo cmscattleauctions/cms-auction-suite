@@ -66,9 +66,12 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .field{margin-bottom:14px}
 .field label{display:block;font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;
   color:var(--dim);margin-bottom:5px}
-.field input{width:100%;background:#0e1330;border:1.5px solid #2c3563;color:var(--txt);
+.field input,.field textarea{width:100%;background:#0e1330;border:1.5px solid #2c3563;color:var(--txt);
   padding:10px 12px;border-radius:8px;font-family:inherit;font-size:14px}
-.field input:focus{outline:0;border-color:var(--blue)}
+.field textarea{min-height:118px;resize:vertical;line-height:1.45}
+.field input[type="color"]{height:42px;padding:5px}
+.field input:focus,.field textarea:focus{outline:0;border-color:var(--blue)}
+.color-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .field .hint{font-size:11px;color:#5f6a92;margin-top:4px}
 .settings-foot{max-width:960px;margin:24px auto 0;display:flex;justify-content:flex-end;gap:12px}
 
@@ -278,26 +281,34 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
   --blue-bright:#1e3fb8;
   --deepblue:#13235e;
   --line:#d4d8e4;
+  --cat-blue:#2a4fc4;
+  --section-fade:#ffffff;
+  --section-text:#ffffff;
+  --table-header-bg:#f2f7ff;
+  --calendar-grey:#3f4653;
+  --supp-bg:#eaf3ff;
+  --supp-bg-alt:#e4f0ff;
+  --supp-accent:#2a4fc4;
   box-shadow:0 10px 28px rgba(19,24,32,.18);
 }
 .sheet .s-title h1{color:#0c1430;}
 .sheet .s-title .sub{font-size:18px !important;line-height:1.12 !important;}
-.sheet .cal-box{border-color:#3f4653 !important;}
-.sheet .cal-box .cap{background:#3f4653 !important;color:#fff !important;}
+.sheet .cal-box{border-color:var(--calendar-grey) !important;}
+.sheet .cal-box .cap{background:var(--calendar-grey) !important;color:#fff !important;}
 .sheet .cal-box .body .dt,
 .sheet .s-meta .row b,
 .sheet .s-foot .web{color:inherit;font-weight:500}
 .sheet .s-section{
-  background:linear-gradient(90deg,#2a4fc4 0%,#ffffff 100%) !important;
+  background:linear-gradient(90deg,var(--cat-blue) 0%,var(--section-fade) 100%) !important;
   min-height:38px;
   border-top:0 !important;
-  border-bottom:2px solid #2a4fc4;
+  border-bottom:2px solid var(--cat-blue);
 }
-.sheet .s-section .nm{font-weight:700;letter-spacing:1.7px;color:#fff !important;}
-.sheet .s-section .lots{color:#fff !important;}
+.sheet .s-section .nm{font-weight:700;letter-spacing:1.7px;color:var(--section-text) !important;}
+.sheet .s-section .lots{color:var(--section-text) !important;}
 .sheet .s-section .chev{display:none;}
-.sheet .s-thead{background:#f2f7ff !important;color:#13235e !important;}
-.sheet .s-foot{border-top-color:#2a4fc4;}
+.sheet .s-thead{background:var(--table-header-bg) !important;color:#13235e !important;}
+.sheet .s-foot{border-top-color:var(--cat-blue);}
 .sheet .lotrow.gtop,.sheet .lotrow.gmid{border-bottom:1px solid #c9cedb;}
 .sheet .lotrow .cell.sex .cc,
 .sheet .lotrow .cell.basewt .cc,
@@ -312,6 +323,13 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 }
 .sheet .lotrow .cell.desc{font-size:.94em;line-height:1.28;}
 .sheet .lotrow .cell.notes{font-size:.84em;line-height:1.26;}
+.sheet .lotrow .cell.price .cc{min-height:18px;}
+.editing .cc:empty::before{content:attr(data-placeholder);color:#9aa3b6;font-style:italic;font-weight:500;}
+.sheet .lotrow.scratched .cell .cc{text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:#1a1d23;}
+.sheet .lotrow.supplemental{background:var(--supp-bg) !important;box-shadow:inset 5px 0 0 var(--supp-accent), inset -5px 0 0 var(--supp-accent);}
+.sheet .lotrow.supplemental.altrow{background:var(--supp-bg-alt) !important;}
+.sheet .lotrow.supplemental::before{content:'SUPPLEMENTAL';position:absolute;right:9px;top:3px;background:var(--supp-accent);color:#fff;font-family:'Oswald';font-size:8px;letter-spacing:.7px;padding:1px 5px;border-radius:2px;z-index:2;}
+.sheet .lotrow.scratched.supplemental::before{content:'SCRATCHED · SUPPLEMENTAL';background:var(--calendar-grey);}
 
 @media (max-width: 760px){.view{padding:18px}.settings-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-wrap:wrap}.crumbs{width:100%;overflow:auto}.ed-rail{width:132px}.ed-canvas{padding:18px}}
 </style>
@@ -371,6 +389,25 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
         <div class="field"><label>Next Auction Tagline (optional)</label><input id="i-ntag"
           placeholder="e.g. Anniversary Special"></div>
       </div>
+      <div class="card">
+        <h3>Catalog Colors</h3>
+        <div class="sub">Controls the printable listing colors. These carry into the PDF.</div>
+        <div class="color-grid">
+          <div class="field"><label>Primary Blue</label><input type="color" id="c-blue"></div>
+          <div class="field"><label>Section Fade End</label><input type="color" id="c-section-end"></div>
+          <div class="field"><label>Section Text</label><input type="color" id="c-section-text"></div>
+          <div class="field"><label>Table Header</label><input type="color" id="c-table-head"></div>
+          <div class="field"><label>Calendar Grey</label><input type="color" id="c-calendar"></div>
+          <div class="field"><label>Supplemental Accent</label><input type="color" id="c-supp-accent"></div>
+          <div class="field"><label>Supplemental Fill</label><input type="color" id="c-supp-bg"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Bold Rules</h3>
+        <div class="sub">One phrase per line. Matching phrases in description and notes are bolded automatically.</div>
+        <div class="field"><label>Auto-Bold Phrases</label><textarea id="bold-rules" placeholder="Top Dollar Angus Verified&#10;100% Holstein Cows"></textarea>
+          <div class="hint">Use exact phrases. You can still manually bold selected text in the editor.</div></div>
+      </div>
     </div>
     <div class="settings-foot">
       <button class="btn ghost" id="backToUpload">Back</button>
@@ -388,6 +425,10 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
       <div class="ed-main">
         <div class="ed-tools">
           <div class="grp"><button class="btn ghost sm" id="boldBtn"><b>B</b> Bold</button></div>
+          <div class="grp">
+            <button class="btn ghost sm" id="scratchBtn">Scratch Lot</button>
+            <button class="btn ghost sm" id="suppBtn">Supplemental</button>
+          </div>
           <div class="vr"></div>
           <div class="grp">
             <span class="lbl">Lot height</span>
@@ -399,6 +440,12 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
             <span class="lbl">Text size</span>
             <button class="btn ghost sm" id="txtMinus">A−</button>
             <button class="btn ghost sm" id="txtPlus">A+</button>
+          </div>
+          <div class="grp">
+            <span class="lbl">Box text</span>
+            <button class="btn ghost sm" id="boxTxtMinus">A−</button>
+            <button class="btn ghost sm" id="boxTxtPlus">A+</button>
+            <button class="btn ghost sm" id="boxTxtReset">Reset</button>
           </div>
           <div class="vr"></div>
           <div class="grp">
@@ -451,6 +498,8 @@ const S = {
     addr:'6900 I40 West, Ste 135, Amarillo, TX 79106'},
   issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:''},
   sections:[], zoom:.70, rowStep:14, textScale:1,
+  colors:{blue:'#2a4fc4',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',calendar:'#3f4653',suppAccent:'#2a4fc4',suppBg:'#eaf3ff'},
+  boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows','Holstein Cow','Holstein Cows'],
   colWidths:{lot:52,seller:138,head:40,desc:146,sex:82,basewt:54,delivery:82,shrink:54,slide:82,notes:250,price:44}
 };
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -466,10 +515,16 @@ function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');
 /* ===== storage (global settings persist) ===== */
 async function loadGlobal(){
   try{const r=await window.storage.get('cms_global');
-    if(r&&r.value)Object.assign(S.global,JSON.parse(r.value));}catch(e){}
+    if(r&&r.value){
+      const data=JSON.parse(r.value);
+      if(data.global)Object.assign(S.global,data.global); else Object.assign(S.global,data);
+      if(data.colors)Object.assign(S.colors,data.colors);
+      if(Array.isArray(data.boldRules))S.boldRules=data.boldRules;
+    }
+  }catch(e){}
 }
 async function saveGlobal(){
-  try{await window.storage.set('cms_global',JSON.stringify(S.global));}catch(e){}
+  try{await window.storage.set('cms_global',JSON.stringify({global:S.global,colors:S.colors,boldRules:S.boldRules}));}catch(e){}
 }
 
 /* ===== navigation ===== */
@@ -506,7 +561,7 @@ function handleFile(file){
       desc2:(r['Second Description']||'').trim(),
       type:(r['Type']||'Uncategorized').trim(),
       price:priceKey?(r[priceKey]||'').trim():'',
-      h:66, edits:{}
+      h:66, edits:{}, scratched:false, supplemental:false, cellScale:{}
     }));
     prefillIssue();
     syncSettingsUI();
@@ -530,18 +585,36 @@ function syncSettingsUI(){
   $('#i-date').value=S.issue.date; $('#i-time').value=S.issue.time;
   $('#i-name').value=S.issue.name; $('#i-ndate').value=S.issue.ndate;
   $('#i-nname').value=S.issue.nname; $('#i-ntag').value=S.issue.ntag;
+  $('#c-blue').value=S.colors.blue; $('#c-section-end').value=S.colors.sectionEnd;
+  $('#c-section-text').value=S.colors.sectionText; $('#c-table-head').value=S.colors.tableHead;
+  $('#c-calendar').value=S.colors.calendar; $('#c-supp-accent').value=S.colors.suppAccent;
+  $('#c-supp-bg').value=S.colors.suppBg; $('#bold-rules').value=S.boldRules.join('\n');
 }
 function readSettingsUI(){
   S.global={house:$('#g-house').value,phone:$('#g-phone').value,
     email:$('#g-email').value,web:$('#g-web').value,addr:$('#g-addr').value};
   S.issue={date:$('#i-date').value,time:$('#i-time').value,name:$('#i-name').value,
     ndate:$('#i-ndate').value,nname:$('#i-nname').value,ntag:$('#i-ntag').value};
+  S.colors={blue:$('#c-blue').value,sectionEnd:$('#c-section-end').value,
+    sectionText:$('#c-section-text').value,tableHead:$('#c-table-head').value,
+    calendar:$('#c-calendar').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value};
+  S.boldRules=$('#bold-rules').value.split(/\n/).map(x=>x.trim()).filter(Boolean);
 }
 
 /* ===== text helpers (auto-bold rules) ===== */
 function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 function nl(s){return esc(s).replace(/\\n|\n/g,'<br>');}
 function flat(s){return esc((s||'').replace(/\\n|\n|\r/g,' ').replace(/\s+/g,' ').trim());}
+function rxEsc(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+function applyBoldRules(html){
+  (S.boldRules||[]).forEach(rule=>{
+    if(!rule)return;
+    const safe=esc(rule);
+    const pat=rxEsc(safe).replace(/\\ /g,'\\s+');
+    html=html.replace(new RegExp(`(?![^<]*>)(${pat})`,'gi'),'<strong>$1</strong>');
+  });
+  return html;
+}
 function descHTML(lot){
   if(lot.edits.desc!=null) return lot.edits.desc;
   const n=parseInt(lot.loadCount)||0;
@@ -549,14 +622,14 @@ function descHTML(lot){
   let breed=flat(lot.breed);
   const hasJersey=/jers/i.test(lot.breed+' '+lot.desc1+' '+lot.desc2);
   if(!hasJersey) breed=breed.replace(/(Holstein Cows?)/gi,'<strong>$1</strong>');
-  return load+breed;
+  return applyBoldRules(load+breed);
 }
 function notesHTML(lot){
   if(lot.edits.notes!=null) return lot.edits.notes;
   let html=[lot.desc1,lot.desc2].filter(Boolean).map(flat).join('<br>');
   html=html.replace(/(100% Holstein Cows?)/gi,'<strong>$1</strong>');
   html=html.replace(/(Top Dollar Angus(?: Sire)? Verified)/gi,'<strong>$1</strong>');
-  return html;
+  return applyBoldRules(html);
 }
 function sellerHTML(lot){
   if(lot.edits.seller!=null) return lot.edits.seller;
@@ -679,7 +752,9 @@ function sheetHTML(page,pageNum,totalPages){
   const sec=page.sec;
   const hasHeader=pageNum===1;
   const I=S.issue,G=S.global;
-  let h=`<div class="sheet" data-pg="${pageNum}" style="--ts:${S.textScale}">`+
+  const C=S.colors;
+  const sheetVars=`--ts:${S.textScale};--cat-blue:${C.blue};--section-fade:${C.sectionEnd};--section-text:${C.sectionText};--table-header-bg:${C.tableHead};--calendar-grey:${C.calendar};--supp-accent:${C.suppAccent};--supp-bg:${C.suppBg};--supp-bg-alt:${C.suppBg};`;
+  let h=`<div class="sheet" data-pg="${pageNum}" style="${sheetVars}">`+
         `<div class="s-pad">`;
   if(hasHeader){
     h+=`<div class="s-head">
@@ -719,7 +794,7 @@ function sheetHTML(page,pageNum,totalPages){
     b.lots.forEach((lot,li)=>{
       const gpos=b.grouped?(li===0?'gtop':(li===b.lots.length-1?'gbot':'gmid')):'';
       const isFirst=li===0;
-      h+=`<div class="lotrow ${gpos} ${alt%2?'altrow':''}" data-id="${lot.id}"
+      h+=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lot.scratched?'scratched':''} ${lot.supplemental?'supplemental':''}" data-id="${lot.id}"
             data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}"
             style="grid-template-columns:${grid};min-height:${lot.h}px">`;
       if(li===0){
@@ -743,7 +818,9 @@ function sheetHTML(page,pageNum,totalPages){
         else if(c==='notes'){cls+=' notes';v=notesHTML(lot);}
         else if(c==='price'){cls+=' price ctr';
           v=lot.edits.price??(lot.price?esc(lot.price):'');}
-        h+=`<div class="${cls}"><div class="cc" contenteditable
+        const cellScale=lot.cellScale&&lot.cellScale[c]&&lot.cellScale[c]!==1?` style="font-size:${lot.cellScale[c]}em"`:'';
+        const placeholder=c==='price'?' data-placeholder="Type price"':'';
+        h+=`<div class="${cls}"><div class="cc" contenteditable${cellScale}${placeholder}
               data-id="${lot.id}" data-c="${c}">${v}</div></div>`;
       });
       h+=`</div>`;
@@ -836,9 +913,13 @@ function wireSheetEvents(){
 
 /* ===== row height ===== */
 let lastFocusLot=null;
+let lastFocusCell=null;
 document.addEventListener('focusin',e=>{
   const r=e.target.closest('.lotrow');
   if(r)lastFocusLot=r.dataset.id;
+  if(e.target&&e.target.matches&&e.target.matches('[contenteditable][data-id][data-c]')){
+    lastFocusCell={id:e.target.dataset.id,c:e.target.dataset.c};
+  }
 });
 function adjustRow(delta){
   if(!lastFocusLot){toast('Click a lot first.');return;}
@@ -846,6 +927,43 @@ function adjustRow(delta){
   if(!lot)return;
   lot.h=Math.max(54,lot.h+delta);
   renderEditor();
+}
+
+function selectedLot(){
+  if(!lastFocusLot){toast('Click a lot first.');return null;}
+  const lot=S.lots.find(l=>l.id===lastFocusLot);
+  if(!lot)toast('Click a lot first.');
+  return lot||null;
+}
+function toggleScratch(){
+  const lot=selectedLot(); if(!lot)return;
+  lot.scratched=!lot.scratched;
+  renderEditor();
+  toast(lot.scratched?'Lot scratched.':'Scratch removed.');
+}
+function toggleSupplemental(){
+  const lot=selectedLot(); if(!lot)return;
+  lot.supplemental=!lot.supplemental;
+  renderEditor();
+  toast(lot.supplemental?'Lot marked supplemental.':'Supplemental mark removed.');
+}
+function adjustBoxText(delta){
+  if(!lastFocusCell){toast('Click inside the box first.');return;}
+  const lot=S.lots.find(l=>l.id===lastFocusCell.id);
+  if(!lot)return;
+  if(!lot.cellScale)lot.cellScale={};
+  const cur=lot.cellScale[lastFocusCell.c]||1;
+  lot.cellScale[lastFocusCell.c]=Math.max(.65,Math.min(1.8,+(cur+delta).toFixed(2)));
+  renderEditor();
+  toast('Box text '+Math.round(lot.cellScale[lastFocusCell.c]*100)+'%');
+}
+function resetBoxText(){
+  if(!lastFocusCell){toast('Click inside the box first.');return;}
+  const lot=S.lots.find(l=>l.id===lastFocusCell.id);
+  if(!lot)return;
+  if(lot.cellScale)delete lot.cellScale[lastFocusCell.c];
+  renderEditor();
+  toast('Box text reset.');
 }
 
 /* ===== bold ===== */
@@ -916,6 +1034,11 @@ $('#toEditor').onclick=()=>{
 $('#backToSettings').onclick=()=>{syncSettingsUI();go('settings');};
 $('#boldBtn').onmousedown=e=>{e.preventDefault();};
 $('#boldBtn').onclick=doBold;
+$('#scratchBtn').onclick=toggleScratch;
+$('#suppBtn').onclick=toggleSupplemental;
+$('#boxTxtMinus').onclick=()=>adjustBoxText(-.08);
+$('#boxTxtPlus').onclick=()=>adjustBoxText(.08);
+$('#boxTxtReset').onclick=resetBoxText;
 $('#rowPlus').onclick=()=>adjustRow(S.rowStep);
 $('#rowMinus').onclick=()=>adjustRow(-S.rowStep);
 $('#txtPlus').onclick=()=>{S.textScale=Math.min(1.5,+(S.textScale+.06).toFixed(2));
