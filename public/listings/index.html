@@ -218,6 +218,11 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .toast.show{opacity:1}
 input[type=date],input[type=number]{font-family:inherit}
 .empty-rail{color:var(--dim);font-size:12px;padding:10px 4px}
+
+.sheet .s-thead .cell{line-height:1.05;}
+.sheet .lotrow .cell.po-price .cc{min-height:18px;white-space:nowrap;overflow-wrap:normal;word-break:normal;}
+.sheet[data-mode="auctioneer"] .lotrow .cell{justify-content:flex-start;padding-top:7px;}
+
 </style>
 
 <!-- Auction Suite theme bridge: visual overrides only. Core catalog-builder logic remains unchanged. -->
@@ -303,12 +308,12 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .cal-box{border-color:var(--calendar-grey) !important;}
 .sheet .cal-box .cap{background:var(--calendar-grey) !important;color:#fff !important;}
 .sheet .cal-box{width:168px !important;max-height:82px !important;border-radius:9px !important;}
-.sheet .cal-box .cap{font-size:9px !important;letter-spacing:.9px !important;padding:3px !important;line-height:1 !important;}
+.sheet .cal-box .cap{font-size:10.5px !important;letter-spacing:1px !important;padding:3px !important;line-height:1 !important;}
 .sheet .cal-box .body{padding:1px 4px !important;gap:0 !important;justify-content:center !important;}
-.sheet .cal-box .body .nx{font-size:9.5px !important;line-height:1 !important;margin:0 !important;}
-.sheet .cal-box .body .dt{font-size:14px !important;gap:3px !important;line-height:1 !important;margin:0 !important;}
-.sheet .cal-box .body .dt svg{width:11px !important;height:11px !important;}
-.sheet .cal-box .body .nm{font-size:11.5px !important;line-height:.95 !important;margin:0 !important;}
+.sheet .cal-box .body .nx{font-size:10.5px !important;line-height:1 !important;margin:0 !important;}
+.sheet .cal-box .body .dt{font-size:15.5px !important;gap:3px !important;line-height:1 !important;margin:0 !important;}
+.sheet .cal-box .body .dt svg{width:13px !important;height:13px !important;}
+.sheet .cal-box .body .nm{font-size:12.5px !important;line-height:.95 !important;margin:0 !important;}
 
 .sheet .cal-box .body .dt,
 .sheet .s-meta .row b,
@@ -349,7 +354,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .lotrow.scratched .cell .cc *{text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:#1a1d23;}
 .sheet .lotrow.supplemental,.sheet .lotrow.supplemental.altrow{background:#fff !important;box-shadow:none !important;}
 .sheet .lotrow.supplemental .cell.lot{background-color:var(--supp-bg) !important;background-image:none !important;border-left:5px solid var(--supp-accent) !important;box-shadow:none !important;}
-.sheet .lotrow.supplemental .cell.price{border-right:5px solid var(--supp-accent) !important;}
+.sheet .lotrow.supplemental .cell.price{border-right:0 !important;}
 
 .sheet .lotrow.supplemental .cell.lot{align-items:stretch !important;}
 .sheet .lotrow.supplemental .cell.lot .cc{
@@ -360,10 +365,39 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 }
 
 .sheet .lotrow.supplemental .cell:not(.lot){background-color:#fff !important;background-image:none !important;}
+.sheet .lotrow.supplemental::after{content:"" !important;display:block !important;position:absolute;top:0;right:0;bottom:0;width:5px;background:var(--supp-accent);z-index:2;}
+
 .sheet .lotrow.supplemental::before,.sheet .lotrow.scratched.supplemental::before{content:none !important;display:none !important;}
 .sheet .supp-tag-row{display:none !important;}
 
+/* Listing builder refinement updates */
+.settings-actions{max-width:960px;margin:0 auto 18px;display:flex;justify-content:flex-end;gap:12px;}
+.settings-actions-bottom{display:none;}
+.sheet .lotrow{border-bottom:8px solid var(--lot-divider,#d3d3d3) !important;}
+.sheet .lotrow.gtop,.sheet .lotrow.gmid{border-bottom:2px solid var(--lot-divider,#d3d3d3) !important;}
+.sheet .lotrow .cell{padding-top:8px !important;padding-bottom:8px !important;}
+.sheet .lotrow .cell.seller .seller-name{display:block;font-family:'Oswald',Arial,sans-serif;font-weight:400;font-size:1.08em;line-height:1.12;color:#1a2444;}
+.sheet .lotrow .cell.seller b{font-weight:400 !important;}
+.sheet .lotrow .cell.sex .cc,
+.sheet .lotrow .cell.basewt .cc,
+.sheet .lotrow .cell.delivery .cc,
+.sheet .lotrow .cell.shrink .cc{font-family:'Barlow',Arial,sans-serif !important;font-weight:400 !important;font-size:.84em !important;color:#2a3354 !important;line-height:1.26 !important;}
+.sheet .lotrow .cell.desc{font-size:.9em !important;line-height:1.28;}
+.sheet .lotrow .cell.notes{font-size:.84em !important;line-height:1.26;}
+.sheet .cal-box .cap{font-size:12.1px !important;padding:2px 3px !important;}
+.sheet .cal-box .body{padding:0 4px 1px !important;gap:0 !important;}
+.sheet .cal-box .body .nx{font-size:12.1px !important;line-height:.94 !important;}
+.sheet .cal-box .body .dt{font-size:17.8px !important;line-height:.98 !important;}
+.sheet .cal-box .body .dt svg{width:15px !important;height:15px !important;}
+.sheet .cal-box .body .nm{font-size:14.4px !important;line-height:.9 !important;}
+.sheet .lotrow.supplemental::after{content:none !important;display:none !important;}
+
 @media (max-width: 760px){.view{padding:18px}.settings-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-wrap:wrap}.crumbs{width:100%;overflow:auto}.ed-rail{width:132px}.ed-canvas{padding:18px}}
+
+.sheet .s-thead .cell{line-height:1.05;}
+.sheet .lotrow .cell.po-price .cc{min-height:18px;white-space:nowrap;overflow-wrap:normal;word-break:normal;}
+.sheet[data-mode="auctioneer"] .lotrow .cell{justify-content:flex-start;padding-top:7px;}
+
 </style>
 
 <div id="app">
@@ -397,6 +431,10 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 
   <!-- VIEW: SETTINGS -->
   <div class="view" id="v-settings">
+    <div class="settings-actions settings-actions-top">
+      <button class="btn ghost" id="backToUpload">Back</button>
+      <button class="btn" id="toEditor">Build Catalog →</button>
+    </div>
     <div class="settings-grid">
       <div class="card">
         <h3>Global Settings</h3>
@@ -424,14 +462,11 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
       <div class="card">
         <h3>Bold Rules</h3>
         <div class="sub">One phrase per line. Matching phrases in description and notes are bolded automatically.</div>
-        <div class="field"><label>Auto-Bold Phrases</label><textarea id="bold-rules" placeholder="Top Dollar Angus Verified&#10;100% Holstein Cows"></textarea>
-          <div class="hint">Use exact phrases. You can still manually bold selected text in the editor.</div></div>
+        <div class="field"><label>Auto-Bold Phrases</label><textarea id="bold-rules" placeholder="Top Dollar Angus Verified&#10;100% Holstein Cows | unless: Jersey, JerseyX"></textarea>
+          <div class="hint">Use exact phrases. Add exclusions with: phrase | unless: word, another word. Example: Holstein Cows | unless: Jersey.</div></div>
       </div>
     </div>
-    <div class="settings-foot">
-      <button class="btn ghost" id="backToUpload">Back</button>
-      <button class="btn" id="toEditor">Build Catalog →</button>
-    </div>
+    <div class="settings-foot settings-actions-bottom"></div>
   </div>
 
   <!-- VIEW: EDITOR -->
@@ -486,6 +521,8 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
           </div>
           <div class="spacer" style="flex:1"></div>
           <button class="btn ghost sm" id="backToSettings">Settings</button>
+          <button class="btn ghost sm" id="exportPoBtn">⬇ Starting / PO Sheet</button>
+          <button class="btn ghost sm" id="exportAuctioneerBtn">⬇ Auctioneer Notes</button>
           <button class="btn sm" id="exportBtn">⬇ Download PDF</button>
         </div>
         <div class="color-editor-bar">
@@ -495,6 +532,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
             <div class="field"><label>Section Fade End</label><input type="color" id="c-section-end"></div>
             <div class="field"><label>Section Text</label><input type="color" id="c-section-text"></div>
             <div class="field"><label>Table Header</label><input type="color" id="c-table-head"></div>
+            <div class="field"><label>Lot Dividers</label><input type="color" id="c-divider"></div>
             <div class="field"><label>Calendar Grey</label><input type="color" id="c-calendar"></div>
             <div class="field"><label>Supplemental Accent</label><input type="color" id="c-supp-accent"></div>
             <div class="field"><label>Supplemental Fill</label><input type="color" id="c-supp-bg"></div>
@@ -523,15 +561,15 @@ const IC = {
 
 /* ===== state ===== */
 const S = {
-  lots:[], results:false,
+  lots:[], results:false, sheetMode:'default',
   global:{house:'CMS Livestock Auction',phone:'(806) 355-7505',
     email:'info@cmslivestock.com',web:'www.CattleMarketingServices.com',
     addr:'6900 I40 West, Ste 135, Amarillo, TX 79106'},
   issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:''},
   sections:[], zoom:.70, rowStep:14, textScale:1,
-  colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff'},
-  boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows','Holstein Cow','Holstein Cows'],
-  colWidths:{lot:52,seller:130,head:46,desc:146,sex:74,basewt:48,delivery:82,shrink:40,slide:62,notes:258,price:60}
+  colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff'},
+  boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows','Holstein Cow | unless: Jersey, Jers','Holstein Cows | unless: Jersey, Jers'],
+  colWidths:{lot:52,seller:130,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:40,slide:62,notes:242,price:60}
 };
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const MONTHS=['January','February','March','April','May','June','July','August',
@@ -591,8 +629,8 @@ function handleFile(file){
       desc1:(r['Description']||'').trim(),
       desc2:(r['Second Description']||'').trim(),
       type:(r['Type']||'Uncategorized').trim(),
-      price:priceKey?(r[priceKey]||'').trim():'',
-      h:66, edits:{}, scratched:false, supplemental:/^S/i.test((r['Lot Number']||'').trim()), cellScale:{}
+      price:priceKey?(r[priceKey]||'').trim():'', poPrice:'',
+      h:74, edits:{}, scratched:false, supplemental:/^S/i.test((r['Lot Number']||'').trim()), cellScale:{}
     }));
     prefillIssue();
     syncSettingsUI();
@@ -618,7 +656,7 @@ function syncSettingsUI(){
   $('#i-nname').value=S.issue.nname; $('#i-ntag').value=S.issue.ntag;
   $('#c-blue').value=S.colors.blue; $('#c-section-end').value=S.colors.sectionEnd;
   $('#c-section-text').value=S.colors.sectionText; $('#c-table-head').value=S.colors.tableHead;
-  $('#c-calendar').value=S.colors.calendar; $('#c-supp-accent').value=S.colors.suppAccent;
+  $('#c-calendar').value=S.colors.calendar; $('#c-divider').value=S.colors.divider||'#d3d3d3'; $('#c-supp-accent').value=S.colors.suppAccent;
   $('#c-supp-bg').value=S.colors.suppBg; $('#bold-rules').value=S.boldRules.join('\n');
 }
 function readSettingsUI(){
@@ -628,7 +666,7 @@ function readSettingsUI(){
     ndate:$('#i-ndate').value,nname:$('#i-nname').value,ntag:$('#i-ntag').value};
   S.colors={blue:$('#c-blue').value,sectionEnd:$('#c-section-end').value,
     sectionText:$('#c-section-text').value,tableHead:$('#c-table-head').value,
-    calendar:$('#c-calendar').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value};
+    calendar:$('#c-calendar').value,divider:$('#c-divider').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value};
   S.boldRules=$('#bold-rules').value.split(/\n/).map(x=>x.trim()).filter(Boolean);
 }
 
@@ -637,10 +675,21 @@ function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':
 function nl(s){return esc(s).replace(/\\n|\n/g,'<br>');}
 function flat(s){return esc((s||'').replace(/\\n|\n|\r/g,' ').replace(/\s+/g,' ').trim());}
 function rxEsc(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+function stripTags(s){return (s||'').replace(/<[^>]*>/g,' ');}
+function parseBoldRule(rule){
+  const parts=String(rule||'').split(/\s*\|\s*unless\s*:\s*/i);
+  const phrase=(parts[0]||'').trim();
+  let unless=parts[1]?parts[1].split(',').map(x=>x.trim()).filter(Boolean):[];
+  if(/^Holstein Cows?$/i.test(phrase) && !unless.length)unless=['Jersey','Jers'];
+  return {phrase,unless};
+}
 function applyBoldRules(html){
+  const plain=stripTags(html);
   (S.boldRules||[]).forEach(rule=>{
-    if(!rule)return;
-    const safe=esc(rule);
+    const {phrase,unless}=parseBoldRule(rule);
+    if(!phrase)return;
+    if(unless.some(term=>new RegExp(rxEsc(term),'i').test(plain)))return;
+    const safe=esc(phrase);
     const pat=rxEsc(safe).replace(/\\ /g,'\\s+');
     html=html.replace(new RegExp(`(?![^<]*>)(${pat})`,'gi'),'<strong>$1</strong>');
   });
@@ -671,7 +720,7 @@ function notesHTML(lot){
 }
 function sellerHTML(lot){
   if(lot.edits.seller!=null) return lot.edits.seller;
-  return `<b>${esc(lot.consignor)}</b>`+(lot.location?`<i>${esc(lot.location)}</i>`:'');
+  return `<span class="seller-name">${esc(lot.consignor)}</span>`+(lot.location?`<i>${esc(lot.location)}</i>`:'');
 }
 
 /* ===== build sections & pagination ===== */
@@ -703,7 +752,7 @@ function autofit(){
     const pages=[[]]; let pi=0;
     let cap=rowsAreaH(hdr(0),true), used=0;
     sec.blocks.forEach(b=>{
-      const bh=b.lots.reduce((s,l)=>s+l.h,0);
+      const bh=b.lots.reduce((s,l)=>s+l.h+rowExtra(),0);
       if(used+bh>cap && pages[pi].length){
         pages.push([]); pi++; cap=rowsAreaH(hdr(pi),pi===0); used=0;
       }
@@ -746,11 +795,16 @@ const COLS=['lot','seller','head','desc','sex','basewt','delivery','shrink',
   'slide','notes','price'];
 const HEADLABELS={lot:'Lot',seller:'Seller / Location',head:'Head',desc:'Description',
   sex:'Sex',basewt:'Base WT',delivery:'Delivery',shrink:'Shrink',slide:'Slide',
-  notes:'Notes',price:'Price'};
-const DEFAULT_COL_WIDTHS={lot:52,seller:130,head:46,desc:146,sex:74,basewt:48,delivery:82,shrink:40,slide:62,notes:258,price:60};
+  notes:'Notes',price:'Price',poPrice:'PO Price'};
+const DEFAULT_COL_WIDTHS={lot:52,seller:130,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:40,slide:62,notes:242,price:60};
 const MIN_COL_WIDTHS={lot:38,seller:90,head:32,desc:90,sex:50,basewt:42,delivery:58,shrink:34,slide:42,notes:110,price:50};
+const PO_COL_WIDTHS={lot:52,seller:130,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:40,slide:62,notes:182,price:60,poPrice:60};
 const TABLE_W=998;
-function gridTemplate(){return COLS.map(c=>Math.round(S.colWidths[c])+'px').join(' ');}
+function activeCols(){return S.sheetMode==='po'?[...COLS,'poPrice']:COLS;}
+function activeLabel(c){return S.sheetMode==='po'&&c==='price'?'Starting Price':HEADLABELS[c];}
+function activeWidth(c){return S.sheetMode==='po'?PO_COL_WIDTHS[c]:(S.colWidths[c]||DEFAULT_COL_WIDTHS[c]);}
+function gridTemplate(){return activeCols().map(c=>Math.round(activeWidth(c))+'px').join(' ');}
+function rowExtra(){return S.sheetMode==='auctioneer'?44:0;}
 function normalizeColWidths(){
   COLS.forEach(c=>{if(!Number.isFinite(S.colWidths[c]))S.colWidths[c]=DEFAULT_COL_WIDTHS[c];});
   ['sex','shrink','slide','price','notes'].forEach(c=>{if(S.colWidths[c] < MIN_COL_WIDTHS[c])S.colWidths[c]=DEFAULT_COL_WIDTHS[c];});
@@ -787,13 +841,13 @@ function updateColControls(){
 }
 
 function sheetHTML(page,pageNum,totalPages){
-  const cols=COLS, grid=gridTemplate();
+  const cols=activeCols(), grid=gridTemplate();
   const sec=page.sec;
   const hasHeader=pageNum===1;
   const I=S.issue,G=S.global;
   const C=S.colors;
-  const sheetVars=`--ts:${S.textScale};--cat-blue:${C.blue};--section-fade:${C.sectionEnd};--section-text:${C.sectionText};--table-header-bg:${C.tableHead};--calendar-grey:${C.calendar};--supp-accent:${C.suppAccent};--supp-bg:${C.suppBg};--supp-bg-alt:${C.suppBg};`;
-  let h=`<div class="sheet" data-pg="${pageNum}" style="${sheetVars}">`+
+  const sheetVars=`--ts:${S.textScale};--cat-blue:${C.blue};--section-fade:${C.sectionEnd};--section-text:${C.sectionText};--table-header-bg:${C.tableHead};--lot-divider:${C.divider||'#d3d3d3'};--calendar-grey:${C.calendar};--supp-accent:${C.suppAccent};--supp-bg:${C.suppBg};--supp-bg-alt:${C.suppBg};`;
+  let h=`<div class="sheet" data-mode="${S.sheetMode}" data-pg="${pageNum}" style="${sheetVars}">`+
         `<div class="s-pad">`;
   if(hasHeader){
     h+=`<div class="s-head">
@@ -825,7 +879,7 @@ function sheetHTML(page,pageNum,totalPages){
   }
   // table
   h+=`<div class="s-tbl"><div class="trow s-thead" style="grid-template-columns:${grid}">`;
-  cols.forEach(c=>h+=`<div class="cell">${HEADLABELS[c]}</div>`);
+  cols.forEach(c=>h+=`<div class="cell">${activeLabel(c)}</div>`);
   h+=`</div>`;
   // rows
   let alt=0;
@@ -835,7 +889,7 @@ function sheetHTML(page,pageNum,totalPages){
       const isFirst=li===0;
       h+=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lot.scratched?'scratched':''} ${lot.supplemental?'supplemental':''}" data-id="${lot.id}"
             data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}"
-            style="grid-template-columns:${grid};min-height:${lot.h}px">`;
+            style="grid-template-columns:${grid};min-height:${lot.h+rowExtra()}px">`;
       if(li===0){
         h+=`<div class="lot-ctl">
             <button data-mv="-1" title="Move up a page">▲</button>
@@ -857,6 +911,8 @@ function sheetHTML(page,pageNum,totalPages){
         else if(c==='notes'){cls+=' notes';v=notesHTML(lot);}
         else if(c==='price'){cls+=' price ctr';
           v=lot.edits.price??(lot.price?esc(lot.price):'');}
+        else if(c==='poPrice'){cls+=' price po-price ctr';
+          v=lot.edits.poPrice??(lot.poPrice?esc(lot.poPrice):'');}
         const cellScale=lot.cellScale&&lot.cellScale[c]&&lot.cellScale[c]!==1?` style="font-size:${lot.cellScale[c]}em"`:'';
         h+=`<div class="${cls}"><div class="cc" contenteditable${cellScale}
               data-id="${lot.id}" data-c="${c}">${v}</div></div>`;
@@ -1008,11 +1064,30 @@ function resetBoxText(){
 function doBold(){document.execCommand('bold');}
 
 /* ===== PDF export ===== */
-async function exportPDF(){
+function fileDateBase(){
+  if(!S.issue.date)return 'Auction';
+  const [y,m,d]=S.issue.date.split('-');
+  return `${m}-${d}-${String(y).slice(-2)}`;
+}
+function exportName(kind){
+  const base=fileDateBase();
+  if(kind==='po')return `${base}-Starting-PO-Price-Sheet.pdf`;
+  if(kind==='auctioneer')return `${base}-Auctioneer-Notes-Sheet.pdf`;
+  return `${base}-${S.results?'Results':'Listings'}.pdf`;
+}
+async function exportPDF(kind='main'){
   toast('Rendering PDF…');
   // commit any focused edit
   if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
   await new Promise(r=>setTimeout(r,60));
+
+  const previousMode=S.sheetMode;
+  const exportMode=kind==='po'?'po':(kind==='auctioneer'?'auctioneer':'default');
+  S.sheetMode=exportMode;
+  autofit();
+  renderEditor();
+  await new Promise(r=>setTimeout(r,80));
+
   const {jsPDF}=window.jspdf;
   const pdf=new jsPDF({orientation:'landscape',unit:'pt',format:'letter'});
   const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
@@ -1031,8 +1106,11 @@ async function exportPDF(){
     pdf.addImage(img,'JPEG',0,0,pw,ph);
   }
   wrap.style.transform=prev;
-  const mo=monthOf(S.issue.date)||'Auction';
-  pdf.save(`CMS_${mo}_${S.results?'Results':'Catalog'}.pdf`);
+  pdf.save(exportName(kind));
+
+  S.sheetMode=previousMode;
+  autofit();
+  renderEditor();
   toast('PDF downloaded.');
 }
 
@@ -1040,7 +1118,7 @@ async function exportPDF(){
 function updateColorsFromEditor(){
   S.colors={blue:$('#c-blue').value,sectionEnd:$('#c-section-end').value,
     sectionText:$('#c-section-text').value,tableHead:$('#c-table-head').value,
-    calendar:$('#c-calendar').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value};
+    calendar:$('#c-calendar').value,divider:$('#c-divider').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value};
   saveGlobal();
   renderEditor();
 }
@@ -1097,8 +1175,10 @@ $('#colMinus').onclick=()=>changeColumnWidth($('#colPick').value,-8);
 $('#colPlus').onclick=()=>changeColumnWidth($('#colPick').value,8);
 $('#colReset').onclick=()=>{S.colWidths={...DEFAULT_COL_WIDTHS};updateColControls();renderEditor();toast('Column widths reset.');};
 $('#autofit').onclick=()=>{autofit();renderEditor();toast('Pages re-fitted.');};
-$$('#c-blue,#c-section-end,#c-section-text,#c-table-head,#c-calendar,#c-supp-accent,#c-supp-bg').forEach(el=>el.addEventListener('input',updateColorsFromEditor));
-$('#exportBtn').onclick=exportPDF;
+$$('#c-blue,#c-section-end,#c-section-text,#c-table-head,#c-divider,#c-calendar,#c-supp-accent,#c-supp-bg').forEach(el=>el.addEventListener('input',updateColorsFromEditor));
+$('#exportBtn').onclick=()=>exportPDF('main');
+$('#exportPoBtn').onclick=()=>exportPDF('po');
+$('#exportAuctioneerBtn').onclick=()=>exportPDF('auctioneer');
 $('#zIn').onclick=()=>{S.zoom=Math.min(1.3,S.zoom+.1);renderEditor();};
 $('#zOut').onclick=()=>{S.zoom=Math.max(.3,S.zoom-.1);renderEditor();};
 $$('.crumb').forEach(c=>c.onclick=()=>{
