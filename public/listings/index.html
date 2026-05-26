@@ -398,6 +398,16 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .cal-box .body .dt svg{width:15px !important;height:15px !important;}
 .sheet .cal-box .body .nm{font-size:14.4px !important;line-height:1 !important;margin:0 !important;}
 .sheet .lotrow.supplemental::after{content:none !important;display:none !important;}
+.tools-toggle-bar{display:flex;align-items:center;gap:8px;padding:8px 16px;background:#fff;border-bottom:1px solid #e6e0d4;}
+.tools-toggle-bar label{font-size:11px;color:#555b66;letter-spacing:.6px;text-transform:uppercase;font-weight:600;}
+.tools-toggle-bar select{height:30px;background:#fff;border:1px solid #d4cdbd;color:#1a1d23;border-radius:6px;padding:0 8px;font-family:inherit;font-size:12.5px;}
+.ed-main.tools-hidden #editTools,.ed-main.tools-hidden .color-editor-bar{display:none !important;}
+.sheet .cal-box{width:188px !important;min-height:98px !important;}
+.sheet .cal-box .cap{padding:8px 3px !important;}
+.sheet .cal-box .body{padding:1px 5px !important;gap:4px !important;justify-content:center !important;}
+.sheet .cal-box .body .nx{font-size:calc(11.4px * var(--calts,1)) !important;line-height:1 !important;}
+.sheet .cal-box .body .dt{font-size:calc(16.2px * var(--calts,1)) !important;line-height:1.05 !important;white-space:nowrap !important;}
+.sheet .cal-box .body .nm{font-size:calc(13.3px * var(--calts,1)) !important;line-height:1 !important;}
 
 @media (max-width: 760px){.view{padding:18px}.settings-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-wrap:wrap}.crumbs{width:100%;overflow:auto}.ed-rail{width:132px}.ed-canvas{padding:18px}}
 
@@ -495,7 +505,14 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
             <input type="file" id="resultsFileInput" accept=".csv" hidden>
           </div>
         </div>
-        <div class="ed-tools">
+        <div class="tools-toggle-bar">
+          <label for="toolsVisibility">Editing Tools</label>
+          <select id="toolsVisibility">
+            <option value="show">Show</option>
+            <option value="hide">Hide</option>
+          </select>
+        </div>
+        <div class="ed-tools" id="editTools">
           <div class="grp"><button class="btn ghost sm" id="boldBtn"><b>B</b> Bold</button></div>
           <div class="grp">
             <button class="btn ghost sm" id="scratchBtn">Scratch Lot</button>
@@ -512,6 +529,11 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
             <span class="lbl">Text size</span>
             <button class="btn ghost sm" id="txtMinus">A−</button>
             <button class="btn ghost sm" id="txtPlus">A+</button>
+          </div>
+          <div class="grp">
+            <span class="lbl">Calendar text</span>
+            <button class="btn ghost sm" id="calTxtMinus">A−</button>
+            <button class="btn ghost sm" id="calTxtPlus">A+</button>
           </div>
           <div class="grp">
             <span class="lbl">Box text</span>
@@ -582,7 +604,7 @@ const S = {
     email:'info@cmslivestock.com',web:'www.CattleMarketingServices.com',
     addr:'6900 I40 West, Ste 135, Amarillo, TX 79106'},
   issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:''},
-  sections:[], zoom:.70, rowStep:14, textScale:1,
+  sections:[], zoom:.70, rowStep:14, textScale:1, calendarTextScale:1, toolsHidden:false,
   colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows'],
   colWidths:{lot:52,seller:114,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:44,slide:78,notes:238,price:60},
@@ -825,19 +847,34 @@ function modeState(mode=modeKey()){
   if(!S.modeStates[mode])S.modeStates[mode]={edits:{},cellScales:{},heights:{},scratched:{},supplemental:{}};
   return S.modeStates[mode];
 }
+const MIRROR_FROM_LISTINGS=['po','results'];
+function mirrorListingsState(kind,lotId,c,value){
+  if(modeKey()!=='default')return;
+  MIRROR_FROM_LISTINGS.forEach(m=>{
+    const st=modeState(m);
+    if(kind==='height')st.heights[lotId]=value;
+    if(kind==='cellScale'){if(!st.cellScales[lotId])st.cellScales[lotId]={}; st.cellScales[lotId][c]=value;}
+    if(kind==='cellScaleClear'&&st.cellScales[lotId])delete st.cellScales[lotId][c];
+  });
+}
+function mirrorListingsLayout(){
+  if(modeKey()!=='default'||!S.modeLayouts.default)return;
+  MIRROR_FROM_LISTINGS.forEach(m=>{S.modeLayouts[m]=JSON.parse(JSON.stringify(S.modeLayouts.default));});
+}
 function lotEdits(lot){return Object.assign({},lot.edits||{},modeState().edits[lot.id]||{});}
 function lotEdit(lot,c){const e=lotEdits(lot); return e[c];}
 function setLotEdit(lot,c,v){const st=modeState(); if(!st.edits[lot.id])st.edits[lot.id]={}; st.edits[lot.id][c]=v;}
 function lotHeight(lot){const h=modeState().heights[lot.id]; return Number.isFinite(h)?h:(lot.h||74);}
-function setLotHeight(lot,h){modeState().heights[lot.id]=Math.max(54,Math.round(h));}
+function setLotHeight(lot,h){const v=Math.max(54,Math.round(h)); modeState().heights[lot.id]=v; mirrorListingsState('height',lot.id,null,v);}
 function lotCellScale(lot,c){const cs=modeState().cellScales[lot.id]||lot.cellScale||{}; return cs[c]||1;}
-function setLotCellScale(lot,c,v){const st=modeState(); if(!st.cellScales[lot.id])st.cellScales[lot.id]={}; st.cellScales[lot.id][c]=v;}
-function clearLotCellScale(lot,c){const st=modeState(); if(st.cellScales[lot.id])delete st.cellScales[lot.id][c];}
+function setLotCellScale(lot,c,v){const st=modeState(); if(!st.cellScales[lot.id])st.cellScales[lot.id]={}; st.cellScales[lot.id][c]=v; mirrorListingsState('cellScale',lot.id,c,v);}
+function clearLotCellScale(lot,c){const st=modeState(); if(st.cellScales[lot.id])delete st.cellScales[lot.id][c]; mirrorListingsState('cellScaleClear',lot.id,c,null);}
 function lotFlag(lot,name){const st=modeState(); if(Object.prototype.hasOwnProperty.call(st[name],lot.id))return !!st[name][lot.id]; return !!lot[name];}
 function setLotFlag(lot,name,v){modeState()[name][lot.id]=!!v;}
 function saveModeLayout(mode=modeKey()){
   if(!S.sections||!S.sections.length)return;
   S.modeLayouts[mode]=S.sections.map(sec=>({type:sec.type,pages:sec.pages.map(pg=>pg.map(b=>b.lots.map(l=>l.id)))}));
+  mirrorListingsLayout();
 }
 function restoreModeLayout(mode=modeKey()){
   const layout=S.modeLayouts[mode];
@@ -908,7 +945,7 @@ function sheetHTML(page,pageNum,totalPages){
   const hasHeader=pageNum===1;
   const I=S.issue,G=S.global;
   const C=S.colors;
-  const sheetVars=`--ts:${S.textScale};--cat-blue:${C.blue};--section-fade:${C.sectionEnd};--section-text:${C.sectionText};--table-header-bg:${C.tableHead};--lot-divider:${C.divider||'#d3d3d3'};--calendar-grey:${C.calendar};--supp-accent:${C.suppAccent};--supp-bg:${C.suppBg};--supp-bg-alt:${C.suppBg};`;
+  const sheetVars=`--ts:${S.textScale};--cat-blue:${C.blue};--section-fade:${C.sectionEnd};--section-text:${C.sectionText};--table-header-bg:${C.tableHead};--lot-divider:${C.divider||'#d3d3d3'};--calts:${S.calendarTextScale||1};--calendar-grey:${C.calendar};--supp-accent:${C.suppAccent};--supp-bg:${C.suppBg};--supp-bg-alt:${C.suppBg};`;
   let h=`<div class="sheet" data-mode="${S.sheetMode}" data-pg="${pageNum}" style="${sheetVars}">`+
         `<div class="s-pad">`;
   if(hasHeader){
@@ -976,7 +1013,7 @@ function sheetHTML(page,pageNum,totalPages){
         else if(c==='poPrice'){cls+=' price po-price ctr';
           v=lotEdit(lot,'poPrice')??(lot.poPrice?esc(lot.poPrice):'');}
         const sc=lotCellScale(lot,c);
-        const cellScale=sc&&sc!==1?` style="font-size:${sc}em"`:'';
+        const cellScale=sc&&sc!==1?` style="font-size:${sc}em !important"`:'';
         h+=`<div class="${cls}"><div class="cc" contenteditable${cellScale}
               data-id="${lot.id}" data-c="${c}">${v}</div></div>`;
       });
@@ -1009,11 +1046,8 @@ function renderEditor(){
   wrap.classList.add('editing');
   wrap.style.transform='scale('+S.zoom+')';
   $('#zVal').textContent=Math.round(S.zoom*100)+'%';
-  // measure real rendered heights so Auto-fit reflects actual content
-  $$('#zoomwrap .lotrow').forEach(r=>{
-    const lot=S.lots.find(l=>l.id===r.dataset.id);
-    if(lot)setLotHeight(lot,r.offsetHeight-rowExtra());
-  });
+  const tv=$('#toolsVisibility'); if(tv){tv.value=S.toolsHidden?'hide':'show'; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden);}
+  // keep manual row heights stable; overflow detection below flags pages without changing layout.
   // overflow detection
   $$('.sheet').forEach(sh=>{
     const tbl=sh.querySelector('.s-tbl');
@@ -1168,22 +1202,41 @@ async function exportPDF(kind=S.sheetMode||'default'){
 function ingestResultsCSV(file){
   Papa.parse(file,{header:true,skipEmptyLines:true,complete:res=>{
     const rows=res.data||[];
+    const fields=(res.meta&&res.meta.fields)||[];
+    const norm=x=>String(x||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
+    const findVal=(r,names)=>{
+      for(const name of names){
+        const key=Object.keys(r).find(k=>norm(k)===norm(name));
+        if(key && String(r[key]||'').trim())return String(r[key]).trim();
+      }
+      return '';
+    };
     const priceFor={};
     rows.forEach(r=>{
-      const lot=String(r['Lot Number']||r['Lot']||r['Lot #']||r['Lot Number #2']||'').trim();
-      const price=String(r['Calculated High Bid']||r['Price']||r['High Bid']||r['Result']||'').trim();
-      if(lot&&price)priceFor[lot.replace(/^S/i,'')]=price;
+      const lot=findVal(r,['Lot Number','Lot','Lot #','Lot Number #2','Group Number']);
+      let price=findVal(r,['Calculated High Bid','Price','High Bid','Result','Results','Final Price','Sale Price','Winning Bid','Current High Bid']);
+      if(!price){
+        const lastKey=Object.keys(r).filter(k=>String(k).trim()==='' || /^__parsed_extra$/i.test(k)).pop() || fields[fields.length-1];
+        if(lastKey && String(r[lastKey]||'').trim())price=String(r[lastKey]).trim();
+      }
+      if(lot&&price)priceFor[String(lot).replace(/^S/i,'').trim()]=price;
     });
     let count=0;
     S.lots.forEach(l=>{
-      const keys=[String(l.lot||''),String(l.lot2||''),displayLotNumber(l)].map(x=>x.replace(/^S/i,'').trim()).filter(Boolean);
+      const keys=[String(l.lot||''),String(l.lot2||''),String(l.group||''),displayLotNumber(l)]
+        .map(x=>x.replace(/^S/i,'').trim()).filter(Boolean);
       const hit=keys.map(k=>priceFor[k]).find(Boolean);
-      if(hit){if(!S.modeStates.results)S.modeStates.results={edits:{},cellScales:{},heights:{},scratched:{},supplemental:{}}; if(!S.modeStates.results.edits[l.id])S.modeStates.results.edits[l.id]={}; S.modeStates.results.edits[l.id].price=hit; count++;}
+      if(hit){
+        const st=modeState('results');
+        if(!st.edits[l.id])st.edits[l.id]={};
+        st.edits[l.id].price=hit;
+        count++;
+      }
     });
     S.results=count>0;
     saveModeLayout();
     switchSheetMode('results');
-    toast(count?`Results added to ${count} lots.`:'No matching result prices found.');
+    toast(count?`Results added to ${count} lots.`:'No matching result prices found. Check lot number and price columns.');
   }});
 }
 
@@ -1242,6 +1295,9 @@ $('#txtPlus').onclick=()=>{S.textScale=Math.min(1.5,+(S.textScale+.06).toFixed(2
   renderEditor();toast('Text size '+Math.round(S.textScale*100)+'%');};
 $('#txtMinus').onclick=()=>{S.textScale=Math.max(.7,+(S.textScale-.06).toFixed(2));
   renderEditor();toast('Text size '+Math.round(S.textScale*100)+'%');};
+$('#calTxtPlus').onclick=()=>{S.calendarTextScale=Math.min(1.35,+((S.calendarTextScale||1)+.05).toFixed(2));renderEditor();toast('Calendar text '+Math.round(S.calendarTextScale*100)+'%');};
+$('#calTxtMinus').onclick=()=>{S.calendarTextScale=Math.max(.75,+((S.calendarTextScale||1)-.05).toFixed(2));renderEditor();toast('Calendar text '+Math.round(S.calendarTextScale*100)+'%');};
+$('#toolsVisibility').onchange=e=>{S.toolsHidden=e.target.value==='hide'; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden);};
 $('#colPick').onchange=updateColControls;
 $('#colMinus').onclick=()=>changeColumnWidth($('#colPick').value,-8);
 $('#colPlus').onclick=()=>changeColumnWidth($('#colPick').value,8);
