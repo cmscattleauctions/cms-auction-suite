@@ -228,6 +228,10 @@ input[type=date],input[type=number]{font-family:inherit}
 .sheet .lotrow .cell.po-price .cc{min-height:18px;white-space:nowrap;overflow-wrap:normal;word-break:normal;}
 .sheet[data-mode="auctioneer"] .lotrow .cell{justify-content:flex-start;padding-top:7px;}
 
+.sheet .note-tags{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px;align-items:flex-start;}
+.sheet .note-tag{display:inline-flex;align-items:center;border:1px solid #9aa3b4;border-radius:4px;padding:1px 4px;font-family:'Barlow',Arial,sans-serif;font-size:.82em;font-weight:700;line-height:1.05;color:#13235e;background:#f7f9fc;white-space:nowrap;}
+.sheet .note-body{display:block;}
+
 </style>
 
 <!-- Auction Suite theme bridge: visual overrides only. Core catalog-builder logic remains unchanged. -->
@@ -312,7 +316,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .s-title .sub{font-size:18px !important;line-height:1.12 !important;}
 .sheet .cal-box{border-color:var(--calendar-grey) !important;}
 .sheet .cal-box .cap{background:var(--calendar-grey) !important;color:#fff !important;}
-.sheet .cal-box{width:168px !important;min-height:96px !important;max-height:none !important;border-radius:9px !important;}
+.sheet .cal-box{width:168px !important;min-height:108px !important;max-height:none !important;border-radius:9px !important;}
 .sheet .cal-box .cap{font-size:10.5px !important;letter-spacing:1px !important;padding:3px !important;line-height:1 !important;}
 .sheet .cal-box .body{padding:1px 4px !important;gap:0 !important;justify-content:center !important;}
 .sheet .cal-box .body .nx{font-size:10.5px !important;line-height:1 !important;margin:0 !important;}
@@ -386,13 +390,14 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .lotrow .cell.sex .cc,
 .sheet .lotrow .cell.basewt .cc,
 .sheet .lotrow .cell.delivery .cc,
-.sheet .lotrow .cell.shrink .cc{font-family:'Barlow',Arial,sans-serif !important;font-weight:400 !important;font-size:.94em !important;color:#2a3354 !important;line-height:1.26 !important;}
+.sheet .lotrow .cell.shrink .cc,
+.sheet .lotrow .cell.slide .cc{font-family:'Barlow',Arial,sans-serif !important;font-weight:400 !important;font-size:1.02em !important;color:#2a3354 !important;line-height:1.26 !important;}
 .sheet .lotrow .cell.desc{font-size:.9em !important;line-height:1.28;}
 .sheet .lotrow .cell.notes{font-size:.84em !important;line-height:1.26;}
 .sheet .cal-box .cap{font-size:12.1px !important;padding:2px 3px !important;}
-.sheet .cal-box .body{padding:2px 4px 5px !important;gap:3px !important;}
-.sheet .cal-box .body .nx{font-size:12.1px !important;line-height:1 !important;margin-bottom:2px !important;}
-.sheet .cal-box .body .dt{font-size:17.8px !important;line-height:1.05 !important;margin-bottom:3px !important;}
+.sheet .cal-box .body{padding:5px 4px 9px !important;gap:6px !important;}
+.sheet .cal-box .body .nx{font-size:12.1px !important;line-height:1 !important;margin-bottom:4px !important;}
+.sheet .cal-box .body .dt{font-size:17.8px !important;line-height:1.05 !important;margin-bottom:5px !important;}
 .sheet .cal-box .body .dt svg{width:15px !important;height:15px !important;}
 .sheet .cal-box .body .nm{font-size:14.4px !important;line-height:1 !important;margin-bottom:2px !important;}
 .sheet .lotrow.supplemental::after{content:none !important;display:none !important;}
@@ -402,6 +407,10 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .s-thead .cell{line-height:1.05;}
 .sheet .lotrow .cell.po-price .cc{min-height:18px;white-space:nowrap;overflow-wrap:normal;word-break:normal;}
 .sheet[data-mode="auctioneer"] .lotrow .cell{justify-content:flex-start;padding-top:7px;}
+
+.sheet .note-tags{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px;align-items:flex-start;}
+.sheet .note-tag{display:inline-flex;align-items:center;border:1px solid #9aa3b4;border-radius:4px;padding:1px 4px;font-family:'Barlow',Arial,sans-serif;font-size:.82em;font-weight:700;line-height:1.05;color:#13235e;background:#f7f9fc;white-space:nowrap;}
+.sheet .note-body{display:block;}
 
 </style>
 
@@ -469,6 +478,8 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
         <div class="sub">One phrase per line. Matching phrases in description and notes are bolded automatically.</div>
         <div class="field"><label>Auto-Bold Phrases</label><textarea id="bold-rules" placeholder="Top Dollar Angus Verified&#10;100% Holstein Cows"></textarea>
           <div class="hint">Use exact phrases. Add exclusions with: phrase | unless: word, another word. Example: Holstein Cows | unless: Jersey.</div></div>
+        <div class="field"><label>Notes Tags</label><textarea id="tag-rules" placeholder="ASV&#10;NHTC&#10;BeefCare"></textarea>
+          <div class="hint">One tag per line. If a tag phrase appears in the Notes column, it is moved into a tag pill at the top of that Notes box and removed from the note text.</div></div>
       </div>
     </div>
     <div class="settings-foot settings-actions-bottom"></div>
@@ -582,8 +593,9 @@ const S = {
   sections:[], zoom:.70, rowStep:14, textScale:1,
   colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows'],
+  tagRules:['ASV','NHTC','BeefCare','100% Holstein Cows','Single Source Dairy','No Implants','100% Vegetarian Fed','Vegetarian Fed','Guaranteed Open'],
   colWidths:{lot:52,seller:114,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:40,slide:78,notes:242,price:60},
-  modeLayouts:{}
+  modeLayouts:{}, modeStates:{}
 };
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const MONTHS=['January','February','March','April','May','June','July','August',
@@ -603,11 +615,12 @@ async function loadGlobal(){
       if(data.global)Object.assign(S.global,data.global); else Object.assign(S.global,data);
       if(data.colors)Object.assign(S.colors,data.colors);
       if(Array.isArray(data.boldRules))S.boldRules=data.boldRules.filter(r=>!/Holstein Cows? \| unless: Jersey, Jers/i.test(r));
+      if(Array.isArray(data.tagRules))S.tagRules=data.tagRules.filter(Boolean);
     }
   }catch(e){}
 }
 async function saveGlobal(){
-  try{await window.storage.set('cms_global',JSON.stringify({global:S.global,colors:S.colors,boldRules:S.boldRules}));}catch(e){}
+  try{await window.storage.set('cms_global',JSON.stringify({global:S.global,colors:S.colors,boldRules:S.boldRules,tagRules:S.tagRules}));}catch(e){}
 }
 
 /* ===== navigation ===== */
@@ -625,6 +638,7 @@ function handleFile(file){
     // detect results mode
     const priceKey=Object.keys(rows[0]).find(k=>/calculated high bid/i.test(k));
     S.results=!!priceKey;
+    S.modeLayouts={}; S.modeStates={}; S.sheetMode='default';
     S.lots=rows.map((r,i)=>({
       id:'L'+i,
       lot:(r['Lot Number']||'').trim(),
@@ -671,7 +685,7 @@ function syncSettingsUI(){
   $('#c-blue').value=S.colors.blue; $('#c-section-end').value=S.colors.sectionEnd;
   $('#c-section-text').value=S.colors.sectionText; $('#c-table-head').value=S.colors.tableHead;
   $('#c-calendar').value=S.colors.calendar; $('#c-divider').value=S.colors.divider||'#d3d3d3'; $('#c-supp-accent').value=S.colors.suppAccent;
-  $('#c-supp-bg').value=S.colors.suppBg; $('#bold-rules').value=S.boldRules.join('\n');
+  $('#c-supp-bg').value=S.colors.suppBg; $('#bold-rules').value=S.boldRules.join('\n'); $('#tag-rules').value=S.tagRules.join('\n');
 }
 function readSettingsUI(){
   S.global={house:$('#g-house').value,phone:$('#g-phone').value,
@@ -682,6 +696,7 @@ function readSettingsUI(){
     sectionText:$('#c-section-text').value,tableHead:$('#c-table-head').value,
     calendar:$('#c-calendar').value,divider:$('#c-divider').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value};
   S.boldRules=$('#bold-rules').value.split(/\n/).map(x=>x.trim()).filter(Boolean);
+  S.tagRules=$('#tag-rules').value.split(/\n/).map(x=>x.trim()).filter(Boolean);
 }
 
 /* ===== text helpers (auto-bold rules) ===== */
@@ -710,30 +725,55 @@ function applyBoldRules(html){
 }
 
 function displayLotNumber(lot){
-  const raw=(lot.edits.lot!=null?lot.edits.lot:lot.lot)||'';
+  const raw=(lotEdit(lot,'lot')!=null?lotEdit(lot,'lot'):lot.lot)||'';
   const text=String(raw).replace(/<[^>]*>/g,'').trim();
-  if(lot.supplemental && text && !/^S/i.test(text)) return 'S'+text;
+  if(lotFlag(lot,'supplemental') && text && !/^S/i.test(text)) return 'S'+text;
   return raw;
 }
 function descHTML(lot){
-  if(lot.edits.desc!=null) return lot.edits.desc;
+  if(lotEdit(lot,'desc')!=null) return lotEdit(lot,'desc');
   const n=parseInt(lot.loadCount)||0;
   const load=lot.loadCount?`<strong>${esc(lot.loadCount)} Load${n===1?'':'s'}</strong> of `:'';
   let breed=flat(lot.breed);
   return applyBoldRules(load+breed);
 }
+function cleanTextPunctuation(s){
+  return (s||'').replace(/\s+/g,' ')
+    .replace(/\s*([,.;])\s*/g,'$1 ')
+    .replace(/^(?:[,.;]\s*)+/,'')
+    .replace(/(?:\s*[,.;])+\s*$/,'')
+    .replace(/\s{2,}/g,' ')
+    .trim();
+}
+function tagNotesHTML(rawHtml){
+  let text=String(rawHtml||'').replace(/<br\s*\/?>/gi,' ').replace(/<[^>]*>/g,' ');
+  text=text.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+  const tags=[];
+  (S.tagRules||[]).forEach(tag=>{
+    if(!tag)return;
+    const re=new RegExp(rxEsc(tag).replace(/\ /g,'\s+'),'i');
+    if(re.test(text)){
+      tags.push(tag);
+      text=text.replace(new RegExp(rxEsc(tag).replace(/\ /g,'\s+'),'gi'),' ');
+    }
+  });
+  text=cleanTextPunctuation(text);
+  const tagHtml=tags.length?`<div class="note-tags">${tags.map(t=>`<span class="note-tag">${esc(t)}</span>`).join('')}</div>`:'';
+  const body=text?`<span class="note-body">${applyBoldRules(esc(text))}</span>`:'';
+  return tagHtml+body;
+}
 function notesHTML(lot){
-  if(lot.edits.notes!=null) return lot.edits.notes;
-  let html=[lot.desc1,lot.desc2].filter(Boolean).map(flat).join('<br>');
-  return applyBoldRules(html);
+  let html=lotEdit(lot,'notes');
+  if(html==null) html=[lot.desc1,lot.desc2].filter(Boolean).map(flat).join('<br>');
+  return tagNotesHTML(html);
 }
 function sellerHTML(lot){
-  if(lot.edits.seller!=null) return lot.edits.seller;
+  if(lotEdit(lot,'seller')!=null) return lotEdit(lot,'seller');
   return `<span class="seller-name">${esc(lot.consignor)}</span>`+(lot.location?`<i>${esc(lot.location)}</i>`:'');
 }
 
 /* ===== build sections & pagination ===== */
-const SHEET_H=816, PAD=24, HEADER_H=130, FOOT_H=34, THEAD_H=24, SECBAR_H=38, SLACK=55;
+const SHEET_H=816, PAD=24, HEADER_H=142, FOOT_H=34, THEAD_H=24, SECBAR_H=38, SLACK=78;
 function rowsAreaH(hasHeader,firstOfSection){
   return SHEET_H-PAD-(hasHeader?HEADER_H:0)-(firstOfSection?SECBAR_H:0)-THEAD_H-FOOT_H-SLACK;
 }
@@ -761,7 +801,7 @@ function autofit(){
     const pages=[[]]; let pi=0;
     let cap=rowsAreaH(hdr(0),true), used=0;
     sec.blocks.forEach(b=>{
-      const bh=b.lots.reduce((s,l)=>s+l.h+rowExtra(),0);
+      const bh=b.lots.reduce((s,l)=>s+lotHeight(l)+rowExtra(),0);
       if(used+bh>cap && pages[pi].length){
         pages.push([]); pi++; cap=rowsAreaH(hdr(pi),pi===0); used=0;
       }
@@ -816,6 +856,21 @@ function activeWidth(c){return S.sheetMode==='po'?PO_COL_WIDTHS[c]:(S.colWidths[
 function gridTemplate(){return activeCols().map(c=>Math.round(activeWidth(c))+'px').join(' ');}
 function rowExtra(){return S.sheetMode==='auctioneer'?44:0;}
 function modeKey(){return S.sheetMode||'default';}
+function modeState(mode=modeKey()){
+  if(!S.modeStates)S.modeStates={};
+  if(!S.modeStates[mode])S.modeStates[mode]={edits:{},cellScales:{},heights:{},scratched:{},supplemental:{}};
+  return S.modeStates[mode];
+}
+function lotEdits(lot){return Object.assign({},lot.edits||{},modeState().edits[lot.id]||{});}
+function lotEdit(lot,c){const e=lotEdits(lot); return e[c];}
+function setLotEdit(lot,c,v){const st=modeState(); if(!st.edits[lot.id])st.edits[lot.id]={}; st.edits[lot.id][c]=v;}
+function lotHeight(lot){const h=modeState().heights[lot.id]; return Number.isFinite(h)?h:(lot.h||74);}
+function setLotHeight(lot,h){modeState().heights[lot.id]=Math.max(54,Math.round(h));}
+function lotCellScale(lot,c){const cs=modeState().cellScales[lot.id]||lot.cellScale||{}; return cs[c]||1;}
+function setLotCellScale(lot,c,v){const st=modeState(); if(!st.cellScales[lot.id])st.cellScales[lot.id]={}; st.cellScales[lot.id][c]=v;}
+function clearLotCellScale(lot,c){const st=modeState(); if(st.cellScales[lot.id])delete st.cellScales[lot.id][c];}
+function lotFlag(lot,name){const st=modeState(); if(Object.prototype.hasOwnProperty.call(st[name],lot.id))return !!st[name][lot.id]; return !!lot[name];}
+function setLotFlag(lot,name,v){modeState()[name][lot.id]=!!v;}
 function saveModeLayout(mode=modeKey()){
   if(!S.sections||!S.sections.length)return;
   S.modeLayouts[mode]=S.sections.map(sec=>({type:sec.type,pages:sec.pages.map(pg=>pg.map(b=>b.lots.map(l=>l.id)))}));
@@ -930,9 +985,9 @@ function sheetHTML(page,pageNum,totalPages){
     b.lots.forEach((lot,li)=>{
       const gpos=b.grouped?(li===0?'gtop':(li===b.lots.length-1?'gbot':'gmid')):'';
       const isFirst=li===0;
-      h+=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lot.scratched?'scratched':''} ${lot.supplemental?'supplemental':''}" data-id="${lot.id}"
+      h+=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lotFlag(lot,'scratched')?'scratched':''} ${lotFlag(lot,'supplemental')?'supplemental':''}" data-id="${lot.id}"
             data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}"
-            style="grid-template-columns:${grid};min-height:${lot.h+rowExtra()}px">`;
+            style="grid-template-columns:${grid};min-height:${lotHeight(lot)+rowExtra()}px">`;
       if(li===0){
         h+=`<div class="lot-ctl">
             <button data-mv="-1" title="Move up a page">▲</button>
@@ -943,20 +998,21 @@ function sheetHTML(page,pageNum,totalPages){
         let v='',cls='cell';
         if(c==='lot'){cls+=' lot';v=esc(displayLotNumber(lot));}
         else if(c==='seller'){cls+=' seller';v=sellerHTML(lot);}
-        else if(c==='head'){cls+=' head ctr';v=esc(lot.edits.head??lot.head);}
+        else if(c==='head'){cls+=' head ctr';v=esc(lotEdit(lot,'head')??lot.head);}
         else if(c==='desc'){cls+=' desc';v=descHTML(lot);}
-        else if(c==='sex'){cls+=' sex ctr';v=(lot.edits.sex??flat(lot.sex));}
+        else if(c==='sex'){cls+=' sex ctr';v=(lotEdit(lot,'sex')??flat(lot.sex));}
         else if(c==='basewt'){cls+=' basewt ctr';
-          v=lot.edits.basewt??(lot.basewt?esc(lot.basewt)+'#':'');}
-        else if(c==='delivery'){cls+=' delivery ctr';v=esc(lot.edits.delivery??lot.delivery);}
-        else if(c==='shrink'){cls+=' shrink ctr';v=esc(lot.edits.shrink??lot.shrink);}
-        else if(c==='slide'){cls+=' slide ctr';v=(lot.edits.slide??flat(lot.slide));}
+          v=lotEdit(lot,'basewt')??(lot.basewt?esc(lot.basewt)+'#':'');}
+        else if(c==='delivery'){cls+=' delivery ctr';v=esc(lotEdit(lot,'delivery')??lot.delivery);}
+        else if(c==='shrink'){cls+=' shrink ctr';v=esc(lotEdit(lot,'shrink')??lot.shrink);}
+        else if(c==='slide'){cls+=' slide ctr';v=(lotEdit(lot,'slide')??flat(lot.slide));}
         else if(c==='notes'){cls+=' notes';v=notesHTML(lot);}
         else if(c==='price'){cls+=' price ctr';
-          v=lot.edits.price??(lot.price?esc(lot.price):'');}
+          v=lotEdit(lot,'price')??(lot.price?esc(lot.price):'');}
         else if(c==='poPrice'){cls+=' price po-price ctr';
-          v=lot.edits.poPrice??(lot.poPrice?esc(lot.poPrice):'');}
-        const cellScale=lot.cellScale&&lot.cellScale[c]&&lot.cellScale[c]!==1?` style="font-size:${lot.cellScale[c]}em"`:'';
+          v=lotEdit(lot,'poPrice')??(lot.poPrice?esc(lot.poPrice):'');}
+        const sc=lotCellScale(lot,c);
+        const cellScale=sc&&sc!==1?` style="font-size:${sc}em"`:'';
         h+=`<div class="${cls}"><div class="cc" contenteditable${cellScale}
               data-id="${lot.id}" data-c="${c}">${v}</div></div>`;
       });
@@ -992,7 +1048,7 @@ function renderEditor(){
   // measure real rendered heights so Auto-fit reflects actual content
   $$('#zoomwrap .lotrow').forEach(r=>{
     const lot=S.lots.find(l=>l.id===r.dataset.id);
-    if(lot)lot.h=r.offsetHeight;
+    if(lot)setLotHeight(lot,r.offsetHeight-rowExtra());
   });
   // overflow detection
   $$('.sheet').forEach(sh=>{
@@ -1033,7 +1089,7 @@ function wireSheetEvents(){
     el.addEventListener('blur',()=>{
       if(el.dataset.c){
         const lot=S.lots.find(l=>l.id===el.dataset.id);
-        if(lot)lot.edits[el.dataset.c]=el.innerHTML;
+        if(lot)setLotEdit(lot,el.dataset.c,el.innerHTML);
       }else if(el.dataset.f==='issName')S.issue.name=el.textContent;
       else if(el.dataset.f==='nextName')S.issue.nname=el.textContent;
       else if(el.dataset.f==='nextTag')S.issue.ntag=el.textContent;
@@ -1062,7 +1118,7 @@ function adjustRow(delta){
   if(!lastFocusLot){toast('Click a lot first.');return;}
   const lot=S.lots.find(l=>l.id===lastFocusLot);
   if(!lot)return;
-  lot.h=Math.max(54,lot.h+delta);
+  setLotHeight(lot,lotHeight(lot)+delta);
   renderEditor();
 }
 
@@ -1074,31 +1130,30 @@ function selectedLot(){
 }
 function toggleScratch(){
   const lot=selectedLot(); if(!lot)return;
-  lot.scratched=!lot.scratched;
+  setLotFlag(lot,'scratched',!lotFlag(lot,'scratched'));
   renderEditor();
-  toast(lot.scratched?'Lot scratched.':'Scratch removed.');
+  toast(lotFlag(lot,'scratched')?'Lot scratched.':'Scratch removed.');
 }
 function toggleSupplemental(){
   const lot=selectedLot(); if(!lot)return;
-  lot.supplemental=!lot.supplemental;
+  setLotFlag(lot,'supplemental',!lotFlag(lot,'supplemental'));
   renderEditor();
-  toast(lot.supplemental?'Lot marked supplemental.':'Supplemental mark removed.');
+  toast(lotFlag(lot,'supplemental')?'Lot marked supplemental.':'Supplemental mark removed.');
 }
 function adjustBoxText(delta){
   if(!lastFocusCell){toast('Click inside the box first.');return;}
   const lot=S.lots.find(l=>l.id===lastFocusCell.id);
   if(!lot)return;
-  if(!lot.cellScale)lot.cellScale={};
-  const cur=lot.cellScale[lastFocusCell.c]||1;
-  lot.cellScale[lastFocusCell.c]=Math.max(.65,Math.min(1.8,+(cur+delta).toFixed(2)));
+  const cur=lotCellScale(lot,lastFocusCell.c)||1;
+  setLotCellScale(lot,lastFocusCell.c,Math.max(.65,Math.min(1.8,+(cur+delta).toFixed(2))));
   renderEditor();
-  toast('Box text '+Math.round(lot.cellScale[lastFocusCell.c]*100)+'%');
+  toast('Box text '+Math.round(lotCellScale(lot,lastFocusCell.c)*100)+'%');
 }
 function resetBoxText(){
   if(!lastFocusCell){toast('Click inside the box first.');return;}
   const lot=S.lots.find(l=>l.id===lastFocusCell.id);
   if(!lot)return;
-  if(lot.cellScale)delete lot.cellScale[lastFocusCell.c];
+  clearLotCellScale(lot,lastFocusCell.c);
   renderEditor();
   toast('Box text reset.');
 }
@@ -1159,7 +1214,7 @@ function ingestResultsCSV(file){
     S.lots.forEach(l=>{
       const keys=[String(l.lot||''),String(l.lot2||''),displayLotNumber(l)].map(x=>x.replace(/^S/i,'').trim()).filter(Boolean);
       const hit=keys.map(k=>priceFor[k]).find(Boolean);
-      if(hit){l.price=hit;l.edits.price=hit;count++;}
+      if(hit){if(!S.modeStates.results)S.modeStates.results={edits:{},cellScales:{},heights:{},scratched:{},supplemental:{}}; if(!S.modeStates.results.edits[l.id])S.modeStates.results.edits[l.id]={}; S.modeStates.results.edits[l.id].price=hit; count++;}
     });
     S.results=count>0;
     saveModeLayout();
