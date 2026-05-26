@@ -670,6 +670,7 @@ function handleFile(file){
       desc2:(r['Second Description']||'').trim(),
       type:(r['Type']||'Uncategorized').trim(),
       price:priceKey?(r[priceKey]||'').trim():'', poPrice:'',
+      lot2:(r['Lot Number #2']||'').trim(),
       h:74, edits:{}, scratched:false, supplemental:/^S/i.test((r['Lot Number']||'').trim()), cellScale:{}
     }));
     prefillIssue();
@@ -1200,44 +1201,54 @@ async function exportPDF(kind=S.sheetMode||'default'){
 }
 
 function ingestResultsCSV(file){
-  Papa.parse(file,{header:true,skipEmptyLines:true,complete:res=>{
-    const rows=res.data||[];
-    const fields=(res.meta&&res.meta.fields)||[];
-    const norm=x=>String(x||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
-    const findVal=(r,names)=>{
-      for(const name of names){
-        const key=Object.keys(r).find(k=>norm(k)===norm(name));
-        if(key && String(r[key]||'').trim())return String(r[key]).trim();
-      }
-      return '';
+  Papa.parse(file,{header:true,skipEmptyLines:true,dynamicTyping:false,complete:res=>{
+    const rows=(res.data||[]).filter(r=>r&&Object.values(r).some(v=>String(v||'').trim()));
+    const fields=((res.meta&&res.meta.fields)||Object.keys(rows[0]||{})).filter(Boolean);
+    const norm=x=>String(x||'').toLowerCase().replace(/^\ufeff/,'').replace(/[^a-z0-9]+/g,'');
+    const clean=x=>String(x||'').replace(/^\ufeff/,'').trim();
+    const findKey=(names)=>fields.find(f=>names.some(n=>norm(f)===norm(n)))||'';
+    const lotKey=findKey(['Lot Number','Lot','Lot #','Lot No','Lot No.','Lot Number #2']);
+    const lot2Key=findKey(['Lot Number #2','Lot 2','Lot Ref']);
+    const groupKey=findKey(['Group Number','Group','Option Group']);
+    const priceKey=findKey(['Calculated High Bid','Price','High Bid','Result','Results','Final Price','Sale Price','Winning Bid','Current High Bid']);
+    if(!rows.length){toast('Results CSV is empty.');return;}
+    if(!lotKey){toast('Results CSV did not include a Lot Number column.');return;}
+    if(!priceKey){toast('Results CSV did not include a price column such as Calculated High Bid or Price.');return;}
+    const keyify=x=>clean(x).replace(/^S/i,'').replace(/\s+/g,'').toUpperCase();
+    const fmtPrice=x=>{
+      const raw=clean(x);
+      if(!raw)return '';
+      if(/[A-Za-z$]/.test(raw))return raw;
+      const n=Number(raw.replace(/,/g,''));
+      return Number.isFinite(n)?'$'+n.toFixed(2):raw;
     };
     const priceFor={};
     rows.forEach(r=>{
-      const lot=findVal(r,['Lot Number','Lot','Lot #','Lot Number #2','Group Number']);
-      let price=findVal(r,['Calculated High Bid','Price','High Bid','Result','Results','Final Price','Sale Price','Winning Bid','Current High Bid']);
-      if(!price){
-        const lastKey=Object.keys(r).filter(k=>String(k).trim()==='' || /^__parsed_extra$/i.test(k)).pop() || fields[fields.length-1];
-        if(lastKey && String(r[lastKey]||'').trim())price=String(r[lastKey]).trim();
-      }
-      if(lot&&price)priceFor[String(lot).replace(/^S/i,'').trim()]=price;
+      const price=fmtPrice(r[priceKey]);
+      if(!price)return;
+      [r[lotKey], lot2Key?r[lot2Key]:'', groupKey?r[groupKey]:''].forEach(k=>{
+        const kk=keyify(k);
+        if(kk && !priceFor[kk])priceFor[kk]=price;
+      });
     });
+    const st=modeState('results');
     let count=0;
     S.lots.forEach(l=>{
-      const keys=[String(l.lot||''),String(l.lot2||''),String(l.group||''),displayLotNumber(l)]
-        .map(x=>x.replace(/^S/i,'').trim()).filter(Boolean);
+      const keys=[l.lot,l.lot2,l.group,displayLotNumber(l)].map(keyify).filter(Boolean);
       const hit=keys.map(k=>priceFor[k]).find(Boolean);
       if(hit){
-        const st=modeState('results');
         if(!st.edits[l.id])st.edits[l.id]={};
         st.edits[l.id].price=hit;
+        l.price=hit;
         count++;
       }
     });
     S.results=count>0;
-    saveModeLayout();
+    saveModeLayout('results');
     switchSheetMode('results');
-    toast(count?`Results added to ${count} lots.`:'No matching result prices found. Check lot number and price columns.');
-  }});
+    renderEditor();
+    toast(count?`Results added to ${count} lots from ${file.name}.`:'No matching result prices found. Check that lot numbers match the listing sheet.');
+  },error:err=>toast('Could not read results CSV: '+(err&&err.message?err.message:'unknown error'))});
 }
 
 function updateColorsFromEditor(){
