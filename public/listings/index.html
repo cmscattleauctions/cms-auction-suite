@@ -175,7 +175,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .lotrow .cell.seller b{display:block;font-family:'Oswald';font-weight:600;font-size:1.2em;
   color:#10193a;letter-spacing:.2px}
 .lotrow .cell.seller i{display:block;font-style:italic;color:#5a6488;font-size:.95em}
-.lotrow .cell.head .cc{font-family:'Barlow';font-weight:600;font-size:1.3em;color:#1a2444}
+.lotrow .cell.head .cc{font-family:'Barlow',Arial,sans-serif;font-weight:400;font-size:.9em;color:#1f2844;line-height:1.28}
 .lotrow .cell.basewt .cc{font-family:'Barlow';font-weight:600;font-size:1.3em;color:#1a2444}
 .lotrow .cell.shrink .cc{font-family:'Barlow';font-weight:600;font-size:1.22em;color:#2a3354}
 .lotrow .cell.price .cc{font-family:'Oswald';font-weight:700;font-size:1.4em;
@@ -228,9 +228,6 @@ input[type=date],input[type=number]{font-family:inherit}
 .sheet .lotrow .cell.po-price .cc{min-height:18px;white-space:nowrap;overflow-wrap:normal;word-break:normal;}
 .sheet[data-mode="auctioneer"] .lotrow .cell{justify-content:flex-start;padding-top:7px;}
 
-.sheet .note-tags{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px;align-items:flex-start;}
-.sheet .note-tag{display:inline-flex;align-items:center;border:1px solid #9aa3b4;border-radius:4px;padding:1px 4px;font-family:'Barlow',Arial,sans-serif;font-size:.82em;font-weight:700;line-height:1.05;color:#13235e;background:#f7f9fc;white-space:nowrap;}
-.sheet .note-body{display:block;}
 
 </style>
 
@@ -354,7 +351,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .lotrow.altrow{background:#fff !important;}
 
 .sheet .lotrow .cell.lot .cc{font-family:Arial,Helvetica,sans-serif !important;font-weight:800 !important;font-size:1.48em;letter-spacing:.02em;color:#13235e;}
-.sheet .lotrow .cell.head .cc{font-family:'Barlow';font-weight:600;font-size:1.3em;color:#1a2444}
+.sheet .lotrow .cell.head .cc{font-family:'Barlow',Arial,sans-serif !important;font-weight:400 !important;font-size:.9em !important;color:#1f2844 !important;line-height:1.28 !important;}
 .sheet .lotrow .cell.slide .cc{font-family:'Barlow',Arial,sans-serif !important;font-weight:400 !important;font-size:.94em !important;color:#2a3354 !important;line-height:1.26 !important;}
 .sheet .lotrow .cell.desc{font-size:.94em;line-height:1.28;}
 .sheet .lotrow .cell.notes{font-size:.84em;line-height:1.26;}
@@ -394,12 +391,12 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .lotrow .cell.slide .cc{font-family:'Barlow',Arial,sans-serif !important;font-weight:400 !important;font-size:1.02em !important;color:#2a3354 !important;line-height:1.26 !important;}
 .sheet .lotrow .cell.desc{font-size:.9em !important;line-height:1.28;}
 .sheet .lotrow .cell.notes{font-size:.84em !important;line-height:1.26;}
-.sheet .cal-box .cap{font-size:12.1px !important;padding:2px 3px !important;}
-.sheet .cal-box .body{padding:5px 4px 9px !important;gap:6px !important;}
-.sheet .cal-box .body .nx{font-size:12.1px !important;line-height:1 !important;margin-bottom:4px !important;}
-.sheet .cal-box .body .dt{font-size:17.8px !important;line-height:1.05 !important;margin-bottom:5px !important;}
+.sheet .cal-box .cap{font-size:12.1px !important;padding:7px 3px !important;line-height:1.05 !important;}
+.sheet .cal-box .body{padding:1px 4px !important;gap:1px !important;justify-content:center !important;}
+.sheet .cal-box .body .nx{font-size:12.1px !important;line-height:1 !important;margin:0 !important;}
+.sheet .cal-box .body .dt{font-size:17.8px !important;line-height:1.05 !important;margin:0 !important;}
 .sheet .cal-box .body .dt svg{width:15px !important;height:15px !important;}
-.sheet .cal-box .body .nm{font-size:14.4px !important;line-height:1 !important;margin-bottom:2px !important;}
+.sheet .cal-box .body .nm{font-size:14.4px !important;line-height:1 !important;margin:0 !important;}
 .sheet .lotrow.supplemental::after{content:none !important;display:none !important;}
 
 @media (max-width: 760px){.view{padding:18px}.settings-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-wrap:wrap}.crumbs{width:100%;overflow:auto}.ed-rail{width:132px}.ed-canvas{padding:18px}}
@@ -408,9 +405,6 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .lotrow .cell.po-price .cc{min-height:18px;white-space:nowrap;overflow-wrap:normal;word-break:normal;}
 .sheet[data-mode="auctioneer"] .lotrow .cell{justify-content:flex-start;padding-top:7px;}
 
-.sheet .note-tags{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px;align-items:flex-start;}
-.sheet .note-tag{display:inline-flex;align-items:center;border:1px solid #9aa3b4;border-radius:4px;padding:1px 4px;font-family:'Barlow',Arial,sans-serif;font-size:.82em;font-weight:700;line-height:1.05;color:#13235e;background:#f7f9fc;white-space:nowrap;}
-.sheet .note-body{display:block;}
 
 </style>
 
@@ -478,8 +472,6 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
         <div class="sub">One phrase per line. Matching phrases in description and notes are bolded automatically.</div>
         <div class="field"><label>Auto-Bold Phrases</label><textarea id="bold-rules" placeholder="Top Dollar Angus Verified&#10;100% Holstein Cows"></textarea>
           <div class="hint">Use exact phrases. Add exclusions with: phrase | unless: word, another word. Example: Holstein Cows | unless: Jersey.</div></div>
-        <div class="field"><label>Notes Tags</label><textarea id="tag-rules" placeholder="ASV&#10;NHTC&#10;BeefCare"></textarea>
-          <div class="hint">One tag per line. If a tag phrase appears in the Notes column, it is moved into a tag pill at the top of that Notes box and removed from the note text.</div></div>
       </div>
     </div>
     <div class="settings-foot settings-actions-bottom"></div>
@@ -593,8 +585,7 @@ const S = {
   sections:[], zoom:.70, rowStep:14, textScale:1,
   colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows'],
-  tagRules:['ASV','NHTC','BeefCare','100% Holstein Cows','Single Source Dairy','No Implants','100% Vegetarian Fed','Vegetarian Fed','Guaranteed Open'],
-  colWidths:{lot:52,seller:114,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:40,slide:78,notes:242,price:60},
+  colWidths:{lot:52,seller:114,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:44,slide:78,notes:238,price:60},
   modeLayouts:{}, modeStates:{}
 };
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -615,12 +606,11 @@ async function loadGlobal(){
       if(data.global)Object.assign(S.global,data.global); else Object.assign(S.global,data);
       if(data.colors)Object.assign(S.colors,data.colors);
       if(Array.isArray(data.boldRules))S.boldRules=data.boldRules.filter(r=>!/Holstein Cows? \| unless: Jersey, Jers/i.test(r));
-      if(Array.isArray(data.tagRules))S.tagRules=data.tagRules.filter(Boolean);
     }
   }catch(e){}
 }
 async function saveGlobal(){
-  try{await window.storage.set('cms_global',JSON.stringify({global:S.global,colors:S.colors,boldRules:S.boldRules,tagRules:S.tagRules}));}catch(e){}
+  try{await window.storage.set('cms_global',JSON.stringify({global:S.global,colors:S.colors,boldRules:S.boldRules}));}catch(e){}
 }
 
 /* ===== navigation ===== */
@@ -685,7 +675,7 @@ function syncSettingsUI(){
   $('#c-blue').value=S.colors.blue; $('#c-section-end').value=S.colors.sectionEnd;
   $('#c-section-text').value=S.colors.sectionText; $('#c-table-head').value=S.colors.tableHead;
   $('#c-calendar').value=S.colors.calendar; $('#c-divider').value=S.colors.divider||'#d3d3d3'; $('#c-supp-accent').value=S.colors.suppAccent;
-  $('#c-supp-bg').value=S.colors.suppBg; $('#bold-rules').value=S.boldRules.join('\n'); $('#tag-rules').value=S.tagRules.join('\n');
+  $('#c-supp-bg').value=S.colors.suppBg; $('#bold-rules').value=S.boldRules.join('\n');
 }
 function readSettingsUI(){
   S.global={house:$('#g-house').value,phone:$('#g-phone').value,
@@ -696,7 +686,6 @@ function readSettingsUI(){
     sectionText:$('#c-section-text').value,tableHead:$('#c-table-head').value,
     calendar:$('#c-calendar').value,divider:$('#c-divider').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value};
   S.boldRules=$('#bold-rules').value.split(/\n/).map(x=>x.trim()).filter(Boolean);
-  S.tagRules=$('#tag-rules').value.split(/\n/).map(x=>x.trim()).filter(Boolean);
 }
 
 /* ===== text helpers (auto-bold rules) ===== */
@@ -737,35 +726,10 @@ function descHTML(lot){
   let breed=flat(lot.breed);
   return applyBoldRules(load+breed);
 }
-function cleanTextPunctuation(s){
-  return (s||'').replace(/\s+/g,' ')
-    .replace(/\s*([,.;])\s*/g,'$1 ')
-    .replace(/^(?:[,.;]\s*)+/,'')
-    .replace(/(?:\s*[,.;])+\s*$/,'')
-    .replace(/\s{2,}/g,' ')
-    .trim();
-}
-function tagNotesHTML(rawHtml){
-  let text=String(rawHtml||'').replace(/<br\s*\/?>/gi,' ').replace(/<[^>]*>/g,' ');
-  text=text.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
-  const tags=[];
-  (S.tagRules||[]).forEach(tag=>{
-    if(!tag)return;
-    const re=new RegExp(rxEsc(tag).replace(/\ /g,'\s+'),'i');
-    if(re.test(text)){
-      tags.push(tag);
-      text=text.replace(new RegExp(rxEsc(tag).replace(/\ /g,'\s+'),'gi'),' ');
-    }
-  });
-  text=cleanTextPunctuation(text);
-  const tagHtml=tags.length?`<div class="note-tags">${tags.map(t=>`<span class="note-tag">${esc(t)}</span>`).join('')}</div>`:'';
-  const body=text?`<span class="note-body">${applyBoldRules(esc(text))}</span>`:'';
-  return tagHtml+body;
-}
 function notesHTML(lot){
   let html=lotEdit(lot,'notes');
   if(html==null) html=[lot.desc1,lot.desc2].filter(Boolean).map(flat).join('<br>');
-  return tagNotesHTML(html);
+  return applyBoldRules(html);
 }
 function sellerHTML(lot){
   if(lotEdit(lot,'seller')!=null) return lotEdit(lot,'seller');
@@ -846,9 +810,9 @@ const COLS=['lot','seller','head','desc','sex','basewt','delivery','shrink',
 const HEADLABELS={lot:'Lot',seller:'Seller / Location',head:'Head',desc:'Description',
   sex:'Sex',basewt:'Base WT',delivery:'Delivery',shrink:'Shrink',slide:'Slide',
   notes:'Notes',price:'Price',poPrice:'PO Price'};
-const DEFAULT_COL_WIDTHS={lot:52,seller:114,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:40,slide:78,notes:242,price:60};
+const DEFAULT_COL_WIDTHS={lot:52,seller:114,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:44,slide:78,notes:238,price:60};
 const MIN_COL_WIDTHS={lot:38,seller:90,head:32,desc:90,sex:50,basewt:42,delivery:58,shrink:34,slide:42,notes:110,price:50};
-const PO_COL_WIDTHS={lot:52,seller:114,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:40,slide:78,notes:182,price:60,poPrice:60};
+const PO_COL_WIDTHS={lot:52,seller:114,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:44,slide:78,notes:178,price:60,poPrice:60};
 const TABLE_W=998;
 function activeCols(){return S.sheetMode==='po'?[...COLS,'poPrice']:COLS;}
 function activeLabel(c){return S.sheetMode==='po'&&c==='price'?'Start Price':HEADLABELS[c];}
