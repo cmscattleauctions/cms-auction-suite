@@ -430,13 +430,40 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .s-meta{margin-top:4px !important;gap:1px !important}
 .sheet .s-meta .row{font-size:11.5px !important;color:#3a4568 !important;line-height:1.08 !important}
 .sheet .s-meta svg{width:12px !important;height:12px !important}
-.sheet .cal-box{width:158px !important;min-height:68px !important;max-height:74px !important;border-radius:8px !important;border-color:var(--calendar-grey) !important;background:#f7f8fa !important}
-.sheet .cal-box .cap{background:var(--calendar-grey) !important;color:#fff !important;font-size:9.6px !important;letter-spacing:.8px !important;padding:3px 3px !important;line-height:1 !important}
-.sheet .cal-box .body{padding:2px 5px !important;gap:1px !important;justify-content:center !important;background:#f8f9fb !important}
-.sheet .cal-box .body .nx{font-size:calc(9.2px * var(--calts,1)) !important;line-height:1 !important;margin:0 !important}
-.sheet .cal-box .body .dt{font-size:calc(13.2px * var(--calts,1)) !important;line-height:1.02 !important;white-space:nowrap !important;gap:3px !important;margin:0 !important}
-.sheet .cal-box .body .dt svg{width:11px !important;height:11px !important}
-.sheet .cal-box .body .nm{font-size:calc(10.7px * var(--calts,1)) !important;line-height:.98 !important;margin:0 !important;text-align:center !important}
+.sheet .cal-box{width:174px !important;min-height:62px !important;max-height:70px !important;border:1px solid #cdd3df !important;border-left:5px solid var(--calendar-grey) !important;border-radius:9px !important;background:linear-gradient(135deg,#ffffff 0%,#f5f7fa 100%) !important;box-shadow:0 1px 4px rgba(12,20,48,.10) !important;display:grid !important;grid-template-columns:48px 1fr !important;overflow:hidden !important;padding:0 !important}
+.sheet .cal-box .cap{display:none !important}
+.sheet .cal-box .date-tile{align-self:stretch !important;background:#eef1f6 !important;border-right:1px solid #d6dbe5 !important;display:flex !important;flex-direction:column !important;align-items:center !important;justify-content:center !important;gap:0 !important;color:#17213f !important;text-transform:uppercase !important}
+.sheet .cal-box .date-tile .mon{font-family:'Oswald',Arial,sans-serif !important;font-size:calc(10px * var(--calts,1)) !important;line-height:.95 !important;letter-spacing:.8px !important;font-weight:700 !important}
+.sheet .cal-box .date-tile .day{font-family:'Archivo Black',sans-serif !important;font-size:calc(19px * var(--calts,1)) !important;line-height:1 !important;letter-spacing:-.4px !important}
+.sheet .cal-box .date-tile .yr{font-size:calc(8px * var(--calts,1)) !important;line-height:1 !important;color:#596273 !important;font-weight:700 !important;letter-spacing:.7px !important}
+.sheet .cal-box .body{padding:6px 7px 5px !important;gap:1px !important;align-items:flex-start !important;justify-content:center !important;background:transparent !important;min-width:0 !important}
+.sheet .cal-box .body .eyebrow{font-family:'Oswald',Arial,sans-serif !important;font-size:calc(8.6px * var(--calts,1)) !important;line-height:1 !important;letter-spacing:.9px !important;color:var(--calendar-grey) !important;font-weight:700 !important;text-transform:uppercase !important;margin:0 !important;white-space:nowrap !important}
+.sheet .cal-box .body .dt{display:none !important}
+.sheet .cal-box .body .nx{display:none !important}
+.sheet .cal-box .body .nm{font-family:'Oswald',Arial,sans-serif !important;font-style:normal !important;font-size:calc(12px * var(--calts,1)) !important;line-height:1.03 !important;margin:1px 0 0 !important;text-align:left !important;color:#111a36 !important;font-weight:700 !important;letter-spacing:.1px !important;max-width:100% !important;overflow:hidden !important;display:-webkit-box !important;-webkit-line-clamp:2 !important;-webkit-box-orient:vertical !important}
+.sheet .cal-box .body .tag{font-size:calc(8.4px * var(--calts,1)) !important;line-height:1 !important;margin:2px 0 0 !important;color:#5b6475 !important;font-weight:600 !important;letter-spacing:.1px !important;text-align:left !important;max-width:100% !important;white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important}
+.sheet.no-calendar .s-title{padding-right:8px !important}
+
+/* Option 1 next-auction badge + restored CMS house header */
+.sheet .s-head{align-items:center !important;gap:14px !important;padding-bottom:9px !important;min-height:94px !important}
+.sheet .s-logo{width:170px !important}
+.sheet .s-logo img{max-height:96px !important}
+.sheet .s-title{justify-content:center !important;padding-top:0 !important;min-width:0 !important}
+.sheet.align-left .s-title{text-align:left !important;align-items:flex-start !important}
+.sheet.align-center .s-title{text-align:center !important;align-items:center !important}
+.sheet .s-title h1{font-family:'Archivo Black',sans-serif !important;font-size:25px !important;line-height:1 !important;letter-spacing:-.15px !important;color:#0c1430 !important;white-space:normal !important;margin:0 !important;text-transform:uppercase !important}
+.sheet .s-title .sub{font-family:'Oswald',Arial,sans-serif !important;font-size:20px !important;line-height:1.05 !important;letter-spacing:.9px !important;color:#0c1430 !important;text-transform:uppercase !important;margin-top:5px !important;font-weight:700 !important;max-width:100% !important}
+.sheet .s-meta{margin-top:6px !important;gap:2px !important;display:flex !important;flex-direction:column !important}
+.sheet.align-center .s-meta{align-items:center !important}
+.sheet .s-meta .row{font-size:12.2px !important;color:#263250 !important;line-height:1.08 !important;display:flex !important;align-items:center !important;gap:6px !important}
+.sheet .s-meta svg{width:12.5px !important;height:12.5px !important}
+.sheet .cal-box{width:auto !important;min-width:142px !important;min-height:42px !important;max-height:50px !important;border:1.2px solid #172145 !important;border-radius:5px !important;background:#fff !important;box-shadow:none !important;display:flex !important;flex-direction:row !important;align-items:center !important;gap:7px !important;align-self:flex-start !important;margin-top:12px !important;padding:7px 10px !important;overflow:hidden !important}
+.sheet .cal-box .cap,.sheet .cal-box .date-tile,.sheet .cal-box .body .nx,.sheet .cal-box .body .nm,.sheet .cal-box .body .tag{display:none !important}
+.sheet .cal-box .badge-icon{width:24px !important;height:24px !important;border:1.4px solid #172145 !important;border-radius:3px !important;color:#172145 !important;display:flex !important;align-items:center !important;justify-content:center !important;flex:0 0 auto !important}
+.sheet .cal-box .badge-icon svg{width:15px !important;height:15px !important}
+.sheet .cal-box .badge-copy{display:flex !important;flex-direction:column !important;justify-content:center !important;line-height:1 !important;min-width:0 !important}
+.sheet .cal-box .badge-copy .eyebrow{font-family:'Oswald',Arial,sans-serif !important;font-size:calc(9.2px * var(--calts,1)) !important;line-height:1 !important;letter-spacing:.7px !important;color:#172145 !important;font-weight:700 !important;text-transform:uppercase !important;margin:0 0 2px !important;white-space:nowrap !important}
+.sheet .cal-box .badge-copy .dt{display:block !important;font-family:'Oswald',Arial,sans-serif !important;font-size:calc(12.2px * var(--calts,1)) !important;line-height:1 !important;color:#172145 !important;font-weight:700 !important;text-transform:uppercase !important;letter-spacing:.35px !important;white-space:nowrap !important}
 .sheet.no-calendar .s-title{padding-right:8px !important}
 
 @media (max-width: 760px){.view{padding:18px}.settings-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-wrap:wrap}.crumbs{width:100%;overflow:auto}.ed-rail{width:132px}.ed-canvas{padding:18px}}
@@ -517,7 +544,9 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
       <div class="card">
         <h3>Output Options</h3>
         <div class="sub">Controls what appears in the printable header for this auction.</div>
-        <div class="check-field"><input type="checkbox" id="i-show-calendar"><div><label for="i-show-calendar">Show Mark Your Calendar section</label><div class="hint">Turn this off to remove the right-side calendar box and give the auction title more room.</div></div></div>
+        <div class="field"><label>Header Text Alignment</label><select id="i-header-align"><option value="left">Left Align</option><option value="center">Center Align</option></select>
+          <div class="hint">Controls the CMS/title/date text block in the printable header.</div></div>
+        <div class="check-field"><input type="checkbox" id="i-show-calendar"><div><label for="i-show-calendar">Show Next Auction Badge</label><div class="hint">Turn this off to remove the top-right next auction badge and give the header more room.</div></div></div>
       </div>
       <div class="card advanced-only">
         <h3>Bold Rules</h3>
@@ -645,7 +674,7 @@ const S = {
   global:{house:'CMS Livestock Auction',phone:'(806) 355-7505',
     email:'info@cmslivestock.com',web:'www.CattleMarketingServices.com',
     addr:'6900 I40 West, Ste 135, Amarillo, TX 79106'},
-  issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:'',showCalendar:true},
+  issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:'',showCalendar:true,headerAlign:'left'},
   sections:[], zoom:.70, rowStep:14, textScale:1, calendarTextScale:1, toolsHidden:false, builderMode:'basic',
   colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows'],
@@ -657,6 +686,7 @@ const MONTHS=['January','February','March','April','May','June','July','August',
   'September','October','November','December'];
 function fmtDate(v){if(!v)return'';const[y,m,d]=v.split('-').map(Number);
   return MONTHS[m-1].toUpperCase()+' '+d+ordinal(d)+', '+y;}
+function dateParts(v){if(!v)return{mon:'—',day:'',yr:''};const[y,m,d]=v.split('-').map(Number);return{mon:(MONTHS[m-1]||'').slice(0,3).toUpperCase(),day:String(d||''),yr:String(y||'')};}
 function ordinal(d){if(d>3&&d<21)return'TH';return['TH','ST','ND','RD'][d%10]||'TH';}
 function monthOf(v){if(!v)return'';return MONTHS[(+v.split('-')[1])-1];}
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');
@@ -739,7 +769,7 @@ function syncSettingsUI(){
   $('#i-date').value=S.issue.date; $('#i-time').value=S.issue.time;
   $('#i-name').value=S.issue.name; $('#i-ndate').value=S.issue.ndate;
   $('#i-nname').value=S.issue.nname; $('#i-ntag').value=S.issue.ntag;
-  $('#i-show-calendar').checked=S.issue.showCalendar!==false; $('#builder-mode').value=S.builderMode||'basic'; $('#v-settings').classList.toggle('basic-builder',(S.builderMode||'basic')==='basic');
+  $('#i-show-calendar').checked=S.issue.showCalendar!==false; $('#i-header-align').value=S.issue.headerAlign||'left'; $('#builder-mode').value=S.builderMode||'basic'; $('#v-settings').classList.toggle('basic-builder',(S.builderMode||'basic')==='basic');
   $('#c-blue').value=S.colors.blue; $('#c-section-end').value=S.colors.sectionEnd;
   $('#c-section-text').value=S.colors.sectionText; $('#c-table-head').value=S.colors.tableHead;
   $('#c-calendar').value=S.colors.calendar; $('#c-divider').value=S.colors.divider||'#d3d3d3'; $('#c-supp-accent').value=S.colors.suppAccent;
@@ -750,7 +780,7 @@ function readSettingsUI(){
     email:$('#g-email').value,web:$('#g-web').value,addr:$('#g-addr').value};
   S.issue={date:$('#i-date').value,time:$('#i-time').value,name:$('#i-name').value,
     ndate:$('#i-ndate').value,nname:$('#i-nname').value,ntag:$('#i-ntag').value,
-    showCalendar:$('#i-show-calendar').checked};
+    showCalendar:$('#i-show-calendar').checked,headerAlign:$('#i-header-align').value||'left'};
   S.builderMode=$('#builder-mode').value||'basic';
   $('#v-settings').classList.toggle('basic-builder',S.builderMode==='basic');
   S.colors={blue:$('#c-blue').value,sectionEnd:$('#c-section-end').value,
@@ -993,27 +1023,27 @@ function sheetHTML(page,pageNum,totalPages){
   const sec=page.sec;
   const hasHeader=pageNum===1;
   const I=S.issue,G=S.global;
+  const ND=dateParts(I.ndate);
   const C=S.colors;
   const sheetVars=`--ts:${S.textScale};--cat-blue:${C.blue};--section-fade:${C.sectionEnd};--section-text:${C.sectionText};--table-header-bg:${C.tableHead};--lot-divider:${C.divider||'#d3d3d3'};--calts:${S.calendarTextScale||1};--calendar-grey:${C.calendar};--supp-accent:${C.suppAccent};--supp-bg:${C.suppBg};--supp-bg-alt:${C.suppBg};`;
-  let h=`<div class="sheet ${I.showCalendar===false?'no-calendar':''}" data-mode="${S.sheetMode}" data-pg="${pageNum}" style="${sheetVars}">`+
+  let h=`<div class="sheet ${I.showCalendar===false?'no-calendar':''} align-${I.headerAlign||'left'}" data-mode="${S.sheetMode}" data-pg="${pageNum}" style="${sheetVars}">`+
         `<div class="s-pad">`;
   if(hasHeader){
     h+=`<div class="s-head">
       <div class="s-logo"><img src="${LOGO}"></div>
       <div class="s-title">
-        <h1 contenteditable data-f="issName">${esc(I.name||G.house||'')}</h1>
-        <div class="sub">${fmtDate(I.date)}${I.time?' @ '+esc(I.time):''}</div>
+        <h1 contenteditable data-f="houseName">${esc(G.house||'CMS Livestock Auction')}</h1>
+        <div class="sub" contenteditable data-f="issName">${esc(I.name||'')}</div>
         <div class="s-meta">
+          <div class="row">${IC.cal}<span>${fmtDate(I.date)}${I.time?' @ '+esc(I.time):''}</span></div>
           <div class="row">${IC.globe}<span>${esc(G.web||'')}</span></div>
         </div>
       </div>
       ${I.showCalendar!==false?`<div class="cal-box">
-        <div class="cap">MARK YOUR CALENDAR</div>
-        <div class="body">
-          <div class="nx">Next Auction:</div>
-          <div class="dt">${IC.cal}<span>${fmtDate(I.ndate)||'—'}</span></div>
-          <div class="nm" contenteditable data-f="nextName">${esc(I.nname||'')}</div>
-          ${I.ntag?`<div class="nm" contenteditable data-f="nextTag">${esc(I.ntag)}</div>`:''}
+        <div class="badge-icon">${IC.cal}</div>
+        <div class="badge-copy">
+          <div class="eyebrow">Next Auction</div>
+          <div class="dt">${fmtDate(I.ndate)||'—'}</div>
         </div>
       </div>`:''}
     </div>`;
@@ -1136,7 +1166,8 @@ function wireSheetEvents(){
       if(el.dataset.c){
         const lot=S.lots.find(l=>l.id===el.dataset.id);
         if(lot)setLotEdit(lot,el.dataset.c,el.innerHTML);
-      }else if(el.dataset.f==='issName')S.issue.name=el.textContent;
+      }else if(el.dataset.f==='houseName'){S.global.house=el.textContent;saveGlobal();}
+      else if(el.dataset.f==='issName')S.issue.name=el.textContent;
       else if(el.dataset.f==='nextName')S.issue.nname=el.textContent;
       else if(el.dataset.f==='nextTag')S.issue.ntag=el.textContent;
     });
