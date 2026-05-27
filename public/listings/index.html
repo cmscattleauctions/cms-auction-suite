@@ -409,6 +409,36 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .cal-box .body .dt{font-size:calc(16.2px * var(--calts,1)) !important;line-height:1.05 !important;white-space:nowrap !important;}
 .sheet .cal-box .body .nm{font-size:calc(13.3px * var(--calts,1)) !important;line-height:1 !important;}
 
+/* Builder page organization */
+.settings-toolbar{max-width:960px;margin:0 auto 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;border:1px solid #e6e0d4;border-radius:10px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.settings-toolbar .label{font-size:11px;color:#555b66;letter-spacing:.6px;text-transform:uppercase;font-weight:700}
+.settings-toolbar select{height:32px;background:#fff;border:1px solid #d4cdbd;color:#1a1d23;border-radius:6px;padding:0 8px;font-family:inherit;font-size:12.5px}
+.settings-grid .card.advanced-only{transition:opacity .15s ease}
+#v-settings.basic-builder .advanced-only{display:none}
+.check-field{display:flex;align-items:flex-start;gap:10px;padding:9px 0}
+.check-field input{width:auto;margin-top:2px}
+.check-field label{margin:0;font-size:13px;color:#1a1d23;font-weight:600}
+.check-field .hint{margin-top:3px}
+
+/* Final header/calendar layout overrides */
+.sheet .s-head{align-items:center !important;gap:14px !important;padding-bottom:8px !important;min-height:94px !important}
+.sheet .s-logo{width:176px !important}
+.sheet .s-logo img{max-height:98px !important}
+.sheet .s-title{justify-content:center !important;padding-top:0 !important;min-width:0 !important}
+.sheet .s-title h1{font-family:'Archivo Black',sans-serif !important;font-size:29px !important;line-height:.96 !important;letter-spacing:-.35px !important;color:#0c1430 !important;white-space:normal !important;margin:0 !important;text-transform:uppercase !important}
+.sheet .s-title .sub{font-family:'Oswald',Arial,sans-serif !important;font-size:17px !important;line-height:1.05 !important;letter-spacing:1px !important;color:#3a4568 !important;text-transform:uppercase !important;margin-top:5px !important;font-weight:600 !important}
+.sheet .s-meta{margin-top:5px !important;gap:1px !important}
+.sheet .s-meta .row{font-size:12.5px !important;color:#3a4568 !important;line-height:1.1 !important}
+.sheet .s-meta svg{width:13px !important;height:13px !important}
+.sheet .cal-box{width:200px !important;min-height:86px !important;max-height:92px !important;border-radius:10px !important;border-color:var(--calendar-grey) !important;background:#f7f8fa !important}
+.sheet .cal-box .cap{background:var(--calendar-grey) !important;color:#fff !important;font-size:11px !important;letter-spacing:1px !important;padding:5px 3px !important;line-height:1 !important}
+.sheet .cal-box .body{padding:4px 6px !important;gap:2px !important;justify-content:center !important;background:#f8f9fb !important}
+.sheet .cal-box .body .nx{font-size:calc(10.5px * var(--calts,1)) !important;line-height:1 !important;margin:0 !important}
+.sheet .cal-box .body .dt{font-size:calc(15.5px * var(--calts,1)) !important;line-height:1.05 !important;white-space:nowrap !important;gap:4px !important;margin:0 !important}
+.sheet .cal-box .body .dt svg{width:13px !important;height:13px !important}
+.sheet .cal-box .body .nm{font-size:calc(12.4px * var(--calts,1)) !important;line-height:1 !important;margin:0 !important;text-align:center !important}
+.sheet.no-calendar .s-title{padding-right:8px !important}
+
 @media (max-width: 760px){.view{padding:18px}.settings-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-wrap:wrap}.crumbs{width:100%;overflow:auto}.ed-rail{width:132px}.ed-canvas{padding:18px}}
 
 .sheet .s-thead .cell{line-height:1.05;}
@@ -453,8 +483,15 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
       <button class="btn ghost" id="backToUpload">Back</button>
       <button class="btn" id="toEditor">Build Catalog →</button>
     </div>
+    <div class="settings-toolbar">
+      <div>
+        <div class="label">Builder Page</div>
+        <div class="sub">Use Basic for normal auctions; Advanced exposes rarely used setup fields.</div>
+      </div>
+      <div class="field" style="margin:0;min-width:170px"><label>Controls</label><select id="builder-mode"><option value="basic">Basic</option><option value="advanced">Advanced</option></select></div>
+    </div>
     <div class="settings-grid">
-      <div class="card">
+      <div class="card advanced-only">
         <h3>Global Settings</h3>
         <div class="sub">Saved between sessions — these rarely change.</div>
         <div class="field"><label>Auction House Name</label><input id="g-house"></div>
@@ -478,6 +515,11 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
           placeholder="e.g. Anniversary Special"></div>
       </div>
       <div class="card">
+        <h3>Output Options</h3>
+        <div class="sub">Controls what appears in the printable header for this auction.</div>
+        <div class="check-field"><input type="checkbox" id="i-show-calendar"><div><label for="i-show-calendar">Show Mark Your Calendar section</label><div class="hint">Turn this off to remove the right-side calendar box and give the auction title more room.</div></div></div>
+      </div>
+      <div class="card advanced-only">
         <h3>Bold Rules</h3>
         <div class="sub">One phrase per line. Matching phrases in description and notes are bolded automatically.</div>
         <div class="field"><label>Auto-Bold Phrases</label><textarea id="bold-rules" placeholder="Top Dollar Angus Verified&#10;100% Holstein Cows"></textarea>
@@ -603,8 +645,8 @@ const S = {
   global:{house:'CMS Livestock Auction',phone:'(806) 355-7505',
     email:'info@cmslivestock.com',web:'www.CattleMarketingServices.com',
     addr:'6900 I40 West, Ste 135, Amarillo, TX 79106'},
-  issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:''},
-  sections:[], zoom:.70, rowStep:14, textScale:1, calendarTextScale:1, toolsHidden:false,
+  issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:'',showCalendar:true},
+  sections:[], zoom:.70, rowStep:14, textScale:1, calendarTextScale:1, toolsHidden:false, builderMode:'basic',
   colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows'],
   colWidths:{lot:52,seller:114,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:44,slide:78,notes:238,price:60},
@@ -627,12 +669,14 @@ async function loadGlobal(){
       const data=JSON.parse(r.value);
       if(data.global)Object.assign(S.global,data.global); else Object.assign(S.global,data);
       if(data.colors)Object.assign(S.colors,data.colors);
+      if(data.builderMode)S.builderMode=data.builderMode;
+      if(typeof data.toolsHidden==='boolean')S.toolsHidden=data.toolsHidden;
       if(Array.isArray(data.boldRules))S.boldRules=data.boldRules.filter(r=>!/Holstein Cows? \| unless: Jersey, Jers/i.test(r));
     }
   }catch(e){}
 }
 async function saveGlobal(){
-  try{await window.storage.set('cms_global',JSON.stringify({global:S.global,colors:S.colors,boldRules:S.boldRules}));}catch(e){}
+  try{await window.storage.set('cms_global',JSON.stringify({global:S.global,colors:S.colors,boldRules:S.boldRules,builderMode:S.builderMode,toolsHidden:S.toolsHidden}));}catch(e){}
 }
 
 /* ===== navigation ===== */
@@ -695,6 +739,7 @@ function syncSettingsUI(){
   $('#i-date').value=S.issue.date; $('#i-time').value=S.issue.time;
   $('#i-name').value=S.issue.name; $('#i-ndate').value=S.issue.ndate;
   $('#i-nname').value=S.issue.nname; $('#i-ntag').value=S.issue.ntag;
+  $('#i-show-calendar').checked=S.issue.showCalendar!==false; $('#builder-mode').value=S.builderMode||'basic'; $('#v-settings').classList.toggle('basic-builder',(S.builderMode||'basic')==='basic');
   $('#c-blue').value=S.colors.blue; $('#c-section-end').value=S.colors.sectionEnd;
   $('#c-section-text').value=S.colors.sectionText; $('#c-table-head').value=S.colors.tableHead;
   $('#c-calendar').value=S.colors.calendar; $('#c-divider').value=S.colors.divider||'#d3d3d3'; $('#c-supp-accent').value=S.colors.suppAccent;
@@ -704,7 +749,10 @@ function readSettingsUI(){
   S.global={house:$('#g-house').value,phone:$('#g-phone').value,
     email:$('#g-email').value,web:$('#g-web').value,addr:$('#g-addr').value};
   S.issue={date:$('#i-date').value,time:$('#i-time').value,name:$('#i-name').value,
-    ndate:$('#i-ndate').value,nname:$('#i-nname').value,ntag:$('#i-ntag').value};
+    ndate:$('#i-ndate').value,nname:$('#i-nname').value,ntag:$('#i-ntag').value,
+    showCalendar:$('#i-show-calendar').checked};
+  S.builderMode=$('#builder-mode').value||'basic';
+  $('#v-settings').classList.toggle('basic-builder',S.builderMode==='basic');
   S.colors={blue:$('#c-blue').value,sectionEnd:$('#c-section-end').value,
     sectionText:$('#c-section-text').value,tableHead:$('#c-table-head').value,
     calendar:$('#c-calendar').value,divider:$('#c-divider').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value};
@@ -947,20 +995,19 @@ function sheetHTML(page,pageNum,totalPages){
   const I=S.issue,G=S.global;
   const C=S.colors;
   const sheetVars=`--ts:${S.textScale};--cat-blue:${C.blue};--section-fade:${C.sectionEnd};--section-text:${C.sectionText};--table-header-bg:${C.tableHead};--lot-divider:${C.divider||'#d3d3d3'};--calts:${S.calendarTextScale||1};--calendar-grey:${C.calendar};--supp-accent:${C.suppAccent};--supp-bg:${C.suppBg};--supp-bg-alt:${C.suppBg};`;
-  let h=`<div class="sheet" data-mode="${S.sheetMode}" data-pg="${pageNum}" style="${sheetVars}">`+
+  let h=`<div class="sheet ${I.showCalendar===false?'no-calendar':''}" data-mode="${S.sheetMode}" data-pg="${pageNum}" style="${sheetVars}">`+
         `<div class="s-pad">`;
   if(hasHeader){
     h+=`<div class="s-head">
       <div class="s-logo"><img src="${LOGO}"></div>
       <div class="s-title">
-        <h1>${esc(G.house||'').toUpperCase()}</h1>
-        <div class="sub" contenteditable data-f="issName">${esc(I.name||'')}</div>
+        <h1 contenteditable data-f="issName">${esc(I.name||G.house||'')}</h1>
+        <div class="sub">${fmtDate(I.date)}${I.time?' @ '+esc(I.time):''}</div>
         <div class="s-meta">
-          <div class="row">${IC.cal}<b>${fmtDate(I.date)}${I.time?' @ '+esc(I.time):''}</b></div>
           <div class="row">${IC.globe}<span>${esc(G.web||'')}</span></div>
         </div>
       </div>
-      <div class="cal-box">
+      ${I.showCalendar!==false?`<div class="cal-box">
         <div class="cap">MARK YOUR CALENDAR</div>
         <div class="body">
           <div class="nx">Next Auction:</div>
@@ -968,7 +1015,7 @@ function sheetHTML(page,pageNum,totalPages){
           <div class="nm" contenteditable data-f="nextName">${esc(I.nname||'')}</div>
           ${I.ntag?`<div class="nm" contenteditable data-f="nextTag">${esc(I.ntag)}</div>`:''}
         </div>
-      </div>
+      </div>`:''}
     </div>`;
   }
   // section bar (only first page of section)
@@ -1282,6 +1329,10 @@ $('#i-ndate').addEventListener('change',e=>{
   if(!cur||/Video Auction$/.test(cur))
     $('#i-nname').value=monthOf(e.target.value)+' Video Auction';
 });
+$('#builder-mode').addEventListener('change',e=>{
+  S.builderMode=e.target.value||'basic';
+  $('#v-settings').classList.toggle('basic-builder',S.builderMode==='basic');
+});
 
 $('#backToUpload').onclick=()=>go('upload');
 $('#toEditor').onclick=()=>{
@@ -1308,7 +1359,7 @@ $('#txtMinus').onclick=()=>{S.textScale=Math.max(.7,+(S.textScale-.06).toFixed(2
   renderEditor();toast('Text size '+Math.round(S.textScale*100)+'%');};
 $('#calTxtPlus').onclick=()=>{S.calendarTextScale=Math.min(1.35,+((S.calendarTextScale||1)+.05).toFixed(2));renderEditor();toast('Calendar text '+Math.round(S.calendarTextScale*100)+'%');};
 $('#calTxtMinus').onclick=()=>{S.calendarTextScale=Math.max(.75,+((S.calendarTextScale||1)-.05).toFixed(2));renderEditor();toast('Calendar text '+Math.round(S.calendarTextScale*100)+'%');};
-$('#toolsVisibility').onchange=e=>{S.toolsHidden=e.target.value==='hide'; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden);};
+$('#toolsVisibility').onchange=e=>{S.toolsHidden=e.target.value==='hide'; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden); saveGlobal();};
 $('#colPick').onchange=updateColControls;
 $('#colMinus').onclick=()=>changeColumnWidth($('#colPick').value,-8);
 $('#colPlus').onclick=()=>changeColumnWidth($('#colPick').value,8);
