@@ -620,6 +620,11 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
             <button class="btn ghost sm" id="scratchBtn">Scratch Lot</button>
             <button class="btn ghost sm" id="suppBtn">Supplemental</button>
           </div>
+          <div class="grp">
+            <span class="lbl">Option groups</span>
+            <button class="btn ghost sm" id="manualGroupBtn">Group Lots</button>
+            <button class="btn ghost sm" id="ungroupBtn">Ungroup Focused</button>
+          </div>
           <div class="vr"></div>
           <div class="grp">
             <span class="lbl">Lot height</span>
@@ -754,6 +759,27 @@ function go(view){
 }
 
 /* ===== CSV parse ===== */
+function firstValue(row,names){
+  for(const name of names){
+    if(Object.prototype.hasOwnProperty.call(row,name) && row[name]!=null && String(row[name]).trim()!=='') return String(row[name]).trim();
+  }
+  return '';
+}
+function naturalOptionGroup(lotNum){
+  const raw=String(lotNum||'').trim();
+  const m=raw.match(/^([A-Za-z]*\d+)([A-Za-z]+)$/);
+  return m?m[1]:raw;
+}
+function lotLookupKey(v){return String(v||'').replace(/<[^>]*>/g,'').trim().toLowerCase();}
+function splitLotList(input){
+  return String(input||'').split(/[\n,]+/).map(x=>x.trim()).filter(Boolean);
+}
+function resetLayoutsAfterGrouping(){
+  S.modeLayouts={};
+  buildSections();
+  saveModeLayout();
+  renderEditor();
+}
 function handleFile(file){
   Papa.parse(file,{header:true,skipEmptyLines:true,complete:res=>{
     const rows=res.data.filter(r=>r['Lot Number']&&r['Lot Number'].trim());
@@ -766,7 +792,7 @@ function handleFile(file){
       id:'L'+i,
       lot:(r['Lot Number']||'').trim(),
       seq:parseFloat(r['Lot Sequence'])||i,
-      group:(r['Group Number']||r['Lot Number']||'').trim(),
+      group:firstValue(r,['Group Number','GroupId','Group ID','Group','Option Group']) || naturalOptionGroup(r['Lot Number']),
       consignor:(r['Consignor']||'').trim(),
       loadCount:(r['Load Count']||'').trim(),
       head:(r['Head Count']||'').trim(),
@@ -1217,6 +1243,39 @@ function wireSheetEvents(){
   });
 }
 
+/* ===== manual option grouping ===== */
+function manualGroupLots(){
+  if(!S.lots.length)return;
+  const defaultLot=lastFocusLot?(S.lots.find(l=>l.id===lastFocusLot)||{}).lot:'';
+  const input=prompt('Enter lot numbers to group together, separated by commas. Example: 210A, 210B, 210C',defaultLot||'');
+  if(input==null)return;
+  const requested=splitLotList(input);
+  if(requested.length<2){toast('Enter at least two lot numbers to group.');return;}
+  const byLot=new Map();
+  S.lots.forEach(l=>{
+    [l.lot,displayLotNumber(l),l.lot2].filter(Boolean).forEach(k=>byLot.set(lotLookupKey(k),l));
+  });
+  const found=[]; const missing=[];
+  requested.forEach(k=>{
+    const lot=byLot.get(lotLookupKey(k));
+    if(lot && !found.includes(lot))found.push(lot);
+    else if(!lot)missing.push(k);
+  });
+  if(found.length<2){toast('Could not find enough matching lots to group.');return;}
+  const groupId='manual-'+naturalOptionGroup(found[0].lot||found[0].id)+'-'+Date.now();
+  found.forEach(l=>{l.group=groupId;});
+  resetLayoutsAfterGrouping();
+  toast('Grouped '+found.length+' lots'+(missing.length?' — not found: '+missing.join(', '):'.'));
+}
+function ungroupFocusedLot(){
+  if(!lastFocusLot){toast('Click a lot first.');return;}
+  const lot=S.lots.find(l=>l.id===lastFocusLot);
+  if(!lot)return;
+  lot.group=lot.lot||lot.id;
+  resetLayoutsAfterGrouping();
+  toast('Focused lot removed from option group.');
+}
+
 /* ===== row height ===== */
 let lastFocusLot=null;
 let lastFocusCell=null;
@@ -1415,6 +1474,8 @@ $('#boldBtn').onmousedown=e=>{e.preventDefault();};
 $('#boldBtn').onclick=doBold;
 $('#scratchBtn').onclick=toggleScratch;
 $('#suppBtn').onclick=toggleSupplemental;
+$('#manualGroupBtn').onclick=manualGroupLots;
+$('#ungroupBtn').onclick=ungroupFocusedLot;
 $('#boxTxtMinus').onclick=()=>adjustBoxText(-.08);
 $('#boxTxtPlus').onclick=()=>adjustBoxText(.08);
 $('#boxTxtReset').onclick=resetBoxText;
