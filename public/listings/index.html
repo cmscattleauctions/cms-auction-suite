@@ -466,6 +466,27 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .cal-box .badge-copy .dt{display:block !important;font-family:'Oswald',Arial,sans-serif !important;font-size:calc(12.2px * var(--calts,1)) !important;line-height:1 !important;color:#172145 !important;font-weight:700 !important;text-transform:uppercase !important;letter-spacing:.35px !important;white-space:nowrap !important}
 .sheet.no-calendar .s-title{padding-right:8px !important}
 
+
+
+/* Requested listing refinements: column fit, header date-only meta, row styling, dividers, option brackets */
+.sheet .s-title h1{font-size:30.25px !important;}
+.sheet .s-meta{margin-top:7px !important;}
+.sheet .s-meta .row.auction-date-row{font-size:15.8px !important;font-weight:700 !important;letter-spacing:.15px !important;color:#172145 !important;}
+.sheet .s-meta .row.auction-date-row svg{width:15px !important;height:15px !important;}
+.sheet.align-center .s-meta .row.auction-date-row{justify-content:center !important;}
+.sheet.align-left .s-meta .row.auction-date-row{justify-content:flex-start !important;}
+.sheet .lotrow{border-bottom:6px solid var(--lot-divider) !important;}
+.sheet .lotrow .cell.lot .cc{font-family:Arial,Helvetica,sans-serif !important;font-weight:700 !important;font-size:1.38em !important;letter-spacing:.01em !important;color:#13235e !important;}
+.sheet .lotrow .cell.seller .seller-name{font-family:'Oswald',Arial,sans-serif !important;font-weight:600 !important;font-size:1.18em !important;line-height:1.1 !important;color:#13235e !important;}
+.sheet .lotrow .cell.seller b{font-weight:600 !important;}
+.sheet .lotrow .cell.head .cc{font-family:'Barlow',Arial,sans-serif !important;font-weight:400 !important;font-size:1.02em !important;color:#2a3354 !important;line-height:1.26 !important;}
+.sheet .lotrow .cell.basewt .cc{font-family:'Barlow',Arial,sans-serif !important;font-weight:400 !important;font-size:1.02em !important;color:#2a3354 !important;line-height:1.26 !important;}
+.sheet .lotrow.supplemental .cell.lot{border-left:0 !important;}
+.sheet .lotrow.gtop,.sheet .lotrow.gmid{border-bottom:.5px solid rgba(201,206,219,.75) !important;}
+.sheet .lotrow.gtop .cell.lot,.sheet .lotrow.gmid .cell.lot,.sheet .lotrow.gbot .cell.lot{position:relative !important;border-left:1.2px solid rgb(219,219,219) !important;}
+.sheet .lotrow.gtop .cell.lot::before{content:"" !important;position:absolute !important;left:0 !important;right:0 !important;top:0 !important;height:1.2px !important;background:rgb(219,219,219) !important;display:block !important;z-index:3 !important;}
+.sheet .lotrow.gbot .cell.lot::after{content:"" !important;position:absolute !important;left:0 !important;right:0 !important;bottom:0 !important;height:1.2px !important;background:rgb(219,219,219) !important;display:block !important;z-index:3 !important;}
+
 @media (max-width: 760px){.view{padding:18px}.settings-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-wrap:wrap}.crumbs{width:100%;overflow:auto}.ed-rail{width:132px}.ed-canvas{padding:18px}}
 
 .sheet .s-thead .cell{line-height:1.05;}
@@ -678,8 +699,8 @@ const S = {
   issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:'',showCalendar:true,headerAlign:'center'},
   sections:[], zoom:.70, rowStep:14, textScale:1, calendarTextScale:1, toolsHidden:false, builderMode:'basic',
   colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff'},
-  boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows'],
-  colWidths:{lot:52,seller:114,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:44,slide:78,notes:238,price:60},
+  boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows','Holstein Cows | unless: Jersey, Jers','Holstein Cow | unless: Jersey, Jers'],
+  colWidths:{lot:52,seller:122,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:52,slide:94,notes:206,price:60},
   modeLayouts:{}, modeStates:{}
 };
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -702,7 +723,12 @@ async function loadGlobal(){
       if(data.colors)Object.assign(S.colors,data.colors);
       if(data.builderMode)S.builderMode=data.builderMode;
       if(typeof data.toolsHidden==='boolean')S.toolsHidden=data.toolsHidden;
-      if(Array.isArray(data.boldRules))S.boldRules=data.boldRules.filter(r=>!/Holstein Cows? \| unless: Jersey, Jers/i.test(r));
+      if(Array.isArray(data.boldRules)){
+        S.boldRules=data.boldRules.slice();
+        ['Holstein Cows | unless: Jersey, Jers','Holstein Cow | unless: Jersey, Jers'].forEach(rule=>{
+          if(!S.boldRules.some(r=>String(r).toLowerCase()===rule.toLowerCase()))S.boldRules.push(rule);
+        });
+      }
     }
   }catch(e){}
 }
@@ -912,7 +938,7 @@ const COLS=['lot','seller','head','desc','sex','basewt','delivery','shrink',
 const HEADLABELS={lot:'Lot',seller:'Seller / Location',head:'Head',desc:'Description',
   sex:'Sex',basewt:'Base WT',delivery:'Delivery',shrink:'Shrink',slide:'Slide',
   notes:'Notes',price:'Price',poPrice:'PO Price'};
-const DEFAULT_COL_WIDTHS={lot:52,seller:114,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:44,slide:78,notes:238,price:60};
+const DEFAULT_COL_WIDTHS={lot:52,seller:122,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:52,slide:94,notes:206,price:60};
 const MIN_COL_WIDTHS={lot:38,seller:90,head:32,desc:90,sex:50,basewt:42,delivery:58,shrink:34,slide:42,notes:110,price:50};
 const PO_COL_WIDTHS={lot:52,seller:114,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:44,slide:78,notes:178,price:60,poPrice:60};
 const TABLE_W=998;
@@ -1036,8 +1062,7 @@ function sheetHTML(page,pageNum,totalPages){
         <h1 contenteditable data-f="houseName">${esc(G.house||'CMS Livestock Auction')}</h1>
         <div class="sub" contenteditable data-f="issName">${esc(I.name||'')}</div>
         <div class="s-meta">
-          <div class="row">${IC.cal}<span>${fmtDate(I.date)}${I.time?' @ '+esc(I.time):''}</span></div>
-          <div class="row">${IC.globe}<span>${esc(G.web||'')}</span></div>
+          <div class="row auction-date-row">${IC.cal}<span>${fmtDate(I.date)}${I.time?' @ '+esc(I.time):''}</span></div>
         </div>
       </div>
       ${I.showCalendar!==false?`<div class="cal-box">
