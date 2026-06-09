@@ -9,6 +9,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<!-- Shared Firebase data layer (state images). Loaded as a module; exposed as window.CMSData. -->
+<script>
+window.cmsDataReady = new Promise(function(res){
+  if(window.CMSData) return res(window.CMSData);
+  window.addEventListener('cmsdata-ready', function(){ res(window.CMSData); }, { once:true });
+});
+</script>
+<script type="module">
+  import * as CMSData from '../shared/cms-data.js';
+  window.CMSData = CMSData;
+  window.dispatchEvent(new Event('cmsdata-ready'));
+</script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -158,10 +170,10 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
   <div id="panelUpload">
     <div class="card" style="margin-bottom:20px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center;">
       <div>
-        <div class="section-title" style="margin-bottom:8px;">Repository Source</div>
-        <div id="repoStatus" class="status-chip warn">Repo settings not configured yet</div>
+        <div class="section-title" style="margin-bottom:8px;">State Image Source</div>
+        <div id="repoStatus" class="status-chip good">State images load from your Firebase cloud</div>
       </div>
-      <div class="helper">State images come from <span class="mono">assets/states</span>. OBS template comes from <span class="mono">template.json</span>.</div>
+      <div class="helper">State images are stored in <span class="mono">Firebase</span>. Manage them in the State Library tab.</div>
     </div>
 
     <div class="upload-zone" id="csvDrop">
@@ -304,40 +316,6 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
     <div class="admin-grid">
       <div style="display:grid;gap:20px;">
         <div class="card">
-          <div class="section-title">Repository Settings</div>
-          <div class="form-row">
-            <label class="form-label">GitHub Owner</label>
-            <input type="text" class="form-input" id="ghOwner" placeholder="your-github-username">
-          </div>
-          <div class="form-row">
-            <label class="form-label">Repository Name</label>
-            <input type="text" class="form-input" id="ghRepo" placeholder="cms-auction-builder">
-          </div>
-          <div class="form-row">
-            <label class="form-label">Branch</label>
-            <input type="text" class="form-input" id="ghBranch" placeholder="main">
-          </div>
-          <div class="two-col">
-            <button class="btn btn-primary" id="btnSaveRepoConfig">Save Repo Settings</button>
-            <button class="btn btn-ghost" id="btnTestRepo">Test Repo</button>
-          </div>
-          <p class="helper" style="margin-top:10px;">State images are stored in <span class="mono">assets/states</span>; OBS template is read from <span class="mono">template.json</span>.</p>
-        </div>
-
-        <div class="card">
-          <div class="section-title">GitHub Token</div>
-          <div class="form-row">
-            <label class="form-label">Fine-Grained Personal Access Token</label>
-            <textarea class="form-textarea mono" id="ghToken" placeholder="Paste token here for this browser session only"></textarea>
-          </div>
-          <div class="two-col">
-            <button class="btn btn-primary" id="btnSaveToken">Use Token</button>
-            <button class="btn btn-ghost" id="btnClearToken">Clear Token</button>
-          </div>
-          <p id="tokenStatus" class="helper" style="margin-top:10px;">Token is not stored until you click Use Token.</p>
-        </div>
-
-        <div class="card">
           <div class="section-title">Add / Replace State Image</div>
           <div class="form-row">
             <label class="form-label">State Abbreviation</label>
@@ -365,11 +343,12 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 
       <div>
         <div class="card" style="margin-bottom:20px;">
-          <div class="section-title">Current Session</div>
+          <div class="section-title">Storage</div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-            <div id="adminSessionChip" class="status-chip warn">Admin unlocked · token not loaded</div>
+            <div id="adminSessionChip" class="status-chip good">Saved to Firebase · shared with the whole team</div>
             <button class="btn btn-ghost btn-sm" id="btnLockAdmin">Lock Admin</button>
           </div>
+          <p class="helper" style="margin-top:10px;">Just pick a 2-letter state, drop a PNG or SVG, and click Upload. No GitHub token needed.</p>
         </div>
 
         <div class="section-title">State Image Library (<span id="libCount">0</span> states)</div>
@@ -514,36 +493,23 @@ function repoIsConfigured() {
   const cfg = loadRepoConfig();
   return !!cfg.owner && !!cfg.repo && !cfg.owner.startsWith('REPLACE_') && !cfg.repo.startsWith('REPLACE_');
 }
-function syncRepoForm() {
-  const cfg = loadRepoConfig();
-  document.getElementById('ghOwner').value = cfg.owner || '';
-  document.getElementById('ghRepo').value = cfg.repo || '';
-  document.getElementById('ghBranch').value = cfg.branch || 'main';
-}
+function syncRepoForm() { /* GitHub repo settings removed — state images now live in Firebase. */ }
 function updateRepoStatus() {
-  const cfg = loadRepoConfig();
   const el = document.getElementById('repoStatus');
-  if (!repoIsConfigured()) {
-    el.className = 'status-chip warn';
-    el.textContent = 'Repo settings not configured yet';
-    return;
-  }
-  el.className = 'status-chip';
-  el.textContent = `${cfg.owner}/${cfg.repo} · ${cfg.branch}`;
+  if (!el) return;
+  el.className = 'status-chip good';
+  el.textContent = window.CMSData && window.CMSData.configured
+    ? 'State images load from your Firebase cloud'
+    : 'Demo mode — Firebase not configured';
 }
 function updateTokenStatus() {
-  const tokenLoaded = !!getSessionToken();
-  const tokenStatus = document.getElementById('tokenStatus');
+  /* GitHub token UI removed — state images now save to Firebase. */
   const chip = document.getElementById('adminSessionChip');
-  if (tokenLoaded) {
-    tokenStatus.textContent = 'Token loaded for this browser session.';
-    chip.className = 'status-chip';
-    chip.textContent = 'Admin unlocked · token loaded';
-  } else {
-    tokenStatus.textContent = 'Token is not stored until you click Use Token.';
-    chip.className = 'status-chip warn';
-    chip.textContent = 'Admin unlocked · token not loaded';
-  }
+  if (!chip) return;
+  chip.className = 'status-chip good';
+  chip.textContent = (window.CMSData && window.CMSData.configured)
+    ? 'Saved to Firebase · shared with the whole team'
+    : 'Demo mode — Firebase not configured';
 }
 function githubHeaders(authRequired = false) {
   const headers = { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
@@ -576,38 +542,50 @@ async function githubFetchJson(url, options = {}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// STATE INDEX (GITHUB-BACKED)
+// STATE INDEX (FIREBASE-BACKED)
 // ═══════════════════════════════════════════════════════════════
 let stateIndex = {};
 let stateIndexLoaded = false;
 
+// Wait for the shared CMSData module to be ready (loaded via the
+// module loader injected in <head>). Resolves to window.CMSData or null.
+function getCMSData(timeoutMs = 4000) {
+  if (window.CMSData) return Promise.resolve(window.CMSData);
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => { if (done) return; done = true; resolve(window.CMSData || null); };
+    if (window.cmsDataReady && typeof window.cmsDataReady.then === 'function') {
+      window.cmsDataReady.then(finish, finish);
+    }
+    window.addEventListener('cmsdata-ready', finish, { once: true });
+    setTimeout(finish, timeoutMs);
+  });
+}
+
 async function fetchStateIndex() {
-  if (!repoIsConfigured()) {
+  const CMS = await getCMSData();
+  if (!CMS || !CMS.configured) {
     stateIndex = {}; stateIndexLoaded = true;
     renderLibrary();
     return stateIndex;
   }
-  const url = buildContentsUrl(STATES_DIR, true);
   try {
-    const data = await githubFetchJson(url, { headers: githubHeaders(false) });
+    const map = await CMS.listStateImages(); // { ABBR: {abbr, ext, dataUrl, updatedAt, updatedBy} }
     const next = {};
-    if (Array.isArray(data)) {
-      data.forEach(item => {
-        if (item.type !== 'file') return;
-        const m = item.name.match(/^([A-Za-z]{2})\.(png|svg)$/i);
-        if (!m) return;
-        const abbr = m[1].toUpperCase();
-        next[abbr] = {
-          name: item.name, path: item.path, sha: item.sha,
-          ext: m[2].toLowerCase(),
-          download_url: item.download_url || rawFileUrl(item.path)
-        };
-      });
-    }
+    Object.keys(map || {}).forEach(abbr => {
+      const info = map[abbr];
+      next[abbr.toUpperCase()] = {
+        abbr: abbr.toUpperCase(),
+        ext: (info.ext || 'png').toLowerCase(),
+        dataUrl: info.dataUrl,
+        updatedAt: info.updatedAt || null,
+        updatedBy: info.updatedBy || null
+      };
+    });
     stateIndex = next;
   } catch (err) {
-    if (String(err.message).includes('404')) stateIndex = {};
-    else throw err;
+    console.warn('Failed to load state images from Firebase:', err);
+    stateIndex = {};
   }
   stateIndexLoaded = true;
   renderLibrary();
@@ -616,8 +594,7 @@ async function fetchStateIndex() {
 function getStateImageInfo(abbr) { return stateIndex[(abbr || '').toUpperCase()] || null; }
 function getStateImageUrl(abbr) {
   const info = getStateImageInfo(abbr);
-  if (!info) return null;
-  return `${info.download_url}?v=${encodeURIComponent(info.sha || Date.now())}`;
+  return info ? info.dataUrl : null;
 }
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -1011,9 +988,9 @@ function cleanCell(value) {
 // Detect breed transition marker from Reference # cell (column B)
 function getBreedTransitionName(value) {
   const t = cleanCell(value).toLowerCase();
-  if (t === 'char x' || t === 'charx') return 'Charloais Transition';
+  if (t === 'char x' || t === 'charx') return 'Charolais Transition';
   if (t === 'natives') return 'Native Transition';
-  if (t === 'holstein steers') return 'Hosltein Transition';
+  if (t === 'holstein steers') return 'Holstein Transition';
   return null;
 }
 
@@ -1207,7 +1184,7 @@ function getOptionBase(lot) {
   return m ? m[1] : null;
 }
 function isBreedTransitionScene(name) {
-  return ['Charloais Transition', 'Native Transition', 'Hosltein Transition'].includes(name);
+  return ['Charolais Transition', 'Native Transition', 'Holstein Transition'].includes(name);
 }
 function isOptionInterludeScene(name) {
   return normalizeSceneName(name).startsWith('Option Lot Interlude');
@@ -1349,7 +1326,7 @@ function buildObsJson(templateData, parsed) {
 
   const fixedStartScenes = ['CMS Logo','Waiting Room Scene','Intro Video','CMS Name Panel'];
   const fixedEndScenes   = ['CMS Name Panel END','End Scene','THIS IS THE END','STOPPPPP','I AM SERIOUS'];
-  const breedTransitionScenes = ['Charloais Transition','Native Transition','Hosltein Transition'];
+  const breedTransitionScenes = ['Charolais Transition','Native Transition','Holstein Transition'];
 
   const optionInterludePool = originalSceneNames.filter(n => normalizeSceneName(n).startsWith('Option Lot Interlude'));
   if (!optionInterludePool.length) throw new Error('No Option Lot Interlude scenes found in template.json.');
@@ -1912,7 +1889,8 @@ function lockAdmin() {
   document.getElementById('adminGate').style.display = 'block';
   document.getElementById('adminContent').style.display = 'none';
   document.getElementById('pinInput').value = '';
-  document.getElementById('ghToken').value = '';
+  const ghTok = document.getElementById('ghToken');
+  if (ghTok) ghTok.value = '';
   document.getElementById('pinMsg').textContent = 'Enter the admin code to manage shared state images.';
 }
 function checkAdminPin() {
@@ -1921,68 +1899,17 @@ function checkAdminPin() {
   if (val === ADMIN_PIN) { pinMsg.textContent = 'Code accepted.'; unlockAdmin(); }
   else { pinMsg.textContent = 'Invalid code.'; showToast('Invalid admin code', true); }
 }
-async function testRepoConnection() {
-  if (!repoIsConfigured()) throw new Error('Save valid repo settings first.');
-  const cfg = loadRepoConfig();
-  const url = `${GITHUB_API}/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}`;
-  return githubFetchJson(url, { headers: githubHeaders(false) });
-}
-async function getExistingFile(path) {
-  try { return await githubFetchJson(buildContentsUrl(path, true), { headers: githubHeaders(true) }); }
-  catch (err) { if (String(err.message).includes('404')) return null; throw err; }
-}
-function fileToBase64Content(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const r = String(reader.result || '');
-      const comma = r.indexOf(',');
-      resolve(comma >= 0 ? r.slice(comma + 1) : r);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-async function putFileToGitHub(path, base64Content, message, sha = null) {
-  const cfg = loadRepoConfig();
-  const body = { message, content: base64Content, branch: cfg.branch };
-  if (sha) body.sha = sha;
-  return githubFetchJson(buildContentsUrl(path, false), {
-    method: 'PUT',
-    headers: { ...githubHeaders(true), 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-}
-async function deleteGitHubFile(path, sha, message) {
-  const cfg = loadRepoConfig();
-  return githubFetchJson(buildContentsUrl(path, false), {
-    method: 'DELETE',
-    headers: { ...githubHeaders(true), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, sha, branch: cfg.branch })
-  });
-}
-
 async function saveStateToGitHub() {
   const abbr = document.getElementById('stateAbbrInput').value.trim().toUpperCase();
   if (!/^[A-Z]{2}$/.test(abbr)) { showToast('State abbreviation must be 2 letters.', true); return; }
   if (!pendingImgFile) { showToast('Drop a PNG or SVG file first.', true); return; }
-  if (!repoIsConfigured()) { showToast('Save repo settings first.', true); return; }
-  if (!getSessionToken()) { showToast('Load a GitHub token first.', true); return; }
-  const ext = pendingImgFile.name.toLowerCase().endsWith('.svg') ? 'svg' : 'png';
+  const CMS = await getCMSData();
+  if (!CMS || !CMS.configured) { showToast('Firebase is not configured.', true); return; }
   const msg = document.getElementById('adminMsg');
   msg.textContent = 'Uploading...';
   try {
-    // Remove any existing file for this abbr with the OTHER extension
-    const otherExt = ext === 'png' ? 'svg' : 'png';
-    const otherPath = `${STATES_DIR}/${abbr}.${otherExt}`;
-    const existingOther = await getExistingFile(otherPath);
-    if (existingOther && existingOther.sha) {
-      await deleteGitHubFile(otherPath, existingOther.sha, `Remove ${abbr}.${otherExt}`);
-    }
-    const path = `${STATES_DIR}/${abbr}.${ext}`;
-    const existing = await getExistingFile(path);
-    const base64 = await fileToBase64Content(pendingImgFile);
-    await putFileToGitHub(path, base64, `Update ${abbr}.${ext}`, existing ? existing.sha : null);
+    const { dataUrl, ext } = await CMS.imageFileToStorableDataUrl(pendingImgFile);
+    await CMS.saveStateImage(abbr, dataUrl, ext);
     msg.textContent = `Uploaded ${abbr}.${ext}.`;
     showToast(`${abbr}.${ext} uploaded`);
     pendingImgFile = null;
@@ -2000,10 +1927,12 @@ async function saveStateToGitHub() {
 async function deleteState(abbr) {
   const info = getStateImageInfo(abbr);
   if (!info) return;
-  if (!confirm(`Delete ${info.name} from the repository?`)) return;
+  if (!confirm(`Delete the ${info.abbr} state image for everyone?`)) return;
+  const CMS = await getCMSData();
+  if (!CMS || !CMS.configured) { showToast('Firebase is not configured.', true); return; }
   try {
-    await deleteGitHubFile(info.path, info.sha, `Remove ${info.name}`);
-    showToast(`${info.name} deleted`);
+    await CMS.deleteStateImage(info.abbr);
+    showToast(`${info.abbr} deleted`);
     await fetchStateIndex();
   } catch (err) {
     console.error(err);
@@ -2017,13 +1946,13 @@ function renderLibrary() {
   const abbrs = Object.keys(stateIndex).sort();
   count.textContent = abbrs.length;
   if (!abbrs.length) {
-    grid.innerHTML = `<p class="no-states">No state images found in the repository yet.</p>`;
+    grid.innerHTML = `<p class="no-states">No state images saved yet. Add one above.</p>`;
     return;
   }
   grid.innerHTML = abbrs.map(a => {
     const info = stateIndex[a];
     return `<div class="state-lib-card">
-      <img src="${info.download_url}?v=${encodeURIComponent(info.sha || '')}" alt="${a}">
+      <img src="${info.dataUrl}" alt="${a}">
       <div class="state-lib-label">
         <span class="state-abbr">${a}</span>
         <button class="del-btn" onclick="deleteState('${a}')" title="Delete">×</button>
@@ -2062,30 +1991,6 @@ document.getElementById('searchBox').addEventListener('input', applySearch);
 document.getElementById('btnPinEnter').addEventListener('click', checkAdminPin);
 document.getElementById('pinInput').addEventListener('keypress', e => { if (e.key === 'Enter') checkAdminPin(); });
 document.getElementById('btnLockAdmin').addEventListener('click', lockAdmin);
-document.getElementById('btnSaveRepoConfig').addEventListener('click', () => {
-  const owner = document.getElementById('ghOwner').value.trim();
-  const repo = document.getElementById('ghRepo').value.trim();
-  const branch = document.getElementById('ghBranch').value.trim() || 'main';
-  saveRepoConfig({ owner, repo, branch });
-  showToast('Repo settings saved');
-  stateIndexLoaded = false;
-});
-document.getElementById('btnTestRepo').addEventListener('click', async () => {
-  try { const data = await testRepoConnection(); showToast(`Connected to ${data.full_name}`); }
-  catch (err) { showToast(err.message, true); }
-});
-document.getElementById('btnSaveToken').addEventListener('click', () => {
-  const token = document.getElementById('ghToken').value.trim();
-  if (!token) { showToast('Paste a GitHub token first.', true); return; }
-  setSessionToken(token);
-  document.getElementById('ghToken').value = '';
-  showToast('Token loaded for this session');
-});
-document.getElementById('btnClearToken').addEventListener('click', () => {
-  setSessionToken('');
-  document.getElementById('ghToken').value = '';
-  showToast('Token cleared');
-});
 document.getElementById('btnRefreshLibrary').addEventListener('click', async () => {
   try { await fetchStateIndex(); showToast('Library refreshed'); }
   catch (err) { showToast(err.message, true); }

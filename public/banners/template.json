@@ -508,7 +508,7 @@
             "name": "434-D Video"
         },
         {
-            "name": "Charloais Transition"
+            "name": "Charolais Transition"
         },
         {
             "name": "435-A Transition"
@@ -736,7 +736,7 @@
             "name": "460-B Video"
         },
         {
-            "name": "Hosltein Transition"
+            "name": "Holstein Transition"
         },
         {
             "name": "461 Transition"
@@ -17965,7 +17965,7 @@
         },
         {
             "prev_ver": 536936449,
-            "name": "Charloais Transition",
+            "name": "Charolais Transition",
             "uuid": "05ad4022-2e6e-49a2-8712-e57c950c394d",
             "id": "scene",
             "versioned_id": "scene",
@@ -18549,7 +18549,7 @@
         },
         {
             "prev_ver": 536936449,
-            "name": "Hosltein Transition",
+            "name": "Holstein Transition",
             "uuid": "acec4918-f7d7-47d5-8e2f-f5163b4796fc",
             "id": "scene",
             "versioned_id": "scene",

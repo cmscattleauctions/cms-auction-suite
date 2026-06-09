@@ -111,6 +111,82 @@ on first install and come back later.
 
 ---
 
+### 3d — Enable Cloud Firestore (saved listings + state images)
+
+The suite now saves three kinds of shared data in Firestore so the whole
+team sees the same thing: **saved listing projects**, **banner state
+images**, and **listing builder settings**. (Logins already use Firestore
+for the approval gate, so you may have it on already — but turn it on now
+if you haven't.)
+
+1. Left sidebar → **Build → Firestore Database**.
+2. Click **Create database**.
+3. Choose a location close to you (e.g. `nam5 (United States)`). This
+   can't be changed later, but any US option is fine.
+4. Start in **production mode** (we'll paste real rules in the next
+   sub-step). If you accidentally pick test mode, that's OK too — just be
+   sure to apply the rules below before going live, because test mode lets
+   anyone read/write for 30 days.
+5. Click **Create**.
+
+> **No Firebase Storage needed.** State images are stored directly in
+> Firestore as compressed data URLs (large PNGs are automatically
+> downscaled to stay under Firestore's 1 MB-per-document limit). That
+> avoids the cross-origin canvas problems that a Storage bucket would
+> introduce, and means there's nothing extra to configure.
+
+### 3e — Apply the Firestore security rules
+
+These rules let any **signed-in, approved** user read and write the shared
+collections, while keeping each person's approval record locked down.
+
+1. Firestore Database → **Rules** tab.
+2. Replace whatever is there with:
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+
+    // A user is "approved" if their users/{uid} doc says so
+    // (how auth.js gates the app) OR they carry an approved custom claim.
+    function isApproved() {
+      return isSignedIn() && (
+        request.auth.token.approved == true ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.approved == true)
+      );
+    }
+
+    // Each person can read and create only their OWN approval record,
+    // and only with approved:false. Flipping it to true happens in the
+    // Firebase Console (or Admin SDK), which bypasses these rules.
+    match /users/{uid} {
+      allow read:   if isSignedIn() && request.auth.uid == uid;
+      allow create: if isSignedIn() && request.auth.uid == uid
+                    && request.resource.data.approved == false;
+      allow update, delete: if false;
+    }
+
+    // Shared team data — any approved user can read and write.
+    match /listingProjects/{docId} { allow read, write: if isApproved(); }
+    match /stateImages/{abbr}      { allow read, write: if isApproved(); }
+    match /appSettings/{key}       { allow read, write: if isApproved(); }
+  }
+}
+```
+
+3. Click **Publish**.
+
+> If your team's approval currently works by toggling `approved: true` on
+> the `users/{uid}` document in the Console, these rules match that exactly
+> — no change to your approval workflow. (The custom-claim branch is just a
+> fallback so either approach keeps working.)
+
+---
+
 ## Step 4 — Plug Firebase values into the code
 
 Open `public/shared/firebase-config.js`. It looks like this:
@@ -277,8 +353,16 @@ warm canvas, the Listings tab loaded by default.
 Click each tab and confirm:
 
 - **Listings** — the Listing Builder loads. Try uploading a test CSV.
+  Then click **💾 Save Project**, give it a name, and save. Reload the
+  page and click **📂 My Projects** — your saved listing should be there
+  (and so should anything a teammate saved, since projects live in
+  Firebase).
 - **Banners** — should be in light theme now (was dark before). Should
   go straight to the Builder/State Library tabs without a PIN prompt.
+  Open the **State Library / Admin** area: there's no longer any GitHub
+  token or repository setup — just type a two-letter state code, drop a
+  PNG or SVG, and click **Save**. It uploads straight to Firebase and
+  shows up in the shared library for everyone.
 - **Pre Auction** — loads the post-auction app, but only shows the
   "Pre-Auction Outputs" section.
 - **Post Auction** — loads the post-auction app with all sections except
@@ -335,6 +419,15 @@ sign out and back in.
 **Yellow demo-mode banner is showing on my live site.**
 `FIREBASE_CONFIGURED` is still `false` in `firebase-config.js`. Edit, push,
 let Netlify redeploy.
+
+**Saving a listing project or a state image fails / says "Missing or insufficient permissions".**
+Two usual causes: (1) Cloud Firestore isn't enabled yet — do Step 3d; or
+(2) the security rules from Step 3e weren't published, or your account
+isn't approved. Confirm you can otherwise use the app (that proves you're
+approved), then re-check the **Firestore → Rules** tab and click
+**Publish** again. Saved projects live in the `listingProjects` collection,
+state images in `stateImages`, and builder settings in `appSettings` — you
+can watch them appear under **Firestore Database → Data** as you save.
 
 **The post-auction app shows the old dark theme.**
 Hard refresh (Ctrl/Cmd-Shift-R). The browser is caching the old CSS. If

@@ -8,6 +8,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!-- Shared Firebase data layer (projects + settings). Loaded as a module; exposed as window.CMSData. -->
+<script>
+window.cmsDataReady = new Promise(function(res){
+  if(window.CMSData) return res(window.CMSData);
+  window.addEventListener('cmsdata-ready', function(){ res(window.CMSData); }, { once:true });
+});
+</script>
+<script type="module">
+  import * as CMSData from '../shared/cms-data.js';
+  window.CMSData = CMSData;
+  window.dispatchEvent(new Event('cmsdata-ready'));
+</script>
 <style>
 :root{
   --navy:#0a1a45; --navy2:#0d2257; --blue:#2a4fc4; --blue-bright:#1e3fb8;
@@ -187,6 +199,8 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .lotrow .cell strong{font-weight:700;color:#0c1430}
 .s-thead .cell:nth-child(1),.lotrow .cell:nth-child(1){border-right:1px solid var(--line)}
 .altrow{background:#fff}
+/* manual cell highlight — color set by --change-hl (editable in Colors panel) */
+.lotrow .cell.cell-hl{background:var(--change-hl,#fff7cc)!important}
 
 /* footer */
 .s-foot{height:34px;border-top:2px solid var(--blue);display:flex;align-items:center;
@@ -402,6 +416,53 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .tools-toggle-bar label{font-size:11px;color:#555b66;letter-spacing:.6px;text-transform:uppercase;font-weight:600;}
 .tools-toggle-bar select{height:30px;background:#fff;border:1px solid #d4cdbd;color:#1a1d23;border-radius:6px;padding:0 8px;font-family:inherit;font-size:12.5px;}
 .ed-main.tools-hidden #editTools,.ed-main.tools-hidden .color-editor-bar{display:none !important;}
+
+/* Compact action bar (always visible) */
+.action-bar{display:flex;align-items:center;gap:10px;padding:8px 16px;background:#fff;border-bottom:1px solid #e6e0d4;}
+.action-bar .action-bar-spacer{flex:1}
+.tools-check{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#1a1d23;font-weight:600;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;user-select:none}
+.tools-check input{width:16px;height:16px;accent-color:#b8860b;cursor:pointer}
+
+/* Compact, clearer editing toolbar */
+.ed-tools{gap:6px !important;padding:6px 12px !important;row-gap:6px !important;}
+.ed-tools .grp{gap:4px;padding:2px 4px;border-radius:7px}
+.ed-tools .grp .lbl{font-size:9.5px !important;letter-spacing:.4px}
+.ed-tools .btn.sm{padding:5px 9px;font-size:11.5px;border-radius:5px}
+.ed-tools .vr{height:18px;margin:0 2px}
+.ed-tools select{height:27px;font-size:11.5px}
+.ed-tools .col-w-val{min-width:38px}
+.ed-tools .sel-grp{background:rgba(184,134,11,.12);border:1px solid #d4a017;border-radius:8px;padding:3px 8px}
+.ed-tools .sel-grp .lbl{color:#9a7209}
+.ed-tools .sel-grp .lbl b{color:#1a1d23;font-size:12px}
+
+/* Per-lot select checkbox (editing only; hidden in PDF) */
+.lot-select{position:absolute;left:-66px;top:50%;transform:translateY(-50%);display:none;align-items:center;justify-content:center}
+.editing .lot-select{display:flex}
+.lot-select input{width:20px;height:20px;accent-color:#b8860b;cursor:pointer}
+.lotrow.sel-on{box-shadow:inset 4px 0 0 #b8860b}
+.hidectl .lot-select{display:none !important}
+
+/* Modal */
+.modal-back{position:fixed;inset:0;background:rgba(19,24,32,.55);display:none;align-items:flex-start;justify-content:center;z-index:5000;padding:40px 16px;overflow:auto}
+.modal-back.on{display:flex}
+.modal{background:#fff;color:#1a1d23;border-radius:14px;width:min(560px,100%);box-shadow:0 18px 60px rgba(0,0,0,.4);overflow:hidden}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e6e0d4}
+.modal-head h3{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px;letter-spacing:.02em}
+.modal-x{background:transparent;border:0;font-size:22px;line-height:1;color:#777;cursor:pointer;padding:2px 6px}
+.modal-body{padding:18px 20px;max-height:62vh;overflow:auto}
+.modal-foot{padding:14px 20px;border-top:1px solid #e6e0d4;display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.modal .field{margin-bottom:12px}
+.modal .field label{display:block;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:#555b66;margin-bottom:5px;font-weight:600}
+.modal .field input,.modal .field textarea,.modal .field select{width:100%;background:#fff;border:1px solid #d4cdbd;color:#1a1d23;padding:9px 11px;border-radius:7px;font-family:inherit;font-size:14px}
+.modal .field textarea{min-height:64px;resize:vertical}
+.modal .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.proj-list{display:flex;flex-direction:column;gap:8px}
+.proj-row{display:flex;align-items:center;gap:12px;border:1px solid #e6e0d4;border-radius:10px;padding:11px 13px}
+.proj-row .meta{flex:1;min-width:0}
+.proj-row .pname{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proj-row .psub{font-size:11.5px;color:#777;margin-top:2px}
+.proj-empty{color:#777;font-size:13px;padding:18px 4px;text-align:center}
+.modal-note{font-size:12px;color:#777;margin:2px 0 12px}
 .sheet .cal-box{width:188px !important;min-height:98px !important;}
 .sheet .cal-box .cap{padding:8px 3px !important;}
 .sheet .cal-box .body{padding:1px 5px !important;gap:4px !important;justify-content:center !important;}
@@ -607,23 +668,36 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
             <input type="file" id="resultsFileInput" accept=".csv" hidden>
           </div>
         </div>
-        <div class="tools-toggle-bar">
-          <label for="toolsVisibility">Editing Tools</label>
-          <select id="toolsVisibility">
-            <option value="show">Show</option>
-            <option value="hide">Hide</option>
-          </select>
+        <div class="action-bar">
+          <label class="tools-check"><input type="checkbox" id="toolsToggle" checked> Editing tools</label>
+          <div class="action-bar-spacer"></div>
+          <button class="btn ghost sm" id="addLotBtn">+ Add Lot</button>
+          <button class="btn ghost sm" id="openProjectsBtn">📂 My Projects</button>
+          <button class="btn sm" id="saveProjectBtn">💾 Save Project</button>
         </div>
         <div class="ed-tools" id="editTools">
-          <div class="grp"><button class="btn ghost sm" id="boldBtn"><b>B</b> Bold</button></div>
-          <div class="grp">
-            <button class="btn ghost sm" id="scratchBtn">Scratch Lot</button>
-            <button class="btn ghost sm" id="suppBtn">Supplemental</button>
+          <div class="grp sel-grp" id="selGroup" style="display:none">
+            <span class="lbl">Selected <b id="selCount">0</b></span>
+            <button class="btn ghost sm" id="selRowMinus" title="Shorter rows">Height −</button>
+            <button class="btn ghost sm" id="selRowPlus" title="Taller rows">Height +</button>
+            <button class="btn ghost sm" id="selDelete" title="Delete selected lots">🗑 Delete</button>
+            <button class="btn ghost sm" id="selClear">Clear</button>
+            <div class="vr"></div>
           </div>
           <div class="grp">
+            <span class="lbl">Format</span>
+            <button class="btn ghost sm" id="boldBtn"><b>B</b></button>
+            <button class="btn ghost sm" id="scratchBtn">Scratch</button>
+            <button class="btn ghost sm" id="suppBtn">Suppl.</button>
+            <button class="btn ghost sm" id="highlightBtn" title="Highlight the box your cursor is in">🖍 Highlight</button>
+            <button class="btn ghost sm" id="clearHlBtn" title="Remove all highlights in this view">Clear HL</button>
+            <button class="btn ghost sm" id="deleteLotBtn" title="Delete the focused lot">🗑 Lot</button>
+          </div>
+          <div class="vr"></div>
+          <div class="grp">
             <span class="lbl">Option groups</span>
-            <button class="btn ghost sm" id="manualGroupBtn">Group Lots</button>
-            <button class="btn ghost sm" id="ungroupBtn">Ungroup Focused</button>
+            <button class="btn ghost sm" id="manualGroupBtn">Group</button>
+            <button class="btn ghost sm" id="ungroupBtn">Ungroup</button>
           </div>
           <div class="vr"></div>
           <div class="grp">
@@ -633,20 +707,20 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
           </div>
           <div class="vr"></div>
           <div class="grp">
-            <span class="lbl">Text size</span>
+            <span class="lbl">Text</span>
             <button class="btn ghost sm" id="txtMinus">A−</button>
             <button class="btn ghost sm" id="txtPlus">A+</button>
-          </div>
-          <div class="grp">
-            <span class="lbl">Calendar text</span>
-            <button class="btn ghost sm" id="calTxtMinus">A−</button>
-            <button class="btn ghost sm" id="calTxtPlus">A+</button>
           </div>
           <div class="grp">
             <span class="lbl">Box text</span>
             <button class="btn ghost sm" id="boxTxtMinus">A−</button>
             <button class="btn ghost sm" id="boxTxtPlus">A+</button>
-            <button class="btn ghost sm" id="boxTxtReset">Reset</button>
+            <button class="btn ghost sm" id="boxTxtReset">↺</button>
+          </div>
+          <div class="grp">
+            <span class="lbl">Calendar</span>
+            <button class="btn ghost sm" id="calTxtMinus">A−</button>
+            <button class="btn ghost sm" id="calTxtPlus">A+</button>
           </div>
           <div class="vr"></div>
           <div class="grp">
@@ -655,10 +729,10 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
             <button class="btn ghost sm" id="colMinus">−</button>
             <span class="lbl col-w-val" id="colWVal">—</span>
             <button class="btn ghost sm" id="colPlus">+</button>
-            <button class="btn ghost sm" id="colReset">Reset</button>
+            <button class="btn ghost sm" id="colReset">↺</button>
           </div>
           <div class="vr"></div>
-          <div class="grp"><button class="btn ghost sm" id="autofit">Auto-fit Pages</button></div>
+          <div class="grp"><button class="btn ghost sm" id="autofit">Auto-fit</button></div>
           <div class="vr"></div>
           <div class="grp">
             <span class="lbl">Zoom</span>
@@ -668,7 +742,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
           </div>
           <div class="spacer" style="flex:1"></div>
           <button class="btn ghost sm" id="backToSettings">Settings</button>
-          <button class="btn sm" id="exportBtn">⬇ Download Current Tab PDF</button>
+          <button class="btn sm" id="exportBtn">⬇ Download Tab PDF</button>
         </div>
         <div class="color-editor-bar">
           <span class="lbl">Catalog Colors</span>
@@ -681,6 +755,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
             <div class="field"><label>Calendar Grey</label><input type="color" id="c-calendar"></div>
             <div class="field"><label>Supplemental Accent</label><input type="color" id="c-supp-accent"></div>
             <div class="field"><label>Supplemental Fill</label><input type="color" id="c-supp-bg"></div>
+            <div class="field"><label>Highlight Color</label><input type="color" id="c-change"></div>
           </div>
         </div>
         <div class="ed-canvas" id="canvas">
@@ -690,6 +765,76 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
     </div>
   </div>
 </div>
+<!-- ===== Modals ===== -->
+<div class="modal-back" id="saveModalBack">
+  <div class="modal">
+    <div class="modal-head"><h3>Save Project</h3><button class="modal-x" data-close>×</button></div>
+    <div class="modal-body">
+      <p class="modal-note">Saves all settings, lots, layout, colors and edits to the shared cloud so you or anyone on the team can reopen it later.</p>
+      <div class="field"><label>Project name</label><input id="saveNameInput" placeholder="e.g. April Dairy & Native Auction"></div>
+      <div id="saveCurrentNote" class="modal-note" style="display:none"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close>Cancel</button>
+      <button class="btn ghost" id="saveAsNewBtn" style="display:none">Save as new copy</button>
+      <button class="btn" id="saveConfirmBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="projectsModalBack">
+  <div class="modal">
+    <div class="modal-head"><h3>My Projects</h3><button class="modal-x" data-close>×</button></div>
+    <div class="modal-body">
+      <p class="modal-note">Saved listings are shared across everyone on the team. Open one to keep editing it.</p>
+      <div class="proj-list" id="projList"><div class="proj-empty">Loading…</div></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="projRefreshBtn">Refresh</button>
+      <button class="btn ghost" data-close>Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="addLotModalBack">
+  <div class="modal">
+    <div class="modal-head"><h3>Add Custom Lot</h3><button class="modal-x" data-close>×</button></div>
+    <div class="modal-body">
+      <p class="modal-note">Build a new lot by hand — no need to re-upload a CSV. It is added to the end of the section you choose.</p>
+      <div class="grid2">
+        <div class="field"><label>Lot Number</label><input id="al-lot" placeholder="e.g. 215"></div>
+        <div class="field"><label>Section</label><select id="al-type"></select></div>
+      </div>
+      <div class="field" id="al-newtype-wrap" style="display:none"><label>New section name</label><input id="al-newtype" placeholder="e.g. Holstein Steers"></div>
+      <div class="grid2">
+        <div class="field"><label>Consignor / Seller</label><input id="al-consignor"></div>
+        <div class="field"><label>Location</label><input id="al-location" placeholder="City, ST"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Head Count</label><input id="al-head"></div>
+        <div class="field"><label>Load Count</label><input id="al-loadcount"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Breed</label><input id="al-breed"></div>
+        <div class="field"><label>Sex</label><input id="al-sex"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Base Weight</label><input id="al-basewt"></div>
+        <div class="field"><label>Delivery</label><input id="al-delivery"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Shrink</label><input id="al-shrink"></div>
+        <div class="field"><label>Slide</label><input id="al-slide"></div>
+      </div>
+      <div class="field"><label>Description / Notes (new line in Sheets = new line here)</label><textarea id="al-desc" placeholder="One detail per line"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close>Cancel</button>
+      <button class="btn" id="addLotConfirmBtn">Add Lot</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -713,10 +858,10 @@ const S = {
     addr:'6900 I40 West, Ste 135, Amarillo, TX 79106'},
   issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:'',showCalendar:true,headerAlign:'center'},
   sections:[], zoom:.70, rowStep:14, textScale:1, calendarTextScale:1, toolsHidden:false, builderMode:'basic',
-  colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff'},
+  colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff',changeHL:'#fff7cc'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows','Holstein Cows | unless: Jersey, Jers','Holstein Cow | unless: Jersey, Jers'],
   colWidths:{lot:52,seller:122,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:52,slide:94,notes:206,price:60},
-  modeLayouts:{}, modeStates:{}
+  modeLayouts:{}, modeStates:{}, selected:new Set(), currentProjectId:null, currentProjectName:''
 };
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const MONTHS=['January','February','March','April','May','June','July','August',
@@ -729,26 +874,45 @@ function monthOf(v){if(!v)return'';return MONTHS[(+v.split('-')[1])-1];}
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');
   clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);}
 
-/* ===== storage (global settings persist) ===== */
+/* ===== storage (global settings persist — Firebase first, window.storage fallback) ===== */
+async function getCMSData(){
+  try{
+    if(window.CMSData) return window.CMSData;
+    if(window.cmsDataReady) return await Promise.race([window.cmsDataReady, new Promise(r=>setTimeout(()=>r(null),4000))]);
+  }catch(e){}
+  return null;
+}
+function applyGlobalData(data){
+  if(!data)return;
+  if(data.global)Object.assign(S.global,data.global); else Object.assign(S.global,data);
+  if(data.colors)Object.assign(S.colors,data.colors);
+  if(data.builderMode)S.builderMode=data.builderMode;
+  if(typeof data.toolsHidden==='boolean')S.toolsHidden=data.toolsHidden;
+  if(Array.isArray(data.boldRules)){
+    S.boldRules=data.boldRules.slice();
+    ['Holstein Cows | unless: Jersey, Jers','Holstein Cow | unless: Jersey, Jers'].forEach(rule=>{
+      if(!S.boldRules.some(r=>String(r).toLowerCase()===rule.toLowerCase()))S.boldRules.push(rule);
+    });
+  }
+}
 async function loadGlobal(){
-  try{const r=await window.storage.get('cms_global');
-    if(r&&r.value){
-      const data=JSON.parse(r.value);
-      if(data.global)Object.assign(S.global,data.global); else Object.assign(S.global,data);
-      if(data.colors)Object.assign(S.colors,data.colors);
-      if(data.builderMode)S.builderMode=data.builderMode;
-      if(typeof data.toolsHidden==='boolean')S.toolsHidden=data.toolsHidden;
-      if(Array.isArray(data.boldRules)){
-        S.boldRules=data.boldRules.slice();
-        ['Holstein Cows | unless: Jersey, Jers','Holstein Cow | unless: Jersey, Jers'].forEach(rule=>{
-          if(!S.boldRules.some(r=>String(r).toLowerCase()===rule.toLowerCase()))S.boldRules.push(rule);
-        });
-      }
+  // Try the shared cloud first so settings follow the team across devices.
+  try{
+    const CD=await getCMSData();
+    if(CD&&CD.configured){
+      const data=await CD.getSettings('listings');
+      if(data){applyGlobalData(data);return;}
     }
+  }catch(e){}
+  // Fallback: this browser's local storage (used in demo/offline mode).
+  try{const r=await window.storage.get('cms_global');
+    if(r&&r.value)applyGlobalData(JSON.parse(r.value));
   }catch(e){}
 }
 async function saveGlobal(){
-  try{await window.storage.set('cms_global',JSON.stringify({global:S.global,colors:S.colors,boldRules:S.boldRules,builderMode:S.builderMode,toolsHidden:S.toolsHidden}));}catch(e){}
+  const payload={global:S.global,colors:S.colors,boldRules:S.boldRules,builderMode:S.builderMode,toolsHidden:S.toolsHidden};
+  try{const CD=await getCMSData(); if(CD&&CD.configured)await CD.setSettings('listings',payload);}catch(e){}
+  try{await window.storage.set('cms_global',JSON.stringify(payload));}catch(e){}
 }
 
 /* ===== navigation ===== */
@@ -836,7 +1000,7 @@ function syncSettingsUI(){
   $('#c-blue').value=S.colors.blue; $('#c-section-end').value=S.colors.sectionEnd;
   $('#c-section-text').value=S.colors.sectionText; $('#c-table-head').value=S.colors.tableHead;
   $('#c-calendar').value=S.colors.calendar; $('#c-divider').value=S.colors.divider||'#d3d3d3'; $('#c-supp-accent').value=S.colors.suppAccent;
-  $('#c-supp-bg').value=S.colors.suppBg; $('#bold-rules').value=S.boldRules.join('\n');
+  $('#c-supp-bg').value=S.colors.suppBg; $('#c-change').value=S.colors.changeHL||'#fff7cc'; $('#bold-rules').value=S.boldRules.join('\n');
 }
 function readSettingsUI(){
   S.global={house:$('#g-house').value,phone:$('#g-phone').value,
@@ -848,7 +1012,7 @@ function readSettingsUI(){
   $('#v-settings').classList.toggle('basic-builder',S.builderMode==='basic');
   S.colors={blue:$('#c-blue').value,sectionEnd:$('#c-section-end').value,
     sectionText:$('#c-section-text').value,tableHead:$('#c-table-head').value,
-    calendar:$('#c-calendar').value,divider:$('#c-divider').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value};
+    calendar:$('#c-calendar').value,divider:$('#c-divider').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value,changeHL:$('#c-change').value};
   S.boldRules=$('#bold-rules').value.split(/\n/).map(x=>x.trim()).filter(Boolean);
 }
 
@@ -856,6 +1020,12 @@ function readSettingsUI(){
 function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 function nl(s){return esc(s).replace(/\\n|\n/g,'<br>');}
 function flat(s){return esc((s||'').replace(/\\n|\n|\r/g,' ').replace(/\s+/g,' ').trim());}
+/* Preserve newlines that came from a spreadsheet cell (Excel/Sheets export them
+   inside quoted fields) by turning them into <br> line breaks. */
+function multi(s){
+  const t=String(s||'').replace(/\r\n?/g,'\n').replace(/[ \t]+/g,' ').replace(/ *\n */g,'\n').replace(/^\n+|\n+$/g,'');
+  return esc(t).replace(/\n+/g,'<br>');
+}
 function rxEsc(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
 function stripTags(s){return (s||'').replace(/<[^>]*>/g,' ');}
 function parseBoldRule(rule){
@@ -892,7 +1062,7 @@ function descHTML(lot){
 }
 function notesHTML(lot){
   let html=lotEdit(lot,'notes');
-  if(html==null) html=[lot.desc1,lot.desc2].filter(Boolean).map(flat).join('<br>');
+  if(html==null) html=[lot.desc1,lot.desc2].filter(Boolean).map(multi).join('<br>');
   return applyBoldRules(html);
 }
 function sellerHTML(lot){
@@ -986,8 +1156,10 @@ function rowExtra(){return S.sheetMode==='auctioneer'?44:0;}
 function modeKey(){return S.sheetMode||'default';}
 function modeState(mode=modeKey()){
   if(!S.modeStates)S.modeStates={};
-  if(!S.modeStates[mode])S.modeStates[mode]={edits:{},cellScales:{},heights:{},scratched:{},supplemental:{}};
-  return S.modeStates[mode];
+  if(!S.modeStates[mode])S.modeStates[mode]={edits:{},cellScales:{},heights:{},scratched:{},supplemental:{},hl:{}};
+  const ms=S.modeStates[mode];
+  if(!ms.hl)ms.hl={}; // backfill projects saved before highlighting existed
+  return ms;
 }
 const MIRROR_FROM_LISTINGS=['po','results'];
 function mirrorListingsState(kind,lotId,c,value){
@@ -1011,6 +1183,9 @@ function setLotHeight(lot,h){const v=Math.max(54,Math.round(h)); modeState().hei
 function lotCellScale(lot,c){const cs=modeState().cellScales[lot.id]||lot.cellScale||{}; return cs[c]||1;}
 function setLotCellScale(lot,c,v){const st=modeState(); if(!st.cellScales[lot.id])st.cellScales[lot.id]={}; st.cellScales[lot.id][c]=v; mirrorListingsState('cellScale',lot.id,c,v);}
 function clearLotCellScale(lot,c){const st=modeState(); if(st.cellScales[lot.id])delete st.cellScales[lot.id][c]; mirrorListingsState('cellScaleClear',lot.id,c,null);}
+function lotCellHL(lot,c){const m=modeState().hl[lot.id]; return !!(m&&m[c]);}
+function setLotCellHL(lot,c,on){const st=modeState(); if(!st.hl[lot.id])st.hl[lot.id]={};
+  if(on)st.hl[lot.id][c]=1; else{delete st.hl[lot.id][c]; if(!Object.keys(st.hl[lot.id]).length)delete st.hl[lot.id];}}
 function lotFlag(lot,name){const st=modeState(); if(Object.prototype.hasOwnProperty.call(st[name],lot.id))return !!st[name][lot.id]; return !!lot[name];}
 function setLotFlag(lot,name,v){modeState()[name][lot.id]=!!v;}
 function saveModeLayout(mode=modeKey()){
@@ -1088,7 +1263,7 @@ function sheetHTML(page,pageNum,totalPages){
   const I=S.issue,G=S.global;
   const ND=dateParts(I.ndate);
   const C=S.colors;
-  const sheetVars=`--ts:${S.textScale};--cat-blue:${C.blue};--section-fade:${C.sectionEnd};--section-text:${C.sectionText};--table-header-bg:${C.tableHead};--lot-divider:${C.divider||'#d3d3d3'};--calts:${S.calendarTextScale||1};--calendar-grey:${C.calendar};--supp-accent:${C.suppAccent};--supp-bg:${C.suppBg};--supp-bg-alt:${C.suppBg};`;
+  const sheetVars=`--ts:${S.textScale};--cat-blue:${C.blue};--section-fade:${C.sectionEnd};--section-text:${C.sectionText};--table-header-bg:${C.tableHead};--lot-divider:${C.divider||'#d3d3d3'};--calts:${S.calendarTextScale||1};--calendar-grey:${C.calendar};--supp-accent:${C.suppAccent};--supp-bg:${C.suppBg};--supp-bg-alt:${C.suppBg};--change-hl:${C.changeHL||'#fff7cc'};`;
   let h=`<div class="sheet ${I.showCalendar===false?'no-calendar':''} align-${I.headerAlign||'center'}" data-mode="${S.sheetMode}" data-pg="${pageNum}" style="${sheetVars}">`+
         `<div class="s-pad">`;
   if(hasHeader){
@@ -1126,9 +1301,11 @@ function sheetHTML(page,pageNum,totalPages){
     b.lots.forEach((lot,li)=>{
       const gpos=b.grouped?(li===0?'gtop':(li===b.lots.length-1?'gbot':'gmid')):'';
       const isFirst=li===0;
-      h+=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lotFlag(lot,'scratched')?'scratched':''} ${lotFlag(lot,'supplemental')?'supplemental':''}" data-id="${lot.id}"
+      const selOn=S.selected&&S.selected.has(lot.id);
+      h+=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lotFlag(lot,'scratched')?'scratched':''} ${lotFlag(lot,'supplemental')?'supplemental':''} ${selOn?'sel-on':''}" data-id="${lot.id}"
             data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}"
             style="grid-template-columns:${grid};min-height:${lotHeight(lot)+rowExtra()}px">`;
+      h+=`<div class="lot-select"><input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot"></div>`;
       if(li===0){
         h+=`<div class="lot-ctl">
             <button data-mv="-1" title="Move up a page">▲</button>
@@ -1154,7 +1331,8 @@ function sheetHTML(page,pageNum,totalPages){
           v=lotEdit(lot,'poPrice')??(lot.poPrice?esc(lot.poPrice):'');}
         const sc=lotCellScale(lot,c);
         const cellScale=sc&&sc!==1?` style="font-size:${sc}em !important"`:'';
-        h+=`<div class="${cls}"><div class="cc" contenteditable${cellScale}
+        const hlCls=lotCellHL(lot,c)?' cell-hl':'';
+        h+=`<div class="${cls}${hlCls}"><div class="cc" contenteditable${cellScale}
               data-id="${lot.id}" data-c="${c}">${v}</div></div>`;
       });
       h+=`</div>`;
@@ -1186,7 +1364,8 @@ function renderEditor(){
   wrap.classList.add('editing');
   wrap.style.transform='scale('+S.zoom+')';
   $('#zVal').textContent=Math.round(S.zoom*100)+'%';
-  const tv=$('#toolsVisibility'); if(tv){tv.value=S.toolsHidden?'hide':'show'; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden);}
+  const tv=$('#toolsToggle'); if(tv){tv.checked=!S.toolsHidden; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden);}
+  if(typeof updateSelectionUI==='function')updateSelectionUI();
   // keep manual row heights stable; overflow detection below flags pages without changing layout.
   // overflow detection
   $$('.sheet').forEach(sh=>{
@@ -1239,6 +1418,17 @@ function wireSheetEvents(){
     btn.addEventListener('click',e=>{
       const row=e.target.closest('.lotrow');
       moveBlock(+row.dataset.si,+row.dataset.pi,+row.dataset.bi,+btn.dataset.mv);
+    });
+  });
+  // selection checkboxes
+  if(!S.selected)S.selected=new Set();
+  $$('#zoomwrap .lot-cb').forEach(cb=>{
+    cb.addEventListener('change',e=>{
+      const id=e.target.dataset.id;
+      if(e.target.checked)S.selected.add(id); else S.selected.delete(id);
+      const row=e.target.closest('.lotrow');
+      if(row)row.classList.toggle('sel-on',e.target.checked);
+      if(typeof updateSelectionUI==='function')updateSelectionUI();
     });
   });
 }
@@ -1328,6 +1518,23 @@ function resetBoxText(){
   clearLotCellScale(lot,lastFocusCell.c);
   renderEditor();
   toast('Box text reset.');
+}
+function toggleHighlight(){
+  if(!lastFocusCell){toast('Click inside a box first, then tap Highlight.');return;}
+  const lot=S.lots.find(l=>l.id===lastFocusCell.id);
+  if(!lot)return;
+  const on=!lotCellHL(lot,lastFocusCell.c);
+  setLotCellHL(lot,lastFocusCell.c,on);
+  renderEditor();
+  toast(on?'Box highlighted.':'Highlight removed.');
+}
+function clearAllHighlights(){
+  const st=modeState();
+  if(!st.hl||!Object.keys(st.hl).length){toast('No highlights to clear in this view.');return;}
+  if(!confirm('Remove every highlight in this view?'))return;
+  st.hl={};
+  renderEditor();
+  toast('Highlights cleared.');
 }
 
 /* ===== bold ===== */
@@ -1427,7 +1634,7 @@ function ingestResultsCSV(file){
 function updateColorsFromEditor(){
   S.colors={blue:$('#c-blue').value,sectionEnd:$('#c-section-end').value,
     sectionText:$('#c-section-text').value,tableHead:$('#c-table-head').value,
-    calendar:$('#c-calendar').value,divider:$('#c-divider').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value};
+    calendar:$('#c-calendar').value,divider:$('#c-divider').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value,changeHL:$('#c-change').value};
   saveGlobal();
   renderEditor();
 }
@@ -1474,6 +1681,8 @@ $('#boldBtn').onmousedown=e=>{e.preventDefault();};
 $('#boldBtn').onclick=doBold;
 $('#scratchBtn').onclick=toggleScratch;
 $('#suppBtn').onclick=toggleSupplemental;
+$('#highlightBtn').onclick=toggleHighlight;
+$('#clearHlBtn').onclick=clearAllHighlights;
 $('#manualGroupBtn').onclick=manualGroupLots;
 $('#ungroupBtn').onclick=ungroupFocusedLot;
 $('#boxTxtMinus').onclick=()=>adjustBoxText(-.08);
@@ -1487,13 +1696,13 @@ $('#txtMinus').onclick=()=>{S.textScale=Math.max(.7,+(S.textScale-.06).toFixed(2
   renderEditor();toast('Text size '+Math.round(S.textScale*100)+'%');};
 $('#calTxtPlus').onclick=()=>{S.calendarTextScale=Math.min(1.35,+((S.calendarTextScale||1)+.05).toFixed(2));renderEditor();toast('Calendar text '+Math.round(S.calendarTextScale*100)+'%');};
 $('#calTxtMinus').onclick=()=>{S.calendarTextScale=Math.max(.75,+((S.calendarTextScale||1)-.05).toFixed(2));renderEditor();toast('Calendar text '+Math.round(S.calendarTextScale*100)+'%');};
-$('#toolsVisibility').onchange=e=>{S.toolsHidden=e.target.value==='hide'; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden); saveGlobal();};
+$('#toolsToggle').onchange=e=>{S.toolsHidden=!e.target.checked; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden); saveGlobal();};
 $('#colPick').onchange=updateColControls;
 $('#colMinus').onclick=()=>changeColumnWidth($('#colPick').value,-8);
 $('#colPlus').onclick=()=>changeColumnWidth($('#colPick').value,8);
 $('#colReset').onclick=()=>{S.colWidths={...DEFAULT_COL_WIDTHS};updateColControls();renderEditor();toast('Column widths reset.');};
 $('#autofit').onclick=()=>{renderEditor();autofit();saveModeLayout();renderEditor();toast('Pages re-fitted.');};
-$$('#c-blue,#c-section-end,#c-section-text,#c-table-head,#c-divider,#c-calendar,#c-supp-accent,#c-supp-bg').forEach(el=>el.addEventListener('input',updateColorsFromEditor));
+$$('#c-blue,#c-section-end,#c-section-text,#c-table-head,#c-divider,#c-calendar,#c-supp-accent,#c-supp-bg,#c-change').forEach(el=>el.addEventListener('input',updateColorsFromEditor));
 $$('#modeTabs .mode-tab').forEach(btn=>btn.onclick=()=>switchSheetMode(btn.dataset.mode));
 $('#uploadResultsBtn').onclick=()=>$('#resultsFileInput').click();
 $('#resultsFileInput').onchange=e=>{if(e.target.files[0])ingestResultsCSV(e.target.files[0]); e.target.value='';};
@@ -1508,4 +1717,279 @@ $$('.crumb').forEach(c=>c.onclick=()=>{
 
 /* ===== init ===== */
 loadGlobal().then(()=>{updateColControls();go('upload');});
+</script>
+
+<script>
+"use strict";
+/* =============================================================
+ * Added features: cloud projects, custom lots, delete lots,
+ * multi-select bulk height. Relies on globals from the main
+ * script above (S, $, $$, toast, buildSections, renderEditor, …).
+ * ============================================================= */
+
+if(!S.selected) S.selected = new Set();
+
+/* ----- tiny helpers ----- */
+function escAttr(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmtWhen(ms){ if(!ms) return ''; const d=new Date(ms);
+  return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})+' '+
+         d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}); }
+function openModal(id){const el=$('#'+id); if(el)el.classList.add('on');}
+function closeModal(id){const el=$('#'+id); if(el)el.classList.remove('on');}
+
+/* ----- selection / bulk height ----- */
+function selectedLots(){return S.lots.filter(l=>S.selected.has(l.id));}
+function updateSelectionUI(){
+  const grp=$('#selGroup'), cnt=$('#selCount');
+  if(!grp)return;
+  const n=S.selected?S.selected.size:0;
+  grp.style.display=n?'flex':'none';
+  if(cnt)cnt.textContent=n;
+}
+function clearSelection(){ S.selected.clear(); renderEditor(); }
+function bulkAdjustHeight(delta){
+  const lots=selectedLots();
+  if(!lots.length){toast('Select one or more lots first (use the checkboxes).');return;}
+  lots.forEach(l=>setLotHeight(l,lotHeight(l)+delta));
+  renderEditor();
+  toast('Adjusted height on '+lots.length+' lot'+(lots.length===1?'':'s')+'.');
+}
+
+/* ----- delete lots ----- */
+function rebuildAfterLotChange(){
+  if(lastFocusLot && !S.lots.some(l=>l.id===lastFocusLot)) lastFocusLot=null;
+  S.modeLayouts={};
+  buildSections();
+  saveModeLayout();
+  renderEditor();
+}
+function performDelete(lots){
+  if(!lots||!lots.length)return;
+  const ids=new Set(lots.map(l=>l.id));
+  const label=lots.length===1?('lot '+(displayLotNumber(lots[0])||lots[0].lot||'').replace(/<[^>]*>/g,'')):(lots.length+' lots');
+  if(!confirm('Delete '+label+'? This cannot be undone.'))return;
+  S.lots=S.lots.filter(l=>!ids.has(l.id));
+  ids.forEach(id=>S.selected.delete(id));
+  Object.values(S.modeStates||{}).forEach(st=>{
+    ['edits','cellScales','heights','scratched','supplemental'].forEach(k=>{
+      if(st&&st[k])ids.forEach(id=>{delete st[k][id];});
+    });
+  });
+  rebuildAfterLotChange();
+  toast('Deleted '+label+'.');
+}
+function deleteSelectedLots(){
+  const lots=selectedLots();
+  if(!lots.length){toast('Select lots to delete using the checkboxes.');return;}
+  performDelete(lots);
+}
+function deleteFocusedLot(){
+  let lots=[];
+  if(lastFocusLot){const l=S.lots.find(x=>x.id===lastFocusLot); if(l)lots=[l];}
+  if(!lots.length && S.selected.size)lots=selectedLots();
+  if(!lots.length){toast('Click a lot first, or select lots with the checkboxes.');return;}
+  performDelete(lots);
+}
+
+/* ----- add custom lot ----- */
+function existingTypes(){
+  const seen=[]; S.lots.forEach(l=>{if(l.type&&!seen.includes(l.type))seen.push(l.type);});
+  return seen;
+}
+function populateAddLotTypes(){
+  const sel=$('#al-type'); if(!sel)return;
+  const types=existingTypes();
+  const focusType=(lastFocusLot&&(S.lots.find(l=>l.id===lastFocusLot)||{}).type)||types[0]||'';
+  sel.innerHTML=types.map(t=>`<option value="${escAttr(t)}">${escAttr(t)}</option>`).join('')+
+    '<option value="__new__">➕ New section…</option>';
+  if(focusType)sel.value=focusType;
+  $('#al-newtype-wrap').style.display=(sel.value==='__new__'||!types.length)?'block':'none';
+  if(!types.length)sel.value='__new__';
+}
+function openAddLot(){
+  ['al-lot','al-consignor','al-location','al-head','al-loadcount','al-breed','al-sex','al-basewt','al-delivery','al-shrink','al-slide','al-desc','al-newtype']
+    .forEach(id=>{const el=$('#'+id); if(el)el.value='';});
+  populateAddLotTypes();
+  openModal('addLotModalBack');
+  setTimeout(()=>{const f=$('#al-lot'); if(f)f.focus();},50);
+}
+function confirmAddLot(){
+  const lotNum=$('#al-lot').value.trim();
+  if(!lotNum){toast('Enter a lot number.');return;}
+  let type=$('#al-type').value;
+  if(type==='__new__'){ type=$('#al-newtype').value.trim()||'Uncategorized'; }
+  const maxSeq=S.lots.reduce((m,l)=>Math.max(m, (parseFloat(l.seq)||0)),0);
+  const lot={
+    id:'L'+Date.now()+Math.floor(Math.random()*1000),
+    lot:lotNum, seq:maxSeq+1, group:naturalOptionGroup(lotNum),
+    consignor:$('#al-consignor').value.trim(),
+    loadCount:$('#al-loadcount').value.trim(),
+    head:$('#al-head').value.trim(),
+    breed:$('#al-breed').value.trim(),
+    sex:$('#al-sex').value.trim(),
+    basewt:$('#al-basewt').value.trim(),
+    delivery:$('#al-delivery').value.trim(),
+    location:$('#al-location').value.trim(),
+    shrink:$('#al-shrink').value.trim(),
+    slide:$('#al-slide').value.trim(),
+    desc1:$('#al-desc').value,
+    desc2:'',
+    type:type,
+    price:'', poPrice:'', lot2:'',
+    h:74, edits:{}, scratched:false, supplemental:/^S/i.test(lotNum), cellScale:{}
+  };
+  S.lots.push(lot);
+  rebuildAfterLotChange();
+  closeModal('addLotModalBack');
+  if(!$('#v-editor').classList.contains('on'))go('editor');
+  toast('Added lot '+lotNum+'.');
+}
+
+/* ----- project serialize / apply ----- */
+function serializeProject(){
+  saveModeLayout();
+  return {
+    v:1,
+    savedAt:Date.now(),
+    lots:S.lots,
+    results:S.results,
+    global:S.global,
+    issue:S.issue,
+    colors:S.colors,
+    boldRules:S.boldRules,
+    rowStep:S.rowStep,
+    textScale:S.textScale,
+    calendarTextScale:S.calendarTextScale,
+    toolsHidden:S.toolsHidden,
+    builderMode:S.builderMode,
+    colWidths:S.colWidths,
+    modeStates:S.modeStates,
+    modeLayouts:S.modeLayouts,
+    sheetMode:S.sheetMode
+  };
+}
+function applyProject(payload){
+  S.lots=Array.isArray(payload.lots)?payload.lots:[];
+  S.results=!!payload.results;
+  if(payload.global)Object.assign(S.global,payload.global);
+  if(payload.issue)Object.assign(S.issue,payload.issue);
+  if(payload.colors)Object.assign(S.colors,payload.colors);
+  if(Array.isArray(payload.boldRules))S.boldRules=payload.boldRules.slice();
+  if(payload.rowStep)S.rowStep=payload.rowStep;
+  if(payload.textScale)S.textScale=payload.textScale;
+  if(payload.calendarTextScale)S.calendarTextScale=payload.calendarTextScale;
+  if(typeof payload.toolsHidden==='boolean')S.toolsHidden=payload.toolsHidden;
+  if(payload.builderMode)S.builderMode=payload.builderMode;
+  S.colWidths=Object.assign({...DEFAULT_COL_WIDTHS},payload.colWidths||{});
+  S.modeStates=payload.modeStates||{};
+  S.modeLayouts=payload.modeLayouts||{};
+  S.sheetMode=payload.sheetMode||'default';
+  S.selected=new Set();
+  buildSections();
+  if(!restoreModeLayout(S.sheetMode))autofit();
+  updateModeTabs();
+  syncSettingsUI();
+  renderEditor();
+  go('editor');
+  (document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{
+    if(!restoreModeLayout(S.sheetMode))autofit();
+    renderEditor();
+  });
+}
+
+/* ----- save modal ----- */
+function openSaveModal(){
+  if(!S.lots.length){toast('Upload a CSV or add a lot before saving.');return;}
+  const nameInput=$('#saveNameInput');
+  nameInput.value=S.currentProjectName||S.issue.name||'';
+  const note=$('#saveCurrentNote'), asNew=$('#saveAsNewBtn');
+  if(S.currentProjectId){
+    note.style.display='block';
+    note.textContent='You are editing “'+(S.currentProjectName||'a saved project')+'”. Saving updates it for everyone.';
+    asNew.style.display='inline-flex';
+  }else{ note.style.display='none'; asNew.style.display='none'; }
+  openModal('saveModalBack');
+  setTimeout(()=>nameInput.focus(),50);
+}
+async function doSave(asNew){
+  const CD=await getCMSData();
+  if(!CD||!CD.configured){toast('Cloud saving needs Firebase configured.');return;}
+  const name=$('#saveNameInput').value.trim()||'Untitled listing';
+  const btn=$('#saveConfirmBtn'); btn.disabled=true; const old=btn.textContent; btn.textContent='Saving…';
+  try{
+    const data=serializeProject();
+    const id=asNew?null:S.currentProjectId;
+    const newId=await CD.saveProject(id,name,data);
+    S.currentProjectId=newId; S.currentProjectName=name;
+    closeModal('saveModalBack');
+    toast('Project saved.');
+  }catch(e){ toast(e.message||'Could not save.'); }
+  finally{ btn.disabled=false; btn.textContent=old; }
+}
+
+/* ----- projects list modal ----- */
+async function renderProjectsList(){
+  const el=$('#projList'); el.innerHTML='<div class="proj-empty">Loading…</div>';
+  const CD=await getCMSData();
+  if(!CD||!CD.configured){el.innerHTML='<div class="proj-empty">Saved projects need Firebase configured.</div>';return;}
+  try{
+    const list=await CD.listProjects();
+    if(!list.length){el.innerHTML='<div class="proj-empty">No saved projects yet. Build a listing and click “Save Project”.</div>';return;}
+    el.innerHTML=list.map(p=>`<div class="proj-row" data-id="${escAttr(p.id)}">
+        <div class="meta">
+          <div class="pname">${escAttr(p.name)}</div>
+          <div class="psub">${p.updatedBy?escAttr(p.updatedBy)+' · ':''}${escAttr(fmtWhen(p.updatedAt))}</div>
+        </div>
+        <button class="btn sm" data-open="${escAttr(p.id)}">Open</button>
+        <button class="btn ghost sm" data-del="${escAttr(p.id)}">Delete</button>
+      </div>`).join('');
+    el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>loadProjectById(b.getAttribute('data-open')));
+    el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
+      const row=b.closest('.proj-row');
+      deleteProjectById(b.getAttribute('data-del'), row?row.querySelector('.pname').textContent:'');
+    });
+  }catch(e){ el.innerHTML='<div class="proj-empty">Could not load projects: '+escAttr(e.message)+'</div>'; }
+}
+function openProjectsModal(){ openModal('projectsModalBack'); renderProjectsList(); }
+async function loadProjectById(id){
+  const CD=await getCMSData(); if(!CD||!CD.configured)return;
+  try{
+    const {name,payload}=await CD.loadProject(id);
+    if(!payload){toast('That project could not be read.');return;}
+    applyProject(payload);
+    S.currentProjectId=id; S.currentProjectName=name;
+    closeModal('projectsModalBack');
+    toast('Opened “'+name+'”.');
+  }catch(e){ toast(e.message||'Could not open project.'); }
+}
+async function deleteProjectById(id,name){
+  if(!confirm('Delete “'+(name||'this project')+'”? It will be removed for everyone.'))return;
+  const CD=await getCMSData(); if(!CD||!CD.configured)return;
+  try{
+    await CD.deleteProject(id);
+    if(S.currentProjectId===id){S.currentProjectId=null;S.currentProjectName='';}
+    renderProjectsList();
+    toast('Project deleted.');
+  }catch(e){ toast(e.message||'Could not delete.'); }
+}
+
+/* ----- wiring ----- */
+$('#addLotBtn').onclick=openAddLot;
+$('#saveProjectBtn').onclick=openSaveModal;
+$('#openProjectsBtn').onclick=openProjectsModal;
+$('#addLotConfirmBtn').onclick=confirmAddLot;
+$('#al-type').onchange=e=>{ $('#al-newtype-wrap').style.display=(e.target.value==='__new__')?'block':'none'; };
+$('#saveConfirmBtn').onclick=()=>doSave(false);
+$('#saveAsNewBtn').onclick=()=>doSave(true);
+$('#projRefreshBtn').onclick=renderProjectsList;
+$('#selRowPlus').onclick=()=>bulkAdjustHeight(S.rowStep);
+$('#selRowMinus').onclick=()=>bulkAdjustHeight(-S.rowStep);
+$('#selDelete').onclick=deleteSelectedLots;
+$('#selClear').onclick=clearSelection;
+$('#deleteLotBtn').onclick=deleteFocusedLot;
+$$('.modal-back').forEach(back=>{
+  back.addEventListener('click',e=>{ if(e.target===back)back.classList.remove('on'); });
+  back.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>back.classList.remove('on'));
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape')$$('.modal-back.on').forEach(m=>m.classList.remove('on')); });
 </script>
