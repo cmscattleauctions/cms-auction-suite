@@ -1169,31 +1169,68 @@ function modeState(mode=modeKey()){
   return ms;
 }
 const MIRROR_FROM_LISTINGS=['po','results'];
-function mirrorListingsState(kind,lotId,c,value){
-  if(modeKey()!=='default')return;
-  MIRROR_FROM_LISTINGS.forEach(m=>{
-    const st=modeState(m);
-    if(kind==='height')st.heights[lotId]=value;
-    if(kind==='cellScale'){if(!st.cellScales[lotId])st.cellScales[lotId]={}; st.cellScales[lotId][c]=value;}
-    if(kind==='cellScaleClear'&&st.cellScales[lotId])delete st.cellScales[lotId][c];
-  });
-}
+// The Listings (default) tab is the source of truth. The PO ("starting")
+// and Results tabs INHERIT every per-lot / per-cell setting from Listings,
+// and only diverge where you explicitly change something on that tab.
+function modeChain(mode=modeKey()){return (mode==='po'||mode==='results')?[mode,'default']:[mode];}
 function mirrorListingsLayout(){
   if(modeKey()!=='default'||!S.modeLayouts.default)return;
   MIRROR_FROM_LISTINGS.forEach(m=>{S.modeLayouts[m]=JSON.parse(JSON.stringify(S.modeLayouts.default));});
 }
-function lotEdits(lot){return Object.assign({},lot.edits||{},modeState().edits[lot.id]||{});}
+// One-time cleanup: drop any PO/Results entry that merely duplicates the
+// Listings value (e.g. left over from the old copy-on-edit behavior) so it
+// inherits going forward. Real per-tab overrides (different values) are kept.
+function normalizeInheritedModes(){
+  const def=S.modeStates&&S.modeStates.default; if(!def)return;
+  MIRROR_FROM_LISTINGS.forEach(m=>{
+    const ms=S.modeStates[m]; if(!ms)return;
+    if(ms.heights&&def.heights)Object.keys(ms.heights).forEach(id=>{if(ms.heights[id]===def.heights[id])delete ms.heights[id];});
+    ['scratched','supplemental'].forEach(f=>{ if(ms[f]&&def[f])Object.keys(ms[f]).forEach(id=>{if(!!ms[f][id]===!!def[f][id])delete ms[f][id];}); });
+    ['edits','cellScales'].forEach(k=>{ if(!ms[k])return; Object.keys(ms[k]).forEach(id=>{
+      const a=ms[k][id], b=(def[k]&&def[k][id])||{};
+      Object.keys(a).forEach(c=>{if(a[c]===b[c])delete a[c];});
+      if(!Object.keys(a).length)delete ms[k][id];
+    }); });
+    if(ms.hl)Object.keys(ms.hl).forEach(id=>{
+      const a=ms.hl[id], b=(def.hl&&def.hl[id])||{};
+      Object.keys(a).forEach(c=>{if(!!a[c]===!!b[c])delete a[c];});
+      if(!Object.keys(a).length)delete ms.hl[id];
+    });
+  });
+}
+// ----- edits (text + bold content), per lot per column -----
+function lotEdits(lot){
+  const out=Object.assign({},lot.edits||{});
+  modeChain().slice().reverse().forEach(m=>Object.assign(out,modeState(m).edits[lot.id]||{}));
+  return out;
+}
 function lotEdit(lot,c){const e=lotEdits(lot); return e[c];}
 function setLotEdit(lot,c,v){const st=modeState(); if(!st.edits[lot.id])st.edits[lot.id]={}; st.edits[lot.id][c]=v;}
-function lotHeight(lot){const h=modeState().heights[lot.id]; return Number.isFinite(h)?h:(lot.h||74);}
-function setLotHeight(lot,h){const v=Math.max(54,Math.round(h)); modeState().heights[lot.id]=v; mirrorListingsState('height',lot.id,null,v);}
-function lotCellScale(lot,c){const cs=modeState().cellScales[lot.id]||lot.cellScale||{}; return cs[c]||1;}
-function setLotCellScale(lot,c,v){const st=modeState(); if(!st.cellScales[lot.id])st.cellScales[lot.id]={}; st.cellScales[lot.id][c]=v; mirrorListingsState('cellScale',lot.id,c,v);}
-function clearLotCellScale(lot,c){const st=modeState(); if(st.cellScales[lot.id])delete st.cellScales[lot.id][c]; mirrorListingsState('cellScaleClear',lot.id,c,null);}
-function lotCellHL(lot,c){const m=modeState().hl[lot.id]; return !!(m&&m[c]);}
-function setLotCellHL(lot,c,on){const st=modeState(); if(!st.hl[lot.id])st.hl[lot.id]={};
-  if(on)st.hl[lot.id][c]=1; else{delete st.hl[lot.id][c]; if(!Object.keys(st.hl[lot.id]).length)delete st.hl[lot.id];}}
-function lotFlag(lot,name){const st=modeState(); if(Object.prototype.hasOwnProperty.call(st[name],lot.id))return !!st[name][lot.id]; return !!lot[name];}
+// ----- row height, per lot -----
+function lotHeight(lot){
+  for(const m of modeChain()){const h=modeState(m).heights[lot.id]; if(Number.isFinite(h))return h;}
+  return lot.h||74;
+}
+function setLotHeight(lot,h){modeState().heights[lot.id]=Math.max(54,Math.round(h));}
+// ----- per-box text scale, per lot per column -----
+function lotCellScale(lot,c){
+  for(const m of modeChain()){const cs=modeState(m).cellScales[lot.id]; if(cs&&cs[c])return cs[c];}
+  if(lot.cellScale&&lot.cellScale[c])return lot.cellScale[c];
+  return 1;
+}
+function setLotCellScale(lot,c,v){const st=modeState(); if(!st.cellScales[lot.id])st.cellScales[lot.id]={}; st.cellScales[lot.id][c]=v;}
+function clearLotCellScale(lot,c){const st=modeState(); if(st.cellScales[lot.id])delete st.cellScales[lot.id][c];}
+// ----- manual highlight, per lot per column (store 0/1 so a tab can override-off) -----
+function lotCellHL(lot,c){
+  for(const m of modeChain()){const hl=modeState(m).hl[lot.id]; if(hl&&Object.prototype.hasOwnProperty.call(hl,c))return !!hl[c];}
+  return false;
+}
+function setLotCellHL(lot,c,on){const st=modeState(); if(!st.hl[lot.id])st.hl[lot.id]={}; st.hl[lot.id][c]=on?1:0;}
+// ----- scratched / supplemental flags, per lot -----
+function lotFlag(lot,name){
+  for(const m of modeChain()){const map=modeState(m)[name]; if(map&&Object.prototype.hasOwnProperty.call(map,lot.id))return !!map[lot.id];}
+  return !!lot[name];
+}
 function setLotFlag(lot,name,v){modeState()[name][lot.id]=!!v;}
 function saveModeLayout(mode=modeKey()){
   if(!S.sections||!S.sections.length)return;
@@ -1889,6 +1926,7 @@ function applyProject(payload){
   if(payload.builderMode)S.builderMode=payload.builderMode;
   S.colWidths=Object.assign({...DEFAULT_COL_WIDTHS},payload.colWidths||{});
   S.modeStates=payload.modeStates||{};
+  normalizeInheritedModes();
   S.modeLayouts=payload.modeLayouts||{};
   S.sheetMode=payload.sheetMode||'default';
   S.selected=new Set();
