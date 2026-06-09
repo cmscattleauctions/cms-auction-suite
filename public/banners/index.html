@@ -2044,6 +2044,10 @@ window.pickOptionStyle = pickOptionStyle;
   unlockAdmin();
   fetchStateIndex().catch(err => { console.warn(err); renderLibrary(); });
   showPanel('upload');
+  // The shared CMSData module loads as an ES module (deferred), so at this
+  // point window.CMSData may not exist yet and the chips would read
+  // "Demo mode". Re-check once it's ready so they show the real status.
+  getCMSData().then(() => { updateRepoStatus(); updateTokenStatus(); });
 })();
 </script>
 </body>
