@@ -138,6 +138,11 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 .style-pick-name { font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:15px; letter-spacing:0.5px; }
 .style-pick-badge { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; }
 .action-row { display: flex; gap: 12px; justify-content: space-between; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+.custom-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 18px; }
+.cl-preview { display: grid; gap: 14px; }
+.cl-preview-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+.cl-preview-empty { color: var(--muted); font-size: 13px; padding: 18px; border: 1px dashed var(--border); border-radius: 10px; text-align: center; }
+@media (max-width: 980px) { .custom-form-grid { grid-template-columns: 1fr; } }
 @media (max-width: 980px) {
   .admin-grid { grid-template-columns: 1fr; }
   .grid { grid-template-columns: 1fr; }
@@ -150,6 +155,7 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 <nav>
   <!-- nav-brand removed in Phase 2 — suite shell owns the brand bar -->
   <button class="nav-tab active" onclick="showPage('flow', this)">Builder</button>
+  <button class="nav-tab" onclick="showPage('custom', this)">Custom Lots</button>
   <button class="nav-tab" onclick="showPage('admin', this)">State Library</button>
 </nav>
 
@@ -294,6 +300,95 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
     </div>
   </div>
 
+</div>
+
+<!-- ============================================================
+     CUSTOM LOTS PAGE — build one-off banners without a CSV
+     ============================================================ -->
+<div class="page" id="page-custom">
+  <div class="info-banner" style="margin-bottom:20px;">
+    Build one-off banners without a CSV — type a lot number and location, generate, and download.
+    Custom banners are <strong>download-only</strong>: they never change the OBS Scene Collection download on the Builder tab.
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <div class="section-title">Custom Lot Builder</div>
+    <div class="custom-form-grid">
+      <div class="form-row">
+        <label class="form-label">Banner Type</label>
+        <select class="form-input" id="clType">
+          <option value="transition">Transition banner (standard lot)</option>
+          <option value="option">Option banner only</option>
+          <option value="both">Transition + Option banner</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Lot Number</label>
+        <input type="text" class="form-input" id="clLot" placeholder="e.g. 402 or 410B">
+      </div>
+      <div class="form-row" data-cl="loc">
+        <label class="form-label">Consignor <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+        <input type="text" class="form-input" id="clConsignor" placeholder="e.g. Smith Cattle Co.">
+      </div>
+      <div class="form-row" data-cl="loc">
+        <label class="form-label">City</label>
+        <input type="text" class="form-input" id="clCity" placeholder="e.g. Hereford">
+      </div>
+      <div class="form-row" data-cl="loc">
+        <label class="form-label">State</label>
+        <select class="form-input" id="clState"><option value="">— Select state —</option></select>
+      </div>
+      <div class="form-row" data-cl="opt" style="display:none">
+        <label class="form-label">Option "Through Lot" Number</label>
+        <input type="text" class="form-input" id="clOptLot" placeholder="e.g. 410-B (defaults to Lot Number)">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Transition Style</label>
+        <select class="form-input" id="clStdStyle">
+          <option value="1">Style 1 — Diagonal</option>
+          <option value="2">Style 2 — Clean</option>
+        </select>
+      </div>
+      <div class="form-row" data-cl="opt" style="display:none">
+        <label class="form-label">Option Style</label>
+        <select class="form-input" id="clOptStyle">
+          <option value="1">Style 1 — Diagonal</option>
+          <option value="2">Style 2 — Clean</option>
+        </select>
+      </div>
+    </div>
+    <div class="section-title" style="margin-top:22px;">Live Preview</div>
+    <div class="cl-preview" id="clPreview">
+      <div class="cl-preview-empty" id="clPreviewEmpty">Start typing a lot number above — the banner preview updates as you type.</div>
+      <div class="cl-preview-item" id="clPrevStdWrap" style="display:none">
+        <div class="cl-preview-label">Transition Banner</div>
+        <div class="banner-preview-shell"><div class="banner-canvas-wrap" id="clPrevStd"></div></div>
+      </div>
+      <div class="cl-preview-item" id="clPrevOptWrap" style="display:none">
+        <div class="cl-preview-label">Option Banner</div>
+        <div class="banner-preview-shell"><div class="banner-canvas-wrap" id="clPrevOpt"></div></div>
+      </div>
+    </div>
+    <div class="action-row">
+      <span class="helper">Option lots like <span class="mono">410B</span> are normalized to <span class="mono">410-B</span> automatically. Filenames match the CSV builder exactly, so PNGs drop straight into your Lot Banners folder.</span>
+      <button class="btn btn-primary btn-lg" id="clGenerate">Generate Banner(s) →</button>
+    </div>
+  </div>
+
+  <div class="controls-row" id="clCtrlRow" style="display:none">
+    <button class="btn btn-success" id="clZip">Download All Custom Banners (ZIP)</button>
+    <button class="btn btn-ghost" id="clClearAll">Clear All</button>
+    <span class="count-label" id="clCount"></span>
+  </div>
+
+  <div class="grid" id="clGrid">
+    <div class="empty">
+      <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 4.5v15m7.5-7.5h-15"/>
+      </svg>
+      <p>No custom banners yet — fill in the form above and hit Generate</p>
+    </div>
+  </div>
 </div>
 
 <!-- ============================================================
@@ -901,13 +996,16 @@ let banners_downloaded = false;  // gates the OBS JSON download
 
 async function drawBannerAsync(banner) {
   const canvas = document.createElement('canvas');
+  // Per-banner style overrides (used by the Custom Lots builder); fall back to the global picks.
+  const stdStyle = banner.stdStyle || currentStandardStyle;
+  const optStyle = banner.optStyle || currentOptionStyle;
 
   if (banner.kind === 'option') {
     // Option banner: 1500x380, transparent background
     canvas.width = OBW;
     canvas.height = OBH;
     const ctx = canvas.getContext('2d');
-    if (currentOptionStyle === 1) {
+    if (optStyle === 1) {
       // Style 1 is drawn natively in OBW x OBH (the new reference-image layout)
       drawStyle1Option(ctx, banner);
     } else {
@@ -930,16 +1028,16 @@ async function drawBannerAsync(banner) {
 
   const url = getStateImageUrl(banner.stateAbbr);
   if (!url) {
-    if (currentStandardStyle === 1) drawStyle1Standard(ctx, banner, null);
+    if (stdStyle === 1) drawStyle1Standard(ctx, banner, null);
     else drawStyle2Standard(ctx, banner, null);
     return canvas;
   }
   try {
     const img = await loadImage(url);
-    if (currentStandardStyle === 1) drawStyle1Standard(ctx, banner, img);
+    if (stdStyle === 1) drawStyle1Standard(ctx, banner, img);
     else drawStyle2Standard(ctx, banner, img);
   } catch {
-    if (currentStandardStyle === 1) drawStyle1Standard(ctx, banner, null);
+    if (stdStyle === 1) drawStyle1Standard(ctx, banner, null);
     else drawStyle2Standard(ctx, banner, null);
   }
   return canvas;
@@ -1987,6 +2085,238 @@ document.getElementById('btnResetAll').addEventListener('click', resetAll);
 document.getElementById('btnZip').addEventListener('click', () => dlAllBanners().catch(err => showToast(err.message, true)));
 document.getElementById('btnDownloadObs').addEventListener('click', () => dlObsJson().catch(err => showToast(err.message, true)));
 document.getElementById('searchBox').addEventListener('input', applySearch);
+
+// ═══════════════════════════════════════════════════════════════
+// CUSTOM LOTS BUILDER — one-off banners without a CSV.
+// Kept completely separate from allBanners/parsedCsvState so the
+// OBS Scene Collection download is never affected.
+// ═══════════════════════════════════════════════════════════════
+let customBanners = [];
+
+function clNormalizeLot(raw) {
+  const t = cleanCell(raw).toUpperCase().replace(/\s+/g, '');
+  const m = t.match(/^(\d+)-?([A-Z])$/);
+  return m ? `${m[1]}-${m[2]}` : t;
+}
+
+function clPopulateStates() {
+  const sel = document.getElementById('clState');
+  if (!sel || sel.options.length > 1) return;
+  Object.entries(STATE_MAP)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .forEach(([name, abbr]) => {
+      const opt = document.createElement('option');
+      opt.value = abbr; opt.textContent = `${abbr} — ${name}`;
+      sel.appendChild(opt);
+    });
+}
+
+function clSyncFormVisibility() {
+  const type = document.getElementById('clType').value;
+  const needsLoc = (type === 'transition' || type === 'both');
+  const needsOpt = (type === 'option' || type === 'both');
+  document.querySelectorAll('#page-custom [data-cl="loc"]').forEach(el => el.style.display = needsLoc ? '' : 'none');
+  document.querySelectorAll('#page-custom [data-cl="opt"]').forEach(el => el.style.display = needsOpt ? '' : 'none');
+}
+
+function clUpdateBar() {
+  const row = document.getElementById('clCtrlRow');
+  const grid = document.getElementById('clGrid');
+  row.style.display = customBanners.length ? 'flex' : 'none';
+  document.getElementById('clCount').textContent = `${customBanners.length} custom banner${customBanners.length !== 1 ? 's' : ''}`;
+  if (!customBanners.length) {
+    grid.innerHTML = `<div class="empty"><p>No custom banners yet — fill in the form above and hit Generate</p></div>`;
+  }
+}
+
+async function clMakeCard(banner) {
+  const card = document.createElement('div');
+  card.className = 'banner-card';
+  const canvas = await drawBannerAsync(banner);
+  const chipClass = banner.kind === 'transition' ? 'transition' : 'option';
+  const chipLabel = banner.kind === 'transition' ? 'TRANSITION' : 'OPTION';
+  const needsState = banner.kind === 'transition' && banner.stateAbbr && !getStateImageInfo(banner.stateAbbr);
+  card.innerHTML = `
+    <div class="banner-preview-shell"><div class="banner-canvas-wrap"></div></div>
+    <div class="banner-card-foot">
+      <div>
+        <span class="banner-kind-chip ${chipClass}">${chipLabel}</span>
+        <span class="lot-tag">${esc(banner.fileName)}</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        ${needsState ? `<span class="missing-badge">No state image</span>` : ''}
+        <button class="btn btn-ghost btn-sm" data-act="dl">Download PNG</button>
+        <button class="btn btn-ghost btn-sm" data-act="rm" title="Remove this banner">✕</button>
+      </div>
+    </div>`;
+  card.querySelector('.banner-canvas-wrap').appendChild(canvas);
+  card.querySelector('[data-act="dl"]').addEventListener('click', async () => {
+    const c = await drawBannerAsync(banner);
+    canvasToPNG(c, banner.fileName);
+  });
+  card.querySelector('[data-act="rm"]').addEventListener('click', () => {
+    customBanners = customBanners.filter(b => b !== banner);
+    card.remove();
+    clUpdateBar();
+  });
+  return card;
+}
+
+function clBuildBanners({ quiet = false } = {}) {
+  const rawLot = document.getElementById('clLot').value.trim();
+  if (!rawLot) {
+    if (!quiet) showToast('Enter a lot number.', true);
+    return { made: [] };
+  }
+  const lot = clNormalizeLot(rawLot);
+  const type = document.getElementById('clType').value;
+  const consignor = document.getElementById('clConsignor').value.trim();
+  const city = document.getElementById('clCity').value.trim();
+  const stateAbbr = document.getElementById('clState').value;
+  const stdStyle = +document.getElementById('clStdStyle').value || 1;
+  const optStyle = +document.getElementById('clOptStyle').value || 1;
+
+  const made = [];
+
+  if (type === 'transition' || type === 'both') {
+    if (!city && !stateAbbr && !quiet) {
+      showToast('Enter a city and/or state for the transition banner.', true);
+      return { made: [] };
+    }
+    const locationDisplay = city && stateAbbr ? `${city}, ${stateAbbr}` : (city || stateAbbr || '');
+    made.push({
+      kind: 'transition',
+      lot: `custom-${lot}`,
+      lotNumber: lot,
+      consignor,
+      rawLocation: locationDisplay,
+      city, stateAbbr, locationDisplay,
+      fileName: `Lot_${lot}_Transition.png`,
+      stdStyle, optStyle,
+    });
+  }
+
+  if (type === 'option' || type === 'both') {
+    const optRaw = document.getElementById('clOptLot').value.trim();
+    const optLot = clNormalizeLot(optRaw || lot);
+    const base = getOptionBase(optLot) || optLot;
+    made.push({
+      kind: 'option',
+      lot: `custom-${base}-Option`,
+      lotNumber: optLot,
+      base,
+      attachedTo: [],
+      fileName: `Lot_${base}-Option.png`,
+      consignor: '', rawLocation: '', stateAbbr: '', locationDisplay: '',
+      stdStyle, optStyle,
+    });
+  }
+
+  return { made };
+}
+
+/* Live preview — re-renders as you type (debounced) */
+let clPrevTimer = null, clPrevSeq = 0;
+function clSchedulePreview() {
+  clearTimeout(clPrevTimer);
+  clPrevTimer = setTimeout(() => { clRenderPreview().catch(err => console.warn(err)); }, 250);
+}
+async function clRenderPreview() {
+  const seq = ++clPrevSeq;
+  const emptyEl = document.getElementById('clPreviewEmpty');
+  const stdWrap = document.getElementById('clPrevStdWrap');
+  const optWrap = document.getElementById('clPrevOptWrap');
+  const { made } = clBuildBanners({ quiet: true });
+  if (!made.length) {
+    emptyEl.style.display = '';
+    stdWrap.style.display = 'none';
+    optWrap.style.display = 'none';
+    return;
+  }
+  await ensureStateIndex();
+  if (seq !== clPrevSeq) return; // a newer keystroke superseded this render
+  const std = made.find(b => b.kind === 'transition');
+  const opt = made.find(b => b.kind === 'option');
+  emptyEl.style.display = 'none';
+  if (std) {
+    const c = await drawBannerAsync(std);
+    if (seq !== clPrevSeq) return;
+    const holder = document.getElementById('clPrevStd');
+    holder.innerHTML = ''; holder.appendChild(c);
+    stdWrap.style.display = '';
+  } else stdWrap.style.display = 'none';
+  if (opt) {
+    const c = await drawBannerAsync(opt);
+    if (seq !== clPrevSeq) return;
+    const holder = document.getElementById('clPrevOpt');
+    holder.innerHTML = ''; holder.appendChild(c);
+    optWrap.style.display = '';
+  } else optWrap.style.display = 'none';
+}
+
+async function clGenerate() {
+  const { made } = clBuildBanners({ quiet: false });
+  if (!made.length) return;
+
+  await ensureStateIndex();
+
+  const grid = document.getElementById('clGrid');
+  if (!customBanners.length) grid.innerHTML = '';
+  for (const b of made) {
+    // Replace an existing custom banner with the same filename instead of stacking duplicates
+    const dupIdx = customBanners.findIndex(x => x.fileName === b.fileName);
+    if (dupIdx !== -1) {
+      customBanners.splice(dupIdx, 1);
+      const oldCard = [...grid.querySelectorAll('.banner-card .lot-tag')]
+        .find(t => t.textContent === b.fileName);
+      if (oldCard) oldCard.closest('.banner-card').remove();
+    }
+    customBanners.push(b);
+    grid.prepend(await clMakeCard(b));
+  }
+  clUpdateBar();
+  const missing = made.some(b => b.kind === 'transition' && b.stateAbbr && !getStateImageInfo(b.stateAbbr));
+  showToast(missing
+    ? 'Banner generated — heads up, that state has no image in the State Library yet.'
+    : `Generated ${made.length} banner${made.length > 1 ? 's' : ''}.`);
+}
+
+async function clZipAll() {
+  if (!customBanners.length) { showToast('No custom banners to download.', true); return; }
+  const btn = document.getElementById('clZip');
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Generating...';
+  try {
+    const zip = new JSZip();
+    for (const b of customBanners) {
+      const canvas = await drawBannerAsync(b);
+      const blob = await canvasToPNGBlob(canvas);
+      zip.file(b.fileName, blob);
+    }
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'CMS_Custom_Banners.zip'; a.click();
+    URL.revokeObjectURL(url);
+    showToast(`${customBanners.length} custom banner${customBanners.length !== 1 ? 's' : ''} downloaded.`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
+
+document.getElementById('clType').addEventListener('change', () => { clSyncFormVisibility(); clSchedulePreview(); });
+['clLot','clConsignor','clCity','clOptLot'].forEach(id =>
+  document.getElementById(id).addEventListener('input', clSchedulePreview));
+['clState','clStdStyle','clOptStyle'].forEach(id =>
+  document.getElementById(id).addEventListener('change', clSchedulePreview));
+document.getElementById('clGenerate').addEventListener('click', () => clGenerate().catch(err => showToast(err.message, true)));
+document.getElementById('clZip').addEventListener('click', () => clZipAll().catch(err => showToast(err.message, true)));
+document.getElementById('clClearAll').addEventListener('click', () => { customBanners = []; clUpdateBar(); });
+document.getElementById('clLot').addEventListener('keypress', e => { if (e.key === 'Enter') clGenerate().catch(err => showToast(err.message, true)); });
+clPopulateStates();
+clSyncFormVisibility();
 
 document.getElementById('btnPinEnter').addEventListener('click', checkAdminPin);
 document.getElementById('pinInput').addEventListener('keypress', e => { if (e.key === 'Enter') checkAdminPin(); });

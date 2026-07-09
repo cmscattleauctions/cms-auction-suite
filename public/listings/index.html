@@ -427,16 +427,41 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .tools-check input{width:16px;height:16px;accent-color:#b8860b;cursor:pointer}
 
 /* Compact, clearer editing toolbar */
-.ed-tools{gap:6px !important;padding:6px 12px !important;row-gap:6px !important;}
-.ed-tools .grp{gap:4px;padding:2px 4px;border-radius:7px}
-.ed-tools .grp .lbl{font-size:9.5px !important;letter-spacing:.4px}
-.ed-tools .btn.sm{padding:5px 9px;font-size:11.5px;border-radius:5px}
-.ed-tools .vr{height:18px;margin:0 2px}
-.ed-tools select{height:27px;font-size:11.5px}
-.ed-tools .col-w-val{min-width:38px}
-.ed-tools .sel-grp{background:rgba(184,134,11,.12);border:1px solid #d4a017;border-radius:8px;padding:3px 8px}
+.ed-tools{gap:5px !important;padding:5px 10px !important;row-gap:5px !important;}
+.ed-tools .grp{gap:3px;padding:1px 3px;border-radius:6px}
+.ed-tools .grp .lbl{font-size:9px !important;letter-spacing:.3px}
+.ed-tools .btn.sm{padding:3px 7px;font-size:11px;border-radius:5px;line-height:1.5}
+.ed-tools .vr{height:16px;margin:0 2px}
+.ed-tools .sel-grp{background:rgba(184,134,11,.12);border:1px solid #d4a017;border-radius:8px;padding:2px 7px}
 .ed-tools .sel-grp .lbl{color:#9a7209}
 .ed-tools .sel-grp .lbl b{color:#1a1d23;font-size:12px}
+
+/* Undo/redo disabled state */
+.ed-tools .btn[disabled]{opacity:.35;cursor:default;pointer-events:none}
+
+/* Autosave restore card (upload view) */
+.autosave-card{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  margin-top:14px;padding:12px 16px;border:1px solid #d4a017;border-radius:10px;background:rgba(184,134,11,.10)}
+.autosave-card .autosave-info{display:flex;flex-direction:column;gap:2px}
+.autosave-card .autosave-info b{color:#1a1d23;font-size:13.5px}
+.autosave-card .autosave-info span{color:#555b66;font-size:12px}
+.autosave-card .autosave-actions{display:flex;gap:8px}
+
+/* Drag & drop lot reordering */
+.lot-ctl .drag-grip{cursor:grab;font-size:13px;letter-spacing:-1px}
+.lot-ctl .drag-grip:active{cursor:grabbing}
+.lotrow.drag-src{opacity:.35}
+.lotrow.drop-above{box-shadow:inset 0 4px 0 #b8860b}
+.lotrow.drop-below{box-shadow:inset 0 -4px 0 #b8860b}
+.lotrow.sel-on.drop-above{box-shadow:inset 4px 0 0 #b8860b,inset 0 4px 0 #b8860b}
+.lotrow.sel-on.drop-below{box-shadow:inset 4px 0 0 #b8860b,inset 0 -4px 0 #b8860b}
+
+/* Drag-to-resize column handles (Excel style) */
+.s-thead .cell{position:relative}
+.col-drag{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:5;display:none}
+.editing .col-drag{display:block}
+.col-drag:hover,.col-drag.dragging{background:rgba(184,134,11,.55);border-radius:2px}
+.hidectl .col-drag{display:none !important}
 
 /* Per-lot select checkbox (editing only; hidden in PDF) */
 .lot-select{position:absolute;left:-66px;top:50%;transform:translateY(-50%);display:none;align-items:center;justify-content:center}
@@ -591,6 +616,16 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
         <button class="btn" id="browseBtn">Choose CSV File</button>
         <input type="file" id="fileInput" accept=".csv" hidden>
       </div>
+      <div class="autosave-card" id="autosaveCard" style="display:none">
+        <div class="autosave-info">
+          <b>💾 Autosaved draft found</b>
+          <span id="autosaveWhen"></span>
+        </div>
+        <div class="autosave-actions">
+          <button class="btn sm" id="autosaveRestoreBtn">Restore Draft</button>
+          <button class="btn ghost sm" id="autosaveDismissBtn">Dismiss</button>
+        </div>
+      </div>
       <div class="upload-or">
         <span></span><b>or</b><span></span>
       </div>
@@ -680,76 +715,74 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
           <div class="action-bar-spacer"></div>
           <button class="btn ghost sm" id="addLotBtn">+ Add Lot</button>
           <button class="btn ghost sm" id="openProjectsBtn">📂 My Projects</button>
+          <button class="btn sm" id="exportBtn">⬇ Download Tab PDF</button>
           <button class="btn sm" id="saveProjectBtn">💾 Save Project</button>
         </div>
         <div class="ed-tools" id="editTools">
+          <div class="grp">
+            <button class="btn ghost sm" id="undoBtn" title="Undo (Ctrl+Z / Cmd+Z)" disabled>↶</button>
+            <button class="btn ghost sm" id="redoBtn" title="Redo (Ctrl+Shift+Z / Ctrl+Y)" disabled>↷</button>
+          </div>
+          <span class="vr"></span>
           <div class="grp sel-grp" id="selGroup" style="display:none">
-            <span class="lbl">Selected <b id="selCount">0</b></span>
-            <button class="btn ghost sm" id="selRowMinus" title="Shorter rows">Height −</button>
-            <button class="btn ghost sm" id="selRowPlus" title="Taller rows">Height +</button>
-            <button class="btn ghost sm" id="selDelete" title="Delete selected lots">🗑 Delete</button>
-            <button class="btn ghost sm" id="selClear">Clear</button>
-            <div class="vr"></div>
+            <span class="lbl">Sel <b id="selCount">0</b></span>
+            <button class="btn ghost sm" id="selRowMinus" title="Shorter rows (selected lots)">H−</button>
+            <button class="btn ghost sm" id="selRowPlus" title="Taller rows (selected lots)">H+</button>
+            <button class="btn ghost sm" id="selDelete" title="Delete selected lots">🗑</button>
+            <button class="btn ghost sm" id="selClear" title="Clear selection">✕</button>
           </div>
           <div class="grp">
-            <span class="lbl">Format</span>
-            <button class="btn ghost sm" id="boldBtn"><b>B</b></button>
-            <button class="btn ghost sm" id="scratchBtn">Scratch</button>
-            <button class="btn ghost sm" id="suppBtn">Suppl.</button>
-            <button class="btn ghost sm" id="highlightBtn" title="Highlight the box your cursor is in">🖍 Highlight</button>
-            <button class="btn ghost sm" id="clearHlBtn" title="Remove all highlights in this view">Clear HL</button>
+            <button class="btn ghost sm" id="boldBtn" title="Bold selected text"><b>B</b></button>
+            <button class="btn ghost sm" id="scratchBtn" title="Scratch / unscratch the focused lot"><s>S</s></button>
+            <button class="btn ghost sm" id="suppBtn" title="Toggle supplemental on the focused lot">Sup</button>
+            <button class="btn ghost sm" id="highlightBtn" title="Highlight the box your cursor is in">🖍</button>
+            <button class="btn ghost sm" id="clearHlBtn" title="Remove all highlights in this view">🖍✕</button>
+          </div>
+          <span class="vr"></span>
+          <div class="grp">
+            <button class="btn ghost sm" id="dupLotBtn" title="Duplicate the focused lot — the copy appears directly below it">⧉ Dup</button>
             <button class="btn ghost sm" id="deleteLotBtn" title="Delete the focused lot">🗑 Lot</button>
           </div>
-          <div class="vr"></div>
+          <span class="vr"></span>
           <div class="grp">
-            <span class="lbl">Option groups</span>
-            <button class="btn ghost sm" id="manualGroupBtn">Group</button>
-            <button class="btn ghost sm" id="ungroupBtn">Ungroup</button>
+            <button class="btn ghost sm" id="manualGroupBtn" title="Group lots into an option group">Group</button>
+            <button class="btn ghost sm" id="ungroupBtn" title="Remove the focused lot from its option group">Ungroup</button>
           </div>
-          <div class="vr"></div>
-          <div class="grp">
-            <span class="lbl">Lot height</span>
+          <span class="vr"></span>
+          <div class="grp" title="Row height of the focused lot">
+            <span class="lbl">Row</span>
             <button class="btn ghost sm" id="rowMinus">−</button>
             <button class="btn ghost sm" id="rowPlus">+</button>
           </div>
-          <div class="vr"></div>
-          <div class="grp">
+          <div class="grp" title="Whole-sheet text size">
             <span class="lbl">Text</span>
             <button class="btn ghost sm" id="txtMinus">A−</button>
             <button class="btn ghost sm" id="txtPlus">A+</button>
           </div>
-          <div class="grp">
-            <span class="lbl">Box text</span>
+          <div class="grp" title="Text size of the box your cursor is in">
+            <span class="lbl">Box</span>
             <button class="btn ghost sm" id="boxTxtMinus">A−</button>
             <button class="btn ghost sm" id="boxTxtPlus">A+</button>
-            <button class="btn ghost sm" id="boxTxtReset">↺</button>
+            <button class="btn ghost sm" id="boxTxtReset" title="Reset box text size">↺</button>
           </div>
-          <div class="grp">
-            <span class="lbl">Calendar</span>
+          <div class="grp" title="Calendar text size">
+            <span class="lbl">Cal</span>
             <button class="btn ghost sm" id="calTxtMinus">A−</button>
             <button class="btn ghost sm" id="calTxtPlus">A+</button>
           </div>
-          <div class="vr"></div>
+          <span class="vr"></span>
           <div class="grp">
-            <span class="lbl">Column</span>
-            <select id="colPick"></select>
-            <button class="btn ghost sm" id="colMinus">−</button>
-            <span class="lbl col-w-val" id="colWVal">—</span>
-            <button class="btn ghost sm" id="colPlus">+</button>
-            <button class="btn ghost sm" id="colReset">↺</button>
+            <button class="btn ghost sm" id="colReset" title="Reset column widths — drag the edges between column headers to resize columns">↔ Cols ↺</button>
+            <button class="btn ghost sm" id="autofit" title="Re-flow lots across pages">Auto-fit</button>
           </div>
-          <div class="vr"></div>
-          <div class="grp"><button class="btn ghost sm" id="autofit">Auto-fit</button></div>
-          <div class="vr"></div>
-          <div class="grp">
-            <span class="lbl">Zoom</span>
+          <span class="vr"></span>
+          <div class="grp" title="Zoom">
             <button class="btn ghost sm" id="zOut">−</button>
             <span class="lbl" id="zVal">70%</span>
             <button class="btn ghost sm" id="zIn">+</button>
           </div>
           <div class="spacer" style="flex:1"></div>
           <button class="btn ghost sm" id="backToSettings">Settings</button>
-          <button class="btn sm" id="exportBtn">⬇ Download Tab PDF</button>
         </div>
         <div class="color-editor-bar">
           <span class="lbl">Catalog Colors</span>
@@ -1115,23 +1148,39 @@ function autofit(){
     sec.pages=pages;
   });
 }
-function moveBlock(secIdx,pageIdx,blockIdx,dir){
+function reorderSectionBlocks(secIdx,fromIdx,toIdx){
+  // Move a block to a new position in its section's flat block order,
+  // preserving the existing page sizes so manual page breaks survive.
   const sec=S.sections[secIdx], pages=sec.pages;
-  const block=pages[pageIdx][blockIdx];
-  if(dir<0){ // up a page
-    if(pageIdx===0)return;
-    pages[pageIdx].splice(blockIdx,1);
-    pages[pageIdx-1].push(block);
-  }else{ // down a page
-    pages[pageIdx].splice(blockIdx,1);
-    if(!pages[pageIdx+1])pages.splice(pageIdx+1,0,[]);
-    pages[pageIdx+1].unshift(block);
-  }
-  // drop empty pages but keep >=1
-  sec.pages=pages.filter(p=>p.length);
+  const counts=pages.map(p=>p.length);
+  const flat=[]; pages.forEach(p=>p.forEach(b=>flat.push(b)));
+  if(fromIdx===toIdx||fromIdx<0||fromIdx>=flat.length||toIdx<0||toIdx>=flat.length)return false;
+  const [blk]=flat.splice(fromIdx,1);
+  flat.splice(toIdx,0,blk);
+  const newPages=[]; let k=0;
+  counts.forEach(c=>{newPages.push(flat.slice(k,k+c)); k+=c;});
+  sec.pages=newPages.filter(p=>p.length);
   if(!sec.pages.length)sec.pages=[[]];
+  sec.blocks=flat.slice();
+  // Keep the underlying sort order in step with what's on screen (Listings tab
+  // is the source of truth) so rebuilds don't undo the move.
+  if(modeKey()==='default'){
+    let s=1; flat.forEach(b=>b.lots.forEach(l=>{l.seq=s++;}));
+  }
   saveModeLayout();
-  renderEditor();
+  return true;
+}
+function sectionFlatIndex(sec,pageIdx,blockIdx){
+  let n=0; for(let p=0;p<pageIdx;p++)n+=sec.pages[p].length;
+  return n+blockIdx;
+}
+function moveBlock(secIdx,pageIdx,blockIdx,dir){
+  // Move the block ONE position up/down (swap with the neighboring block),
+  // crossing page boundaries naturally instead of jumping a whole page.
+  const sec=S.sections[secIdx];
+  const from=sectionFlatIndex(sec,pageIdx,blockIdx);
+  const to=from+(dir<0?-1:1);
+  if(reorderSectionBlocks(secIdx,from,to))renderEditor();
 }
 
 /* ===== flatten pages for global numbering ===== */
@@ -1337,7 +1386,7 @@ function sheetHTML(page,pageNum,totalPages){
   }
   // table
   h+=`<div class="s-tbl"><div class="trow s-thead" style="grid-template-columns:${grid}">`;
-  cols.forEach(c=>h+=`<div class="cell">${activeLabel(c)}</div>`);
+  cols.forEach(c=>h+=`<div class="cell">${activeLabel(c)}${(S.sheetMode!=='po'&&COLS.includes(c))?`<span class="col-drag" data-col="${c}" title="Drag to resize column"></span>`:''}</div>`);
   h+=`</div>`;
   // rows
   let alt=0;
@@ -1352,8 +1401,9 @@ function sheetHTML(page,pageNum,totalPages){
       h+=`<div class="lot-select"><input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot"></div>`;
       if(li===0){
         h+=`<div class="lot-ctl">
-            <button data-mv="-1" title="Move up a page">▲</button>
-            <button data-mv="1" title="Move down a page">▼</button>
+            <button data-mv="-1" title="Move up one spot">▲</button>
+            <button class="drag-grip" draggable="true" title="Drag to move this lot anywhere in the section">≡</button>
+            <button data-mv="1" title="Move down one spot">▼</button>
           </div>`;
       }
       cols.forEach(c=>{
@@ -1423,6 +1473,7 @@ function renderEditor(){
   });
   wireSheetEvents();
   renderThumbs();
+  if(typeof commitUndo==='function')commitUndo();
 }
 function renderThumbs(){
   const pages=allPages();
@@ -1458,7 +1509,7 @@ function wireSheetEvents(){
     });
   });
   // move buttons
-  $$('#zoomwrap .lot-ctl button').forEach(btn=>{
+  $$('#zoomwrap .lot-ctl button[data-mv]').forEach(btn=>{
     btn.addEventListener('click',e=>{
       const row=e.target.closest('.lotrow');
       moveBlock(+row.dataset.si,+row.dataset.pi,+row.dataset.bi,+btn.dataset.mv);
@@ -1475,7 +1526,94 @@ function wireSheetEvents(){
       if(typeof updateSelectionUI==='function')updateSelectionUI();
     });
   });
+  // Excel-style column resize: drag the handle on a column header's right edge.
+  // The sheet is fixed print-width, so the Notes column (or Description when
+  // Notes is at its minimum) gives or takes the difference.
+  $$('#zoomwrap .col-drag').forEach(handle=>{
+    handle.addEventListener('mousedown',e=>{
+      e.preventDefault();e.stopPropagation();
+      const col=handle.dataset.col;
+      const startX=e.clientX;
+      const startW={...S.colWidths};
+      handle.classList.add('dragging');
+      document.body.style.cursor='col-resize';
+      document.body.style.userSelect='none';
+      let raf=null;
+      const applyLive=()=>{raf=null;
+        const grid=gridTemplate();
+        $$('#zoomwrap .s-thead, #zoomwrap .lotrow').forEach(el=>{el.style.gridTemplateColumns=grid;});
+      };
+      const onMove=ev=>{
+        let next=Math.max(MIN_COL_WIDTHS[col],startW[col]+(ev.clientX-startX)/(S.zoom||1));
+        let diff=next-startW[col];
+        let donor=col==='notes'?'desc':'notes';
+        if(startW[donor]-diff<MIN_COL_WIDTHS[donor])donor=donor==='notes'?'desc':'notes';
+        const donorRoom=startW[donor]-MIN_COL_WIDTHS[donor];
+        if(diff>donorRoom){diff=donorRoom;next=startW[col]+diff;}
+        COLS.forEach(c=>{S.colWidths[c]=startW[c];});
+        S.colWidths[col]=next;
+        S.colWidths[donor]=startW[donor]-diff;
+        if(!raf)raf=requestAnimationFrame(applyLive);
+      };
+      const onUp=()=>{
+        document.removeEventListener('mousemove',onMove);
+        document.removeEventListener('mouseup',onUp);
+        handle.classList.remove('dragging');
+        document.body.style.cursor='';
+        document.body.style.userSelect='';
+        if(raf)cancelAnimationFrame(raf);
+        normalizeColWidths();
+        renderEditor();
+      };
+      document.addEventListener('mousemove',onMove);
+      document.addEventListener('mouseup',onUp);
+    });
+  });
+  // Drag & drop lot reordering — grab the ≡ grip and drop anywhere in the section.
+  $$('#zoomwrap .drag-grip').forEach(g=>{
+    g.addEventListener('dragstart',e=>{
+      const row=e.target.closest('.lotrow');
+      if(!row)return;
+      dndSrc={si:+row.dataset.si,pi:+row.dataset.pi,bi:+row.dataset.bi};
+      row.classList.add('drag-src');
+      e.dataTransfer.effectAllowed='move';
+      try{e.dataTransfer.setData('text/plain','lot');}catch(_){}
+      try{e.dataTransfer.setDragImage(row,30,20);}catch(_){}
+    });
+    g.addEventListener('dragend',()=>{
+      dndSrc=null;
+      $$('#zoomwrap .lotrow').forEach(r=>r.classList.remove('drag-src','drop-above','drop-below'));
+    });
+  });
+  $$('#zoomwrap .lotrow').forEach(row=>{
+    row.addEventListener('dragover',e=>{
+      if(!dndSrc||+row.dataset.si!==dndSrc.si)return; // only within the same section
+      e.preventDefault();
+      e.dataTransfer.dropEffect='move';
+      const rect=row.getBoundingClientRect();
+      const below=(e.clientY-rect.top)>rect.height/2;
+      row.classList.toggle('drop-above',!below);
+      row.classList.toggle('drop-below',below);
+    });
+    row.addEventListener('dragleave',()=>row.classList.remove('drop-above','drop-below'));
+    row.addEventListener('drop',e=>{
+      if(!dndSrc||+row.dataset.si!==dndSrc.si)return;
+      e.preventDefault();
+      const si=dndSrc.si, sec=S.sections[si];
+      const from=sectionFlatIndex(sec,dndSrc.pi,dndSrc.bi);
+      const rect=row.getBoundingClientRect();
+      const below=(e.clientY-rect.top)>rect.height/2;
+      let to=sectionFlatIndex(sec,+row.dataset.pi,+row.dataset.bi)+(below?1:0);
+      if(from<to)to--;
+      dndSrc=null;
+      if(from===to){renderEditor();return;}
+      reorderSectionBlocks(si,from,to);
+      renderEditor();
+      toast('Lot moved.');
+    });
+  });
 }
+let dndSrc=null;
 
 /* ===== manual option grouping ===== */
 function manualGroupLots(){
@@ -1741,10 +1879,7 @@ $('#txtMinus').onclick=()=>{S.textScale=Math.max(.7,+(S.textScale-.06).toFixed(2
 $('#calTxtPlus').onclick=()=>{S.calendarTextScale=Math.min(1.35,+((S.calendarTextScale||1)+.05).toFixed(2));renderEditor();toast('Calendar text '+Math.round(S.calendarTextScale*100)+'%');};
 $('#calTxtMinus').onclick=()=>{S.calendarTextScale=Math.max(.75,+((S.calendarTextScale||1)-.05).toFixed(2));renderEditor();toast('Calendar text '+Math.round(S.calendarTextScale*100)+'%');};
 $('#toolsToggle').onchange=e=>{S.toolsHidden=!e.target.checked; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden); saveGlobal();};
-$('#colPick').onchange=updateColControls;
-$('#colMinus').onclick=()=>changeColumnWidth($('#colPick').value,-8);
-$('#colPlus').onclick=()=>changeColumnWidth($('#colPick').value,8);
-$('#colReset').onclick=()=>{S.colWidths={...DEFAULT_COL_WIDTHS};updateColControls();renderEditor();toast('Column widths reset.');};
+$('#colReset').onclick=()=>{S.colWidths={...DEFAULT_COL_WIDTHS};renderEditor();toast('Column widths reset.');};
 $('#autofit').onclick=()=>{renderEditor();autofit();saveModeLayout();renderEditor();toast('Pages re-fitted.');};
 $$('#c-blue,#c-section-end,#c-section-text,#c-table-head,#c-divider,#c-calendar,#c-supp-accent,#c-supp-bg,#c-change').forEach(el=>el.addEventListener('input',updateColorsFromEditor));
 $$('#modeTabs .mode-tab').forEach(btn=>btn.onclick=()=>switchSheetMode(btn.dataset.mode));
@@ -1833,6 +1968,32 @@ function deleteFocusedLot(){
   if(!lots.length && S.selected.size)lots=selectedLots();
   if(!lots.length){toast('Click a lot first, or select lots with the checkboxes.');return;}
   performDelete(lots);
+}
+
+/* ----- duplicate lot ----- */
+function duplicateFocusedLot(){
+  if(!lastFocusLot){toast('Click a lot first, then hit Duplicate.');return;}
+  const src=S.lots.find(l=>l.id===lastFocusLot);
+  if(!src){toast('Click a lot first, then hit Duplicate.');return;}
+  const copy=JSON.parse(JSON.stringify(src));
+  copy.id='L'+Date.now()+Math.floor(Math.random()*1000);
+  copy.seq=(parseFloat(src.seq)||0)+0.5;   // slots directly below the original
+  copy.group=copy.id;                       // its own row (not merged into an option group)
+  // Carry over per-tab edits, cell sizes, heights and flags so the copy looks identical
+  Object.values(S.modeStates||{}).forEach(st=>{
+    if(!st)return;
+    ['edits','cellScales','heights','scratched','supplemental','hl'].forEach(k=>{
+      if(st[k]&&st[k][src.id]!==undefined)st[k][copy.id]=JSON.parse(JSON.stringify(st[k][src.id]));
+    });
+  });
+  S.lots.push(copy);
+  // Re-space sequence numbers within this section so future inserts stay clean
+  S.lots.filter(l=>l.type===src.type)
+    .sort((a,b)=>(parseFloat(a.seq)||0)-(parseFloat(b.seq)||0))
+    .forEach((l,i)=>{l.seq=i+1;});
+  lastFocusLot=copy.id;
+  rebuildAfterLotChange();
+  toast('Duplicated lot '+(src.lot||'')+' — the copy is directly below it.');
 }
 
 /* ----- add custom lot ----- */
@@ -2020,6 +2181,7 @@ async function deleteProjectById(id,name){
 
 /* ----- wiring ----- */
 $('#addLotBtn').onclick=openAddLot;
+$('#dupLotBtn').onclick=duplicateFocusedLot;
 $('#saveProjectBtn').onclick=openSaveModal;
 $('#openProjectsBtn').onclick=openProjectsModal;
 $('#openProjectsBtnUpload').onclick=openProjectsModal;
@@ -2038,4 +2200,126 @@ $$('.modal-back').forEach(back=>{
   back.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>back.classList.remove('on'));
 });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape')$$('.modal-back.on').forEach(m=>m.classList.remove('on')); });
+
+/* =================================================================
+ * UNDO / REDO + LOCAL AUTOSAVE
+ * The undo stack holds full snapshots of the project (same payload
+ * used for cloud saves). A snapshot is committed after every render,
+ * plus after edits that don't re-render (contenteditable blurs).
+ * ================================================================= */
+const UNDO_LIMIT=30;
+const undoStack=[], redoStack=[];
+let restoringSnapshot=false;
+
+function snapshotState(){
+  const p={...serializeProject()};
+  // View-only bits shouldn't create undo steps or be changed by undo:
+  delete p.savedAt; delete p.sheetMode; delete p.toolsHidden;
+  return JSON.stringify(p);
+}
+function updateUndoButtons(){
+  const u=$('#undoBtn'), r=$('#redoBtn');
+  if(u)u.disabled=undoStack.length<2;
+  if(r)r.disabled=!redoStack.length;
+}
+function commitUndo(){
+  if(restoringSnapshot)return;
+  try{
+    const snap=snapshotState();
+    if(undoStack.length&&undoStack[undoStack.length-1]===snap)return; // nothing changed
+    undoStack.push(snap);
+    if(undoStack.length>UNDO_LIMIT)undoStack.shift();
+    redoStack.length=0;
+    updateUndoButtons();
+    scheduleAutosave();
+  }catch(e){console.warn('undo snapshot failed',e);}
+}
+function applySnapshot(json){
+  restoringSnapshot=true;
+  try{
+    const p=JSON.parse(json);
+    p.sheetMode=S.sheetMode;       // stay on the tab you're looking at
+    p.toolsHidden=S.toolsHidden;   // keep the tools toggle as-is
+    applyProject(p);
+  }finally{restoringSnapshot=false;}
+  updateUndoButtons();
+  scheduleAutosave();
+}
+function doUndo(){
+  if(undoStack.length<2){toast('Nothing to undo.');return;}
+  redoStack.push(undoStack.pop());
+  applySnapshot(undoStack[undoStack.length-1]);
+  toast('Undone.');
+}
+function doRedo(){
+  if(!redoStack.length){toast('Nothing to redo.');return;}
+  const s=redoStack.pop();
+  undoStack.push(s);
+  applySnapshot(s);
+  toast('Redone.');
+}
+$('#undoBtn').onclick=doUndo;
+$('#redoBtn').onclick=doRedo;
+
+// Ctrl/Cmd+Z to undo, Ctrl/Cmd+Shift+Z or Ctrl+Y to redo.
+// While typing inside a cell or input, the browser's own text undo wins;
+// click out of the field first for a full-catalog undo.
+document.addEventListener('keydown',e=>{
+  if(!(e.ctrlKey||e.metaKey))return;
+  const k=(e.key||'').toLowerCase();
+  if(k!=='z'&&k!=='y')return;
+  const a=document.activeElement;
+  if(a&&(a.isContentEditable||a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT'))return;
+  if(!$('#v-editor').classList.contains('on'))return;
+  e.preventDefault();
+  if(k==='y'||(k==='z'&&e.shiftKey))doRedo(); else doUndo();
+});
+
+// Commit after edits that don't trigger a re-render (contenteditable blurs, heights, flags)
+(function wrapForUndo(){
+  const after=fn=>function(...a){const r=fn.apply(this,a);commitUndo();return r;};
+  setLotEdit=after(setLotEdit);
+  setLotHeight=after(setLotHeight);
+  setLotFlag=after(setLotFlag);
+  setLotCellScale=after(setLotCellScale);
+  setLotCellHL=after(setLotCellHL);
+})();
+
+/* ----- local autosave (draft) ----- */
+const AUTOSAVE_KEY='cms_listings_autosave_v1';
+let autosaveTimer=null;
+function scheduleAutosave(){clearTimeout(autosaveTimer);autosaveTimer=setTimeout(autosaveNow,2000);}
+function autosaveNow(){
+  if(!S.lots||!S.lots.length)return;
+  try{
+    localStorage.setItem(AUTOSAVE_KEY,JSON.stringify({
+      when:Date.now(),
+      projectId:S.currentProjectId||null,
+      projectName:S.currentProjectName||null,
+      payload:serializeProject()
+    }));
+  }catch(e){console.warn('autosave failed',e);}
+}
+setInterval(autosaveNow,30000);
+window.addEventListener('beforeunload',autosaveNow);
+
+function checkAutosave(){
+  let d=null;
+  try{d=JSON.parse(localStorage.getItem(AUTOSAVE_KEY)||'null');}catch(_){}
+  if(!d||!d.payload||!Array.isArray(d.payload.lots)||!d.payload.lots.length)return;
+  const card=$('#autosaveCard'); if(!card)return;
+  card.style.display='flex';
+  $('#autosaveWhen').textContent=
+    (d.projectName?'\u201C'+d.projectName+'\u201D \u00B7 ':'')+
+    fmtWhen(d.when)+' \u00B7 '+d.payload.lots.length+' lot'+(d.payload.lots.length!==1?'s':'');
+  $('#autosaveRestoreBtn').onclick=()=>{
+    applyProject(d.payload);
+    S.currentProjectId=d.projectId||null;
+    S.currentProjectName=d.projectName||null;
+    card.style.display='none';
+    toast('Autosaved draft restored.');
+  };
+  $('#autosaveDismissBtn').onclick=()=>{card.style.display='none';};
+}
+checkAutosave();
 </script>

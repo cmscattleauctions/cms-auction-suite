@@ -1510,7 +1510,9 @@ async function buildPdfForGroup({entityName, rows, mode, singleLotMode=false, fo
     const topLine = mode === "rep" ? 
       `Lot # ${lotForHeader || contract} - ${consignor}` :
       mode === "buyer" ?
-      `${lotForHeader ? `Lot # ${lotForHeader}` : `Contract # ${contract}`} - ${consignor}` :
+      // Contract Details (singleLotMode) already shows "Consignor: ..." in its own grey box,
+      // so keep the consignor out of the lot header there to avoid printing it twice.
+      `${lotForHeader ? `Lot # ${lotForHeader}` : `Contract # ${contract}`}${singleLotMode ? "" : ` - ${consignor}`}` :
       (lotForHeader ? `Lot # ${lotForHeader}` : `Contract # ${contract}`);
     const row1H = drawLotHeaderRow({ textLeft: topLine, fillHex: headerFillHex });
 
@@ -4259,6 +4261,10 @@ function init(){
     
     // Set the formatted date
     auctionDate.value = `${month} ${day}${ordinal(day)}, ${year} @ ${timeStr}`;
+
+    // Auto-select the Contract Details banner color that matches this month
+    const monthColorRadio = document.querySelector(`input[name="lotByLotColor"][data-month="${dateObj.getMonth()}"]`);
+    if(monthColorRadio) monthColorRadio.checked = true;
     
     // Auto-fill auction title ONLY if empty
     if(!auctionName.value || auctionName.value.trim() === ""){
@@ -4277,6 +4283,10 @@ function init(){
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   auctionDatePicker.value = `${year}-${month}-${day}T13:00`;
+
+  // Pre-select the Contract Details banner color for the default (current) month
+  const defaultMonthColorRadio = document.querySelector(`input[name="lotByLotColor"][data-month="${now.getMonth()}"]`);
+  if(defaultMonthColorRadio) defaultMonthColorRadio.checked = true;
 
   // Phase 3: PIN gate removed. Suite shell now provides auth.
   goto(pageBuilder);
