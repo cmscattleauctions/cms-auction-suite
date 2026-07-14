@@ -221,13 +221,25 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .editing [contenteditable]:focus{box-shadow:inset 0 0 0 2px var(--blue);
   background:#eef1fc}
 .lot-ctl{position:absolute;left:-36px;top:0;width:32px;display:none;
-  flex-direction:column;gap:4px}
+  flex-direction:column;gap:3px;z-index:10}
 .editing .lot-ctl{display:flex;opacity:.45;transition:opacity .12s}
-.editing .lotrow:hover .lot-ctl,.lot-ctl:hover{opacity:1}
-.lot-ctl button{width:32px;height:26px;background:var(--navy);color:#fff;
-  border-radius:6px;font-size:14px;line-height:1;display:flex;align-items:center;
+.editing .lotrow:hover .lot-ctl,.lot-ctl:hover{opacity:1;z-index:30}
+.lot-ctl button{width:32px;height:22px;background:var(--navy);color:#fff;
+  border-radius:6px;font-size:13px;line-height:1;display:flex;align-items:center;
   justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)}
 .lot-ctl button:hover{background:var(--blue)}
+.lot-ctl button.pgbtn{background:#3d4a72;font-size:14px}
+.lot-ctl button.pgbtn:hover{background:var(--blue)}
+/* split control on option-group continuation rows */
+.lot-split{position:absolute;left:-36px;top:50%;transform:translateY(-50%);width:32px;
+  display:none;justify-content:center;z-index:10}
+.editing .lot-split{display:flex;opacity:.45;transition:opacity .12s}
+.editing .lotrow:hover .lot-split,.lot-split:hover{opacity:1;z-index:30}
+.lot-split button{width:32px;height:22px;background:#7a5a12;color:#fff;
+  border-radius:6px;font-size:12px;line-height:1;display:flex;align-items:center;
+  justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.lot-split button:hover{background:#b8860b}
+.hidectl .lot-split{display:none!important}
 .over-badge{position:absolute;top:6px;right:84px;background:#e0483c;color:#fff;
   font-size:10px;font-weight:700;padding:3px 9px;border-radius:11px;letter-spacing:.5px;
   font-family:'Barlow'}
@@ -1161,12 +1173,8 @@ function reorderSectionBlocks(secIdx,fromIdx,toIdx){
   counts.forEach(c=>{newPages.push(flat.slice(k,k+c)); k+=c;});
   sec.pages=newPages.filter(p=>p.length);
   if(!sec.pages.length)sec.pages=[[]];
-  sec.blocks=flat.slice();
-  // Keep the underlying sort order in step with what's on screen (Listings tab
-  // is the source of truth) so rebuilds don't undo the move.
-  if(modeKey()==='default'){
-    let s=1; flat.forEach(b=>b.lots.forEach(l=>{l.seq=s++;}));
-  }
+  rebuildSectionBlocks(sec);
+  syncSeqToLayout(sec);
   saveModeLayout();
   return true;
 }
@@ -1181,6 +1189,65 @@ function moveBlock(secIdx,pageIdx,blockIdx,dir){
   const from=sectionFlatIndex(sec,pageIdx,blockIdx);
   const to=from+(dir<0?-1:1);
   if(reorderSectionBlocks(secIdx,from,to))renderEditor();
+}
+function rebuildSectionBlocks(sec){
+  // Rebuild the section's master block list from the current pages, re-merging
+  // adjacent fragments of the same option group. Auto-fit paginates from this
+  // list, so running Auto-fit rejoins any split groups.
+  const blocks=[];
+  sec.pages.forEach(pg=>pg.forEach(b=>{
+    const prev=blocks[blocks.length-1];
+    if(prev&&b.group&&prev.group===b.group){
+      prev.lots=prev.lots.concat(b.lots);
+      prev.grouped=prev.lots.length>1;
+    }else{
+      blocks.push({group:b.group,lots:b.lots.slice(),grouped:b.lots.length>1});
+    }
+  }));
+  sec.blocks=blocks;
+}
+function syncSeqToLayout(sec){
+  // Keep the underlying sort order in step with the visible layout
+  // (only when editing the Listings tab, which is the source of truth).
+  if(modeKey()!=='default')return;
+  let s=1; sec.pages.forEach(pg=>pg.forEach(b=>b.lots.forEach(l=>{l.seq=s++;})));
+}
+function moveBlockPage(secIdx,pageIdx,blockIdx,dir){
+  // Jump the block to the previous/next page (creating a new page if needed).
+  const sec=S.sections[secIdx], pages=sec.pages;
+  const block=pages[pageIdx]&&pages[pageIdx][blockIdx];
+  if(!block)return;
+  if(dir<0){
+    if(pageIdx===0){toast('Already on the first page of this section.');return;}
+    pages[pageIdx].splice(blockIdx,1);
+    pages[pageIdx-1].push(block);
+  }else{
+    pages[pageIdx].splice(blockIdx,1);
+    if(!pages[pageIdx+1])pages.splice(pageIdx+1,0,[]);
+    pages[pageIdx+1].unshift(block);
+  }
+  sec.pages=pages.filter(p=>p.length);
+  if(!sec.pages.length)sec.pages=[[]];
+  rebuildSectionBlocks(sec);
+  syncSeqToLayout(sec);
+  saveModeLayout();
+  renderEditor();
+}
+function splitBlockAt(secIdx,pageIdx,blockIdx,lotIdx){
+  // Split an option group: this lot and everything below it become their own
+  // block at the top of the next page (Auto-fit or Ctrl+Z rejoins them).
+  const sec=S.sections[secIdx];
+  const block=sec.pages[pageIdx]&&sec.pages[pageIdx][blockIdx];
+  if(!block||lotIdx<=0||lotIdx>=block.lots.length)return;
+  const movedLots=block.lots.splice(lotIdx);
+  block.grouped=block.lots.length>1;
+  const newBlock={group:block.group,lots:movedLots,grouped:movedLots.length>1};
+  if(!sec.pages[pageIdx+1])sec.pages.push([]);
+  sec.pages[pageIdx+1].unshift(newBlock);
+  rebuildSectionBlocks(sec);
+  saveModeLayout();
+  renderEditor();
+  toast('Option group split — the rest of the group is now at the top of the next page. Auto-fit rejoins it.');
 }
 
 /* ===== flatten pages for global numbering ===== */
@@ -1402,8 +1469,14 @@ function sheetHTML(page,pageNum,totalPages){
       if(li===0){
         h+=`<div class="lot-ctl">
             <button data-mv="-1" title="Move up one spot">▲</button>
+            <button data-pg="-1" class="pgbtn" title="Move to the previous page">⇞</button>
             <button class="drag-grip" draggable="true" title="Drag to move this lot anywhere in the section">≡</button>
+            <button data-pg="1" class="pgbtn" title="Move to the next page (creates one if needed)">⇟</button>
             <button data-mv="1" title="Move down one spot">▼</button>
+          </div>`;
+      }else if(b.grouped){
+        h+=`<div class="lot-split">
+            <button class="split-btn" data-li="${li}" title="Split the option group here — this lot and the ones below it move to the top of the next page">✂</button>
           </div>`;
       }
       cols.forEach(c=>{
@@ -1509,6 +1582,20 @@ function wireSheetEvents(){
     });
   });
   // move buttons
+  $$('#zoomwrap .lot-ctl button[data-pg]').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const row=e.target.closest('.lotrow');
+      moveBlockPage(+row.dataset.si,+row.dataset.pi,+row.dataset.bi,+btn.dataset.pg);
+    });
+  });
+  $$('#zoomwrap .split-btn').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const row=e.target.closest('.lotrow');
+      splitBlockAt(+row.dataset.si,+row.dataset.pi,+row.dataset.bi,+btn.dataset.li);
+    });
+  });
   $$('#zoomwrap .lot-ctl button[data-mv]').forEach(btn=>{
     btn.addEventListener('click',e=>{
       const row=e.target.closest('.lotrow');
