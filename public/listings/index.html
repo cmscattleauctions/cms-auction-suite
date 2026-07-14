@@ -225,28 +225,30 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .editing [contenteditable]:hover{box-shadow:inset 0 0 0 1.5px #b9c4ef}
 .editing [contenteditable]:focus{box-shadow:inset 0 0 0 2px var(--blue);
   background:#eef1fc}
-.lot-ctl{position:absolute;left:-52px;top:0;width:46px;display:none;
-  flex-direction:column;gap:0;z-index:10;background:#0f1730;border-radius:9px;
+/* Left gutter layout: checkbox column at -66px, control panel at -38px..-4px
+   (a 34px strip), so the two never overlap. */
+.lot-ctl{position:absolute;left:-38px;top:0;width:34px;display:none;
+  flex-direction:column;gap:0;z-index:10;background:#0f1730;border-radius:8px;
   padding:2px;box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .editing .lot-ctl{display:flex;opacity:.45;transition:opacity .12s}
 .editing .lotrow:hover .lot-ctl,.lot-ctl:hover{opacity:1;z-index:30}
-.lot-ctl button{width:42px;height:21px;background:transparent;color:#fff;
-  border-radius:6px;font-size:12px;line-height:1;display:flex;align-items:center;
-  justify-content:center;gap:1px}
+.lot-ctl button{width:30px;height:20px;background:transparent;color:#fff;
+  border-radius:5px;font-size:11px;line-height:1;display:flex;align-items:center;
+  justify-content:center}
 .lot-ctl button.step:hover{background:var(--blue)}
-.lot-ctl button.pgbtn{color:#aeb9e2;font-size:9px;font-weight:700;letter-spacing:.4px;
+.lot-ctl button.pgbtn{color:#aeb9e2;font-size:8.5px;font-weight:700;letter-spacing:.3px;
   border-top:1px solid rgba(255,255,255,.10);border-bottom:1px solid rgba(255,255,255,.10)}
 .lot-ctl button.pgbtn:hover{background:var(--blue);color:#fff}
-.lot-ctl .drag-grip{color:#8a94b8;font-size:12px;letter-spacing:1px;cursor:grab}
+.lot-ctl .drag-grip{color:#8a94b8;font-size:11px;letter-spacing:1px;cursor:grab}
 .lot-ctl .drag-grip:hover{background:#2a3560;color:#fff}
 .lot-ctl .drag-grip:active{cursor:grabbing}
 /* split control on option-group continuation rows */
-.lot-split{position:absolute;left:-52px;top:50%;transform:translateY(-50%);width:46px;
+.lot-split{position:absolute;left:-38px;top:50%;transform:translateY(-50%);width:34px;
   display:none;justify-content:center;z-index:10}
 .editing .lot-split{display:flex;opacity:.45;transition:opacity .12s}
 .editing .lotrow:hover .lot-split,.lot-split:hover{opacity:1;z-index:30}
-.lot-split button{width:42px;height:21px;background:#7a5a12;color:#fff;
-  border-radius:7px;font-size:11px;line-height:1;display:flex;align-items:center;
+.lot-split button{width:30px;height:20px;background:#7a5a12;color:#fff;
+  border-radius:6px;font-size:11px;line-height:1;display:flex;align-items:center;
   justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)}
 .lot-split button:hover{background:#b8860b}
 .hidectl .lot-split{display:none!important}
