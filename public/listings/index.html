@@ -114,9 +114,14 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .results-upload{display:none;align-items:center;gap:8px;margin-left:auto}
 .results-upload.on{display:flex}
 .ed-tools .col-w-val{min-width:42px;text-align:center}
-.ed-canvas{flex:1;overflow:auto;padding:30px;background:#0c1024;text-align:center}
-.color-editor-bar{display:flex;align-items:center;gap:12px;padding:9px 16px;background:#fff;border-bottom:1px solid #e6e0d4;flex-wrap:wrap}
-.color-editor-bar .lbl{font-size:11px;color:#555b66;letter-spacing:.6px;text-transform:uppercase;font-weight:600}
+.ed-canvas{flex:1;overflow:auto;padding:30px 30px 30px 44px;background:#0c1024;text-align:center}
+.color-editor-bar{display:flex;align-items:center;gap:12px;padding:5px 16px;background:#fff;border-bottom:1px solid #e6e0d4;flex-wrap:wrap}
+.color-editor-bar .color-bar-toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:#555b66;
+  letter-spacing:.6px;text-transform:uppercase;font-weight:600;background:none;padding:4px 6px;border-radius:6px;cursor:pointer}
+.color-editor-bar .color-bar-toggle:hover{background:#f2ede2;color:#1a1d23}
+.color-editor-bar .color-bar-toggle .caret{display:inline-block;transition:transform .12s;font-size:10px}
+.color-editor-bar:not(.collapsed) .color-bar-toggle .caret{transform:rotate(90deg)}
+.color-editor-bar.collapsed .color-grid{display:none}
 .color-editor-bar .color-grid{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .color-editor-bar .field{margin:0;display:flex;align-items:center;gap:6px}
 .color-editor-bar .field label{margin:0;font-size:10.5px;color:#555b66;white-space:nowrap}
@@ -220,23 +225,28 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .editing [contenteditable]:hover{box-shadow:inset 0 0 0 1.5px #b9c4ef}
 .editing [contenteditable]:focus{box-shadow:inset 0 0 0 2px var(--blue);
   background:#eef1fc}
-.lot-ctl{position:absolute;left:-36px;top:0;width:32px;display:none;
-  flex-direction:column;gap:3px;z-index:10}
+.lot-ctl{position:absolute;left:-52px;top:0;width:46px;display:none;
+  flex-direction:column;gap:0;z-index:10;background:#0f1730;border-radius:9px;
+  padding:2px;box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .editing .lot-ctl{display:flex;opacity:.45;transition:opacity .12s}
 .editing .lotrow:hover .lot-ctl,.lot-ctl:hover{opacity:1;z-index:30}
-.lot-ctl button{width:32px;height:22px;background:var(--navy);color:#fff;
-  border-radius:6px;font-size:13px;line-height:1;display:flex;align-items:center;
-  justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)}
-.lot-ctl button:hover{background:var(--blue)}
-.lot-ctl button.pgbtn{background:#3d4a72;font-size:14px}
-.lot-ctl button.pgbtn:hover{background:var(--blue)}
+.lot-ctl button{width:42px;height:21px;background:transparent;color:#fff;
+  border-radius:6px;font-size:12px;line-height:1;display:flex;align-items:center;
+  justify-content:center;gap:1px}
+.lot-ctl button.step:hover{background:var(--blue)}
+.lot-ctl button.pgbtn{color:#aeb9e2;font-size:9px;font-weight:700;letter-spacing:.4px;
+  border-top:1px solid rgba(255,255,255,.10);border-bottom:1px solid rgba(255,255,255,.10)}
+.lot-ctl button.pgbtn:hover{background:var(--blue);color:#fff}
+.lot-ctl .drag-grip{color:#8a94b8;font-size:12px;letter-spacing:1px;cursor:grab}
+.lot-ctl .drag-grip:hover{background:#2a3560;color:#fff}
+.lot-ctl .drag-grip:active{cursor:grabbing}
 /* split control on option-group continuation rows */
-.lot-split{position:absolute;left:-36px;top:50%;transform:translateY(-50%);width:32px;
+.lot-split{position:absolute;left:-52px;top:50%;transform:translateY(-50%);width:46px;
   display:none;justify-content:center;z-index:10}
 .editing .lot-split{display:flex;opacity:.45;transition:opacity .12s}
 .editing .lotrow:hover .lot-split,.lot-split:hover{opacity:1;z-index:30}
-.lot-split button{width:32px;height:22px;background:#7a5a12;color:#fff;
-  border-radius:6px;font-size:12px;line-height:1;display:flex;align-items:center;
+.lot-split button{width:42px;height:21px;background:#7a5a12;color:#fff;
+  border-radius:7px;font-size:11px;line-height:1;display:flex;align-items:center;
   justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)}
 .lot-split button:hover{background:#b8860b}
 .hidectl .lot-split{display:none!important}
@@ -460,8 +470,6 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .autosave-card .autosave-actions{display:flex;gap:8px}
 
 /* Drag & drop lot reordering */
-.lot-ctl .drag-grip{cursor:grab;font-size:13px;letter-spacing:-1px}
-.lot-ctl .drag-grip:active{cursor:grabbing}
 .lotrow.drag-src{opacity:.35}
 .lotrow.drop-above{box-shadow:inset 0 4px 0 #b8860b}
 .lotrow.drop-below{box-shadow:inset 0 -4px 0 #b8860b}
@@ -757,8 +765,8 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
           </div>
           <span class="vr"></span>
           <div class="grp">
-            <button class="btn ghost sm" id="manualGroupBtn" title="Group lots into an option group">Group</button>
-            <button class="btn ghost sm" id="ungroupBtn" title="Remove the focused lot from its option group">Ungroup</button>
+            <button class="btn ghost sm" id="manualGroupBtn" title="Check the boxes next to 2+ lots, then click to group them into an option group">Group</button>
+            <button class="btn ghost sm" id="ungroupBtn" title="Remove the checked lots (or the focused lot) from their option group">Ungroup</button>
           </div>
           <span class="vr"></span>
           <div class="grp" title="Row height of the focused lot">
@@ -796,8 +804,10 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
           <div class="spacer" style="flex:1"></div>
           <button class="btn ghost sm" id="backToSettings">Settings</button>
         </div>
-        <div class="color-editor-bar">
-          <span class="lbl">Catalog Colors</span>
+        <div class="color-editor-bar collapsed" id="colorBar">
+          <button class="color-bar-toggle" id="colorBarToggle" title="Show / hide the catalog color pickers">
+            <span class="caret">▸</span> Catalog Colors
+          </button>
           <div class="color-grid">
             <div class="field"><label>Primary Blue</label><input type="color" id="c-blue"></div>
             <div class="field"><label>Section Fade End</label><input type="color" id="c-section-end"></div>
@@ -1468,11 +1478,11 @@ function sheetHTML(page,pageNum,totalPages){
       h+=`<div class="lot-select"><input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot"></div>`;
       if(li===0){
         h+=`<div class="lot-ctl">
-            <button data-mv="-1" title="Move up one spot">▲</button>
-            <button data-pg="-1" class="pgbtn" title="Move to the previous page">⇞</button>
-            <button class="drag-grip" draggable="true" title="Drag to move this lot anywhere in the section">≡</button>
-            <button data-pg="1" class="pgbtn" title="Move to the next page (creates one if needed)">⇟</button>
-            <button data-mv="1" title="Move down one spot">▼</button>
+            <button data-mv="-1" class="step" title="Move up one spot">▲</button>
+            <button data-pg="-1" class="pgbtn" title="Move to the previous page">PG▲</button>
+            <button class="drag-grip" draggable="true" title="Drag to move this lot anywhere in the section">⠿</button>
+            <button data-pg="1" class="pgbtn" title="Move to the next page (creates one if needed)">PG▼</button>
+            <button data-mv="1" class="step" title="Move down one spot">▼</button>
           </div>`;
       }else if(b.grouped){
         h+=`<div class="lot-split">
@@ -1534,19 +1544,40 @@ function renderEditor(){
   const tv=$('#toolsToggle'); if(tv){tv.checked=!S.toolsHidden; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden);}
   if(typeof updateSelectionUI==='function')updateSelectionUI();
   // keep manual row heights stable; overflow detection below flags pages without changing layout.
-  // overflow detection
+  // overflow detection — measure where the last row actually ends (fraction-accurate
+  // and zoom-aware) instead of scrollHeight rounding, and allow a few px of slop
+  // so hairline rounding differences don't raise a false OVERFLOW flag.
+  const zm=S.zoom||1;
   $$('.sheet').forEach(sh=>{
     const tbl=sh.querySelector('.s-tbl');
-    if(tbl.scrollHeight>tbl.clientHeight+2){
+    let overBy=0;
+    const rows=tbl.querySelectorAll('.lotrow');
+    if(rows.length){
+      const last=rows[rows.length-1].getBoundingClientRect();
+      const box=tbl.getBoundingClientRect();
+      overBy=(last.bottom-box.bottom)/zm;
+    }else{
+      overBy=tbl.scrollHeight-tbl.clientHeight;
+    }
+    if(overBy>4){
       sh.classList.add('over');
       const b=document.createElement('div');
       b.className='over-badge';b.textContent='OVERFLOW';
+      b.title='Content runs about '+Math.round(overBy)+'px past the bottom of this page';
       sh.querySelector('.s-pad').appendChild(b);
     }
   });
   wireSheetEvents();
   renderThumbs();
   if(typeof commitUndo==='function')commitUndo();
+}
+// Webfonts (Oswald/Barlow) change text metrics when they finish loading; re-render
+// once so the overflow check measures with the real fonts, not the fallbacks.
+if(document.fonts&&document.fonts.ready){
+  document.fonts.ready.then(()=>{
+    const ed=document.getElementById('v-editor');
+    if(ed&&ed.classList.contains('on'))renderEditor();
+  });
 }
 function renderThumbs(){
   const pages=allPages();
@@ -1703,10 +1734,38 @@ function wireSheetEvents(){
 let dndSrc=null;
 
 /* ===== manual option grouping ===== */
+function groupLotsTogether(list){
+  // Group the given lots into one option group. Also makes them adjacent in
+  // the ordering (right where the first checked lot sits) so they render as
+  // a single block — grouping only shows when the lots sit next to each other.
+  const type=list[0].type;
+  if(list.some(l=>l.type!==type)){toast('Pick lots from the same section — lots in different sections can\u2019t share an option group.');return false;}
+  const sorted=list.slice().sort((a,b)=>(parseFloat(a.seq)||0)-(parseFloat(b.seq)||0));
+  const groupId='manual-'+naturalOptionGroup(sorted[0].lot||sorted[0].id)+'-'+Date.now();
+  const base=parseFloat(sorted[0].seq)||0;
+  sorted.forEach((l,i)=>{l.group=groupId;l.seq=base+(i+1)/(sorted.length+1);});
+  // re-space the section back to clean integers
+  S.lots.filter(l=>l.type===type)
+    .sort((a,b)=>(parseFloat(a.seq)||0)-(parseFloat(b.seq)||0))
+    .forEach((l,i)=>{l.seq=i+1;});
+  return true;
+}
 function manualGroupLots(){
   if(!S.lots.length)return;
+  // Preferred flow: check the boxes next to 2+ lots, then hit Group.
+  const sel=(typeof selectedLots==='function')?selectedLots():[];
+  if(sel.length>=2){
+    if(!groupLotsTogether(sel))return;
+    const n=sel.length;
+    S.selected=new Set();
+    resetLayoutsAfterGrouping();
+    toast('Grouped '+n+' checked lots into an option group.');
+    return;
+  }
+  if(sel.length===1){toast('Check at least two lots (the boxes on the left), then hit Group.');return;}
+  // Fallback: no boxes checked — type the lot numbers instead.
   const defaultLot=lastFocusLot?(S.lots.find(l=>l.id===lastFocusLot)||{}).lot:'';
-  const input=prompt('Enter lot numbers to group together, separated by commas. Example: 210A, 210B, 210C',defaultLot||'');
+  const input=prompt('No lots are checked. Tip: check the boxes next to 2+ lots and hit Group.\n\nOr enter lot numbers to group, separated by commas. Example: 210A, 210B, 210C',defaultLot||'');
   if(input==null)return;
   const requested=splitLotList(input);
   if(requested.length<2){toast('Enter at least two lot numbers to group.');return;}
@@ -1721,18 +1780,24 @@ function manualGroupLots(){
     else if(!lot)missing.push(k);
   });
   if(found.length<2){toast('Could not find enough matching lots to group.');return;}
-  const groupId='manual-'+naturalOptionGroup(found[0].lot||found[0].id)+'-'+Date.now();
-  found.forEach(l=>{l.group=groupId;});
+  if(!groupLotsTogether(found))return;
   resetLayoutsAfterGrouping();
   toast('Grouped '+found.length+' lots'+(missing.length?' — not found: '+missing.join(', '):'.'));
 }
 function ungroupFocusedLot(){
-  if(!lastFocusLot){toast('Click a lot first.');return;}
-  const lot=S.lots.find(l=>l.id===lastFocusLot);
-  if(!lot)return;
-  lot.group=lot.lot||lot.id;
+  // Ungroups the checked lots if any are checked, otherwise the focused lot.
+  const sel=(typeof selectedLots==='function')?selectedLots():[];
+  let targets=sel;
+  if(!targets.length){
+    if(!lastFocusLot){toast('Check a lot (or click one), then hit Ungroup.');return;}
+    const lot=S.lots.find(l=>l.id===lastFocusLot);
+    if(!lot)return;
+    targets=[lot];
+  }
+  targets.forEach(l=>{l.group=l.lot||l.id;});
+  if(sel.length)S.selected=new Set();
   resetLayoutsAfterGrouping();
-  toast('Focused lot removed from option group.');
+  toast(targets.length>1?('Removed '+targets.length+' lots from their option groups.'):'Lot removed from its option group.');
 }
 
 /* ===== row height ===== */
@@ -2269,6 +2334,7 @@ async function deleteProjectById(id,name){
 /* ----- wiring ----- */
 $('#addLotBtn').onclick=openAddLot;
 $('#dupLotBtn').onclick=duplicateFocusedLot;
+$('#colorBarToggle').onclick=()=>$('#colorBar').classList.toggle('collapsed');
 $('#saveProjectBtn').onclick=openSaveModal;
 $('#openProjectsBtn').onclick=openProjectsModal;
 $('#openProjectsBtnUpload').onclick=openProjectsModal;
