@@ -13,6 +13,12 @@
 [functions]
   directory = "netlify/functions"
 
+# Firebase web API keys are intentionally public (client-side config —
+# real security is Firebase Auth + Firestore rules), but Netlify's
+# secrets scanner flags the "AIza..." pattern. Skip that one file.
+[build.environment]
+  SECRETS_SCAN_OMIT_PATHS = "public/shared/firebase-config.js"
+
 # SPA-style fallback for the shell. If a user reloads at /listings,
 # /banners, etc. and there's no exact file match, fall through to
 # index.html so the shell can route them to the right tab.
