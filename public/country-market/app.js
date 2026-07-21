@@ -116,10 +116,24 @@ function getWaitingLots() { return state.lots.filter(l => l.status === 'Sold' &&
 function getShippedLots() { return state.lots.filter(l => l.status === 'Sold' && l.soldSt === 'shipped'); }
 function getArchivedLots(){ return getLotsByStatus('Archived'); }
 
+
+// Keep every list in the app ordered by Lot Sequence (numeric),
+// falling back to the lot number when a sequence is missing.
+function seqVal(l) {
+  const s = parseFloat(l.seq);
+  if (!isNaN(s)) return s;
+  const m = String(l.lot || '').match(/^(\d+)/);
+  return m ? parseInt(m[1], 10) * 10 : Number.MAX_SAFE_INTEGER;
+}
+function sortLotsBySeq() {
+  state.lots.sort((a, b) => seqVal(a) - seqVal(b) || String(a.lot).localeCompare(String(b.lot)));
+}
+
 function upsertLot(lot) {
   const idx = state.lots.findIndex(l => l.id === lot.id);
   if (idx >= 0) state.lots[idx] = lot;
   else state.lots.unshift(lot);
+  sortLotsBySeq();
 }
 
 function removeLot(id) {
@@ -1005,6 +1019,22 @@ function offerAgeColor(iso) {
   return 'var(--err)';
 }
 
+function bidCell(l) {
+    if (l.sale !== 'Direct Bid Auction') return '<td style="color:var(--text-faint);">—</td>';
+    if (!l.highBid) {
+      return `<td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();showBidModal(${l.id})">+ Bid</button></td>`;
+    }
+    return `<td style="white-space:nowrap;">
+      <div style="display:inline-block;background:var(--brand-pale);border:1.5px solid var(--brand);border-radius:var(--r);padding:4px 10px;cursor:pointer;"
+           onclick="event.stopPropagation();showBidModal(${l.id})" title="Click to update">
+        <div style="font-size:16px;font-weight:800;color:var(--brand-dark);line-height:1.1;">$${esc(l.highBid)}</div>
+        <div style="font-size:11px;color:var(--text-mid);">${esc(l.highBidBy || 'Unknown buyer')}
+          <span style="color:${offerAgeColor(l.highBidAt)};font-weight:700;"> · ${offerAge(l.highBidAt) || 'no time'}</span>
+        </div>
+      </div>
+    </td>`;
+}
+
 function showBidModal(lotId) {
   const l = getLot(lotId);
   if (!l) return;
@@ -1638,6 +1668,7 @@ async function loadApp() {
       fetchLots(), fetchConsignors(), fetchSettings()
     ]);
     state.lots       = lots?.map ? lots.map(dbToLot) : [];
+    sortLotsBySeq();
     state.consignors = consignors || [];
     state.settings   = settings  || {};
     if (isAdmin()) {
@@ -2405,7 +2436,9 @@ function parseSortVal(val, col) {
 }
 
 function sortedByState(lots) {
-  if (!state.ui.sortCol) return lots;
+  if (!state.ui.sortCol) {
+    return [...lots].sort((a, b) => seqVal(a) - seqVal(b) || String(a.lot).localeCompare(String(b.lot)));
+  }
   const col = state.ui.sortCol;
   const dir = state.ui.sortDir === 'asc' ? 1 : -1;
   return [...lots].sort((a, b) => {
@@ -2432,21 +2465,6 @@ function renderStagedPage() {
     return `<span style="${cls}">${txt}</span>`;
   };
 
-  const bidCell = (l) => {
-    if (l.sale !== 'Direct Bid Auction') return '<td style="color:var(--text-faint);">—</td>';
-    if (!l.highBid) {
-      return `<td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();showBidModal(${l.id})">+ Bid</button></td>`;
-    }
-    return `<td style="white-space:nowrap;">
-      <div style="display:inline-block;background:var(--brand-pale);border:1.5px solid var(--brand);border-radius:var(--r);padding:4px 10px;cursor:pointer;"
-           onclick="event.stopPropagation();showBidModal(${l.id})" title="Click to update">
-        <div style="font-size:16px;font-weight:800;color:var(--brand-dark);line-height:1.1;">$${esc(l.highBid)}</div>
-        <div style="font-size:11px;color:var(--text-mid);">${esc(l.highBidBy || 'Unknown buyer')}
-          <span style="color:${offerAgeColor(l.highBidAt)};font-weight:700;"> · ${offerAge(l.highBidAt) || 'no time'}</span>
-        </div>
-      </div>
-    </td>`;
-  };
 
   const rows = lots.map(l => `
     <tr data-id="${l.id}" style="cursor:pointer;" onclick="if(!event.target.closest('button,select'))renderLDP(${l.id})">
@@ -2558,7 +2576,7 @@ function renderActivePage() {
             ${sh('High Bid','highBid')}
             <th class="sortable-th" data-sort="closeDate" style="cursor:pointer;user-select:none;">Closes${sortIcon('closeDate')}</th>
           </tr></thead>
-          <tbody>${rows || '<tr><td colspan="14" class="empty-row">No active lots.</td></tr>'}</tbody>
+          <tbody>${rows || '<tr><td colspan="15" class="empty-row">No active lots.</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
