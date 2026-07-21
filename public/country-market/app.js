@@ -1019,21 +1019,94 @@ function offerAgeColor(iso) {
   return 'var(--err)';
 }
 
+let _qbEditing = null; // lot id whose bid chip is expanded into the inline editor
+
 function bidCell(l) {
-    if (l.sale !== 'Direct Bid Auction') return '<td style="color:var(--text-faint);">—</td>';
-    if (!l.highBid) {
-      return `<td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();showBidModal(${l.id})">+ Bid</button></td>`;
-    }
-    return `<td style="white-space:nowrap;">
-      <div style="display:inline-block;background:var(--brand-pale);border:1.5px solid var(--brand);border-radius:var(--r);padding:4px 10px;cursor:pointer;"
-           onclick="event.stopPropagation();showBidModal(${l.id})" title="Click to update">
-        <div style="font-size:16px;font-weight:800;color:var(--brand-dark);line-height:1.1;">$${esc(l.highBid)}</div>
-        <div style="font-size:11px;color:var(--text-mid);">${esc(l.highBidBy || 'Unknown buyer')}
-          <span style="color:${offerAgeColor(l.highBidAt)};font-weight:700;"> · ${offerAge(l.highBidAt) || 'no time'}</span>
-        </div>
-      </div>
+  if (l.sale !== 'Direct Bid Auction') return '<td style="color:var(--text-faint);">—</td>';
+
+  // Inline quick-entry: type amount (+ optional buyer), press Enter.
+  // Timestamp is set automatically to now. Clock icon opens the full
+  // dialog for backdating an offer that came in earlier.
+  if (!l.highBid || _qbEditing === l.id) {
+    return `<td class="bid-wrap" onclick="event.stopPropagation()">
+      <span class="quick-bid" data-id="${l.id}" style="display:inline-flex;gap:4px;align-items:center;white-space:nowrap;">
+        <input type="number" step="0.01" min="0" class="qb-amt" placeholder="$ bid" value="${esc(l.highBid || '')}"
+               style="width:74px;padding:6px 8px;border:1.5px solid var(--brand);border-radius:var(--r);font:inherit;font-weight:700;">
+        <input type="text" class="qb-by" placeholder="buyer" value="${esc(l.highBidBy || '')}"
+               style="width:92px;padding:6px 8px;border:1px solid var(--border-mid);border-radius:var(--r);font:inherit;font-size:12px;">
+        <button class="btn btn-primary btn-sm qb-save" title="Save (or press Enter)" style="padding:5px 9px;">✓</button>
+        <button class="btn btn-ghost btn-sm qb-time" title="Backdate — set when the offer was made" style="padding:5px 7px;">⏱</button>
+      </span>
     </td>`;
+  }
+
+  // Saved bid: prominent chip; click to quick-edit
+  return `<td class="bid-wrap" onclick="event.stopPropagation()">
+    <div class="bid-chip" data-id="${l.id}" title="Click to update"
+         style="display:inline-block;background:var(--brand-pale);border:1.5px solid var(--brand);border-radius:var(--r);padding:4px 10px;cursor:pointer;">
+      <div style="font-size:16px;font-weight:800;color:var(--brand-dark);line-height:1.1;">$${esc(l.highBid)}</div>
+      <div style="font-size:11px;color:var(--text-mid);">${esc(l.highBidBy || 'Unknown buyer')}
+        <span style="color:${offerAgeColor(l.highBidAt)};font-weight:700;"> · ${offerAge(l.highBidAt) || 'no time'}</span>
+      </div>
+    </div>
+  </td>`;
 }
+
+async function saveQuickBid(lotId, amount, by) {
+  const l = getLot(lotId);
+  if (!l) return;
+  if (!amount || isNaN(+amount)) { toast('Enter a bid amount', true); return; }
+  try {
+    const saved = await updateLot(l.id, {
+      highBid: String(amount),
+      highBidBy: by || '',
+      highBidAt: new Date().toISOString()
+    });
+    upsertLot(saved);
+    logActivity(l.id, `High bid $${amount}${by ? ' from ' + by : ''}`, getUserDisplayName());
+    _qbEditing = null;
+    rerenderCurrentPage();
+    toast('High bid recorded');
+  } catch (e) {
+    toast(e.message || 'Failed to save bid', true);
+  }
+}
+
+// Delegated events for quick bid entry (survives table re-renders)
+(function () {
+  function ctx(el) {
+    const box = el.closest('.quick-bid');
+    if (!box) return null;
+    return {
+      id: +box.dataset.id,
+      amt: box.querySelector('.qb-amt')?.value.trim(),
+      by: box.querySelector('.qb-by')?.value.trim()
+    };
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    if (!e.target.classList) return;
+    if (e.target.classList.contains('qb-amt') || e.target.classList.contains('qb-by')) {
+      const c = ctx(e.target);
+      if (c) { e.preventDefault(); saveQuickBid(c.id, c.amt, c.by); }
+    }
+  });
+  document.addEventListener('click', (e) => {
+    const save = e.target.closest('.qb-save');
+    if (save) { const c = ctx(save); if (c) saveQuickBid(c.id, c.amt, c.by); return; }
+    const time = e.target.closest('.qb-time');
+    if (time) { const c = ctx(time); if (c) { _qbEditing = null; showBidModal(c.id); } return; }
+    const chip = e.target.closest('.bid-chip');
+    if (chip) {
+      _qbEditing = +chip.dataset.id;
+      rerenderCurrentPage();
+      // focus the amount box of the newly opened editor
+      setTimeout(() => {
+        document.querySelector(`.quick-bid[data-id="${chip.dataset.id}"] .qb-amt`)?.focus();
+      }, 30);
+    }
+  });
+})();
 
 function showBidModal(lotId) {
   const l = getLot(lotId);
