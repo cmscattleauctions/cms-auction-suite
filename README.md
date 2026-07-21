@@ -10,8 +10,10 @@ separate apps behind one shell with a single Firebase login.
 | **Listings** | `/#listings` | Build the auction master listing PDF from a CSV |
 | **Lot Images** | `/#lot-images` | Upload a working CSV → get a named image per lot (real video frames, not the logo thumbnail) + manifest CSV |
 | **Banners** | `/#banners` | Generate OBS scene banners + scene collection from a working CSV |
+| **Country Market** | `/#country-market` | CMS Country Page Manager — lot management + Country Page template export with images. Runs on the suite Firebase/Firestore backend with the same login. |
 | **Pre Auction** | `/#pre-auction` | Pre-auction listing confirmations + condensed listings |
 | **Post Auction** | `/#post-auction` | Sales contracts, summaries, recaps |
+| **Auction Results** | `/#results` | Enter high bids/buyers after the sale, merge option lots, export the Auction Results CSV |
 
 Pre and Post Auction tabs both load the same underlying app
 (`post-auction/index.html`) with different `?mode=` query params, which

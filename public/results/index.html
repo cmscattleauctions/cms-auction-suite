@@ -1,0 +1,54 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>CMS Auction Suite — Auction Results</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../shared/theme.css">
+<link rel="stylesheet" href="./styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<div class="page">
+  <header class="page-header">
+    <div><h1>Auction Results</h1></div>
+    <div class="header-actions" id="header-actions" hidden>
+      <button class="btn btn-primary" id="btn-export" type="button">Download Results CSV</button>
+    </div>
+  </header>
+
+  <section class="card dropzone" id="dropzone">
+    <input type="file" id="file-input" accept=".csv" hidden>
+    <div class="dropzone-inner">
+      <div class="dropzone-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="3" width="16" height="18" rx="2"/>
+          <path d="M8 8 H16 M8 12 H16 M8 16 H13"/>
+        </svg>
+      </div>
+      <h2>Upload the working sheet</h2>
+      <p class="muted">Drop this week's working CSV here. Enter high bids and buyers after
+      the sale, merge option lots that sold together, and download the Auction Results CSV.</p>
+      <button class="btn btn-primary" id="btn-browse" type="button">Choose CSV</button>
+    </div>
+  </section>
+
+  <section class="controls card" id="controls" hidden>
+    <div class="control">
+      <label for="sale-date">Sale date</label>
+      <input type="date" id="sale-date">
+    </div>
+    <div class="control">
+      <label for="down-per-head">Down money $/head</label>
+      <div class="control-row">
+        <input type="number" id="down-per-head" min="0" step="1" placeholder="e.g. 30">
+        <button class="btn btn-secondary" id="btn-apply-down" type="button">Apply to all</button>
+      </div>
+    </div>
+    <div class="control hint-block">
+      <span class="hint-strong">High Bid</span> is in $/cwt. Type <b>PO</b> (or click the PO button)
+      for lots that passed out. Estimated $ and pounds calculate automatically.
+    </div>
+  </section>
+
+  <section id="table-wrap"></section>
+</div>
+
+<script type="module" src="./app.js"></script>

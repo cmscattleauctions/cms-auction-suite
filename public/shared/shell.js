@@ -25,8 +25,10 @@ const TABS = [
   { id: 'listings',     label: 'Listings',     src: './listings/index.html',                ready: true },
   { id: 'lot-images',   label: 'Lot Images',   src: './lot-images/index.html',              ready: true },
   { id: 'banners',      label: 'Banners',      src: './banners/index.html',                 ready: true },
+  { id: 'country-market', label: 'Country Market', src: './country-market/index.html',        ready: true },
   { id: 'pre-auction',  label: 'Pre Auction',  src: './post-auction/index.html?mode=pre',   ready: true },
   { id: 'post-auction', label: 'Post Auction', src: './post-auction/index.html?mode=post',  ready: true },
+  { id: 'results',      label: 'Auction Results', src: './results/index.html',              ready: true },
 ];
 
 const DEFAULT_TAB = 'listings';
@@ -159,6 +161,10 @@ function iconFor(id) {
       return svg`<rect x="2.5" y="3.5" width="15" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
                  <circle cx="7" cy="8" r="1.3" fill="currentColor"/>
                  <path d="M3 14 L8 9 L13 13 L17 9.5" fill="none" stroke="currentColor" stroke-width="1.4"/>`;
+    case 'country-market':
+      return svg`<path d="M3 9 L10 3.5 L17 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                 <path d="M4.5 8.5 V16 H15.5 V8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                 <path d="M8 16 V11.5 H12 V16" fill="none" stroke="currentColor" stroke-width="1.4"/>`;
     case 'pre-auction':
       return svg`<rect x="3.5" y="3.5" width="13" height="13" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/>
                  <path d="M6 8 H14 M6 11 H14 M6 14 H11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
@@ -167,6 +173,9 @@ function iconFor(id) {
       return svg`<rect x="3.5" y="3.5" width="13" height="13" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/>
                  <path d="M6 8 H14 M6 11 H14 M6 14 H11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
                  <path d="M13 13 L15 15 L18 11" fill="none" stroke="var(--success, currentColor)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+    case 'results':
+      return svg`<rect x="3.5" y="3.5" width="13" height="13" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/>
+                 <path d="M6.5 13 V10 M10 13 V7 M13.5 13 V9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>`;
     default:
       return '';
   }

@@ -26,8 +26,7 @@ const VIDEO_LINK_COLS = ["Preview Video Link", "Automated Embedded Link"];
 const DEFAULT_FRAME = 2;
 
 /** state */
-let lots = [];      // [{ lot, consignor, videoId, link }]
-let videos = [];    // [{ id, link, frame, lots: [lotStr...] }]
+let lots = [];      // [{ lot, consignor, videoId, link, frame }]
 let missing = [];   // lot numbers with no video link
 
 /* =============================================================
@@ -98,7 +97,6 @@ function videoIdFrom(url) {
 function buildModel(rows) {
   lots = [];
   missing = [];
-  const byVideo = new Map();
 
   const lotKeyRows = rows.filter(
     (r) => getCol(r, [COLUMN_NAMES.lotNumber]).trim() !== ""
@@ -123,14 +121,9 @@ function buildModel(rows) {
       missing.push(lot);
       continue;
     }
-    lots.push({ lot, consignor, videoId: vid, link });
-    if (!byVideo.has(vid)) {
-      byVideo.set(vid, { id: vid, link, frame: DEFAULT_FRAME, lots: [] });
-    }
-    byVideo.get(vid).lots.push(lot);
+    lots.push({ lot, consignor, videoId: vid, link, frame: DEFAULT_FRAME });
   }
 
-  videos = [...byVideo.values()];
   render();
 }
 
@@ -158,7 +151,7 @@ function render() {
 
   summary.innerHTML = `
     <div class="stat"><b>${lots.length}</b> lots with images</div>
-    <div class="stat"><b>${videos.length}</b> unique videos</div>
+    <div class="stat"><b>${new Set(lots.map((l) => l.videoId)).size}</b> unique videos</div>
     ${
       missing.length
         ? `<div class="stat warn"><b>${missing.length}</b> lots missing a video link<br>
@@ -171,32 +164,31 @@ function render() {
   `;
   $("btn-reset").addEventListener("click", reset);
 
-  grid.innerHTML = videos
+  grid.innerHTML = lots
     .map(
-      (v, i) => `
+      (l, i) => `
     <div class="card video-card" data-index="${i}">
       <img class="main-frame"
-           src="https://i.ytimg.com/vi/${v.id}/hq${v.frame}.jpg"
+           src="https://i.ytimg.com/vi/${l.videoId}/hq${l.frame}.jpg"
            alt="Frame preview" loading="lazy">
       <div class="body">
         <div class="lot-badges">
-          ${v.lots
-            .map((l) => `<span class="lot-badge">Lot ${escapeHtml(l)}</span>`)
-            .join("")}
+          <span class="lot-badge">Lot ${escapeHtml(l.lot)}</span>
+          <span class="muted" style="font-size:12px;align-self:center">${escapeHtml(l.consignor || "")}</span>
         </div>
         <div class="frame-picker">
           <span class="hint">Pick frame:</span>
           ${[1, 2, 3]
             .map(
               (n) => `
-            <img class="frame-thumb ${n === v.frame ? "selected" : ""}"
+            <img class="frame-thumb ${n === l.frame ? "selected" : ""}"
                  data-frame="${n}"
-                 src="https://i.ytimg.com/vi/${v.id}/hq${n}.jpg"
+                 src="https://i.ytimg.com/vi/${l.videoId}/hq${n}.jpg"
                  alt="Frame option ${n}" loading="lazy">`
             )
             .join("")}
         </div>
-        <a class="video-link" href="https://www.youtube.com/watch?v=${v.id}"
+        <a class="video-link" href="https://www.youtube.com/watch?v=${l.videoId}"
            target="_blank" rel="noopener">Open video ↗</a>
       </div>
     </div>`
@@ -208,20 +200,19 @@ function onGridClick(e) {
   const thumb = e.target.closest(".frame-thumb");
   if (!thumb) return;
   const card = thumb.closest(".video-card");
-  const video = videos[Number(card.dataset.index)];
-  video.frame = Number(thumb.dataset.frame);
+  const lot = lots[Number(card.dataset.index)];
+  lot.frame = Number(thumb.dataset.frame);
 
-  card.querySelector(".main-frame").src = `https://i.ytimg.com/vi/${video.id}/hq${video.frame}.jpg`;
+  card.querySelector(".main-frame").src = `https://i.ytimg.com/vi/${lot.videoId}/hq${lot.frame}.jpg`;
   card
     .querySelectorAll(".frame-thumb")
     .forEach((t) =>
-      t.classList.toggle("selected", Number(t.dataset.frame) === video.frame)
+      t.classList.toggle("selected", Number(t.dataset.frame) === lot.frame)
     );
 }
 
 function reset() {
   lots = [];
-  videos = [];
   missing = [];
   fileInput.value = "";
   grid.innerHTML = "";
@@ -235,11 +226,6 @@ function reset() {
  * Downloads
  * ============================================================= */
 
-function frameFor(videoId) {
-  const v = videos.find((v) => v.id === videoId);
-  return v ? v.frame : DEFAULT_FRAME;
-}
-
 function manifestCsv() {
   const header = "lot_number,consignor,filename,video_link,frame\n";
   const rows = lots.map((l) =>
@@ -248,7 +234,7 @@ function manifestCsv() {
       csvCell(l.consignor),
       csvCell(`Lot_${l.lot}.jpg`),
       csvCell(l.link),
-      frameFor(l.videoId),
+      l.frame,
     ].join(",")
   );
   return header + rows.join("\n") + "\n";
@@ -293,23 +279,28 @@ async function downloadZip() {
   progressCard.hidden = false;
 
   const zip = new JSZip();
-  const cache = new Map(); // videoId -> blob
-  const failed = [];
+  const cache = new Map(); // "videoId-frame" -> blob
+  const failedLots = [];
 
-  // Download each unique video's frame (max 5 at a time)
-  const queue = [...videos];
+  // Unique video+frame pairs to download (max 5 at a time).
+  // Video IDs are exactly 11 chars and may themselves contain "-",
+  // so slice by position instead of splitting on "-".
+  const pairs = [...new Set(lots.map((l) => `${l.videoId}-${l.frame}`))].map(
+    (k) => ({ key: k, videoId: k.slice(0, 11), frame: Number(k.slice(12)) })
+  );
+  const queue = [...pairs];
   let done = 0;
   const workers = Array.from({ length: 5 }, async () => {
     while (queue.length) {
-      const v = queue.shift();
+      const p = queue.shift();
       try {
-        cache.set(v.id, await fetchFrameBlob(v.id, v.frame));
+        cache.set(p.key, await fetchFrameBlob(p.videoId, p.frame));
       } catch {
-        failed.push(v);
+        /* marked missing below per-lot */
       }
       done++;
-      progressLabel.textContent = `Downloading frames… ${done} of ${videos.length}`;
-      progressFill.style.width = `${(done / videos.length) * 90}%`;
+      progressLabel.textContent = `Downloading frames… ${done} of ${pairs.length}`;
+      progressFill.style.width = `${(done / pairs.length) * 90}%`;
     }
   });
   await Promise.all(workers);
@@ -317,8 +308,9 @@ async function downloadZip() {
   // One named copy per lot
   progressLabel.textContent = "Building zip…";
   for (const l of lots) {
-    const blob = cache.get(l.videoId);
+    const blob = cache.get(`${l.videoId}-${l.frame}`);
     if (blob) zip.file(`Lot_${l.lot}.jpg`, blob);
+    else failedLots.push(l.lot);
   }
   zip.file("lot_images.csv", manifestCsv());
 
@@ -326,14 +318,12 @@ async function downloadZip() {
   progressFill.style.width = "100%";
   saveBlob(out, "lot_images.zip");
 
-  progressLabel.textContent = failed.length
-    ? `Done — but ${failed.length} video(s) failed: ${failed
-        .map((v) => v.lots.join("/"))
-        .join(", ")}`
+  progressLabel.textContent = failedLots.length
+    ? `Done — but these lots failed: ${failedLots.join(", ")}`
     : "Done! Check your downloads for lot_images.zip";
   btn.disabled = false;
   setTimeout(() => {
-    if (!failed.length) progressCard.hidden = true;
+    if (!failedLots.length) progressCard.hidden = true;
     progressFill.style.width = "0%";
   }, 4000);
 }

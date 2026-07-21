@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CMS Country Page Manager</title>
+  <meta name="description" content="Cattle Marketing Services — Internal Lot Management Tool">
+
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>★</text></svg>">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Firestore data layer, backed by the suite's shared Firebase project
+       (module scripts run before DOMContentLoaded, so it's installed
+       before the app boots) -->
+  <script type="module" src="./firestore-adapter.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- App mounts here -->
+    <div class="loading-screen">
+      <div class="loading-logo">★</div>
+      <div class="loading-text">Loading CMS…</div>
+    </div>
+  </div>
+
+  <!-- App -->
+  <script src="app.js"></script>
+</body>
+</html>
