@@ -96,6 +96,10 @@ function handleFile(file) {
       if (!fields.some((f) => f.toLowerCase().trim() === "lot number")) {
         fields = [...fields, "Lot Number"];
       }
+      if (!fields.some((f) => f.toLowerCase().trim() === "group number")) {
+        const lotIdx = fields.findIndex((f) => f.toLowerCase().trim() === "lot number");
+        fields = [...fields.slice(0, lotIdx + 1), "Group Number", ...fields.slice(lotIdx + 1)];
+      }
       renumber();
     },
     error: (err) => alert("Could not read that CSV: " + err.message),
@@ -153,6 +157,7 @@ function renumber() {
     plan.push({
       rowIndex,
       lot: option ? `${base}${option}` : String(base),
+      group: String(base),
       isLot: true,
       groupStart,
       option,
@@ -185,7 +190,7 @@ function render() {
     </p>
     <table class="num-table">
       <thead><tr>
-        <th>New Lot #</th><th>Option</th><th>Consignor</th>
+        <th>New Lot #</th><th>Group #</th><th>Option</th><th>Consignor</th>
         <th>Head</th><th>Breed</th><th>Reference #</th>
       </tr></thead>
       <tbody>
@@ -196,11 +201,12 @@ function render() {
                 .map((f) => String(rows[p.rowIndex][f] ?? "").trim())
                 .filter(Boolean)
                 .join(" · ");
-              return `<tr class="skip"><td class="newlot">—</td><td colspan="5">${esc(raw || "(blank row)")}</td></tr>`;
+              return `<tr class="skip"><td class="newlot">—</td><td colspan="6">${esc(raw || "(blank row)")}</td></tr>`;
             }
             return `
           <tr class="${p.groupStart && p.option ? "group-start" : ""}">
             <td class="newlot">${esc(p.lot)}</td>
+            <td>${esc(p.group)}</td>
             <td class="opt">${esc(p.option)}</td>
             <td>${esc(p.consignor)}</td>
             <td>${esc(p.head)}</td>
@@ -219,11 +225,16 @@ function render() {
 function exportCsv() {
   const lotKey =
     fields.find((f) => f.toLowerCase().trim() === "lot number") || "Lot Number";
+  const groupKey =
+    fields.find((f) => f.toLowerCase().trim() === "group number") || "Group Number";
 
   const outRows = rows.map((row, i) => {
     const p = plan[i];
     const copy = { ...row };
-    if (p && p.isLot) copy[lotKey] = p.lot;
+    if (p && p.isLot) {
+      copy[lotKey] = p.lot;
+      copy[groupKey] = p.group;
+    }
     return copy;
   });
 

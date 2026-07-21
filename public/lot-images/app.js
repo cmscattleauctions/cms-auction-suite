@@ -26,7 +26,8 @@ const VIDEO_LINK_COLS = ["Preview Video Link", "Automated Embedded Link"];
 const DEFAULT_FRAME = 2;
 
 /** state */
-let lots = [];      // [{ lot, consignor, videoId, link, frame }]
+let lots = [];      // [{ lot, consignor, videoId, link }]
+let videos = [];    // [{ id, frame, lots: [lot labels] }] — one frame choice per video
 let missing = [];   // lot numbers with no video link
 
 /* =============================================================
@@ -121,8 +122,20 @@ function buildModel(rows) {
       missing.push(lot);
       continue;
     }
-    lots.push({ lot, consignor, videoId: vid, link, frame: DEFAULT_FRAME });
+    lots.push({ lot, consignor, videoId: vid, link });
   }
+
+  // One card per unique video; picking a frame applies to every lot on it
+  const byVideo = new Map();
+  for (const l of lots) {
+    if (!byVideo.has(l.videoId)) {
+      byVideo.set(l.videoId, { id: l.videoId, frame: DEFAULT_FRAME, lots: [], consignors: new Set() });
+    }
+    const v = byVideo.get(l.videoId);
+    v.lots.push(l.lot);
+    if (l.consignor) v.consignors.add(l.consignor);
+  }
+  videos = [...byVideo.values()];
 
   render();
 }
@@ -151,7 +164,7 @@ function render() {
 
   summary.innerHTML = `
     <div class="stat"><b>${lots.length}</b> lots with images</div>
-    <div class="stat"><b>${new Set(lots.map((l) => l.videoId)).size}</b> unique videos</div>
+    <div class="stat"><b>${videos.length}</b> videos — pick one clip each</div>
     ${
       missing.length
         ? `<div class="stat warn"><b>${missing.length}</b> lots missing a video link<br>
@@ -164,31 +177,33 @@ function render() {
   `;
   $("btn-reset").addEventListener("click", reset);
 
-  grid.innerHTML = lots
+  grid.innerHTML = videos
     .map(
-      (l, i) => `
+      (v, i) => `
     <div class="card video-card" data-index="${i}">
       <img class="main-frame"
-           src="https://i.ytimg.com/vi/${l.videoId}/hq${l.frame}.jpg"
+           src="https://i.ytimg.com/vi/${v.id}/hq${v.frame}.jpg"
            alt="Frame preview" loading="lazy">
       <div class="body">
         <div class="lot-badges">
-          <span class="lot-badge">Lot ${escapeHtml(l.lot)}</span>
-          <span class="muted" style="font-size:12px;align-self:center">${escapeHtml(l.consignor || "")}</span>
+          ${v.lots
+            .map((l) => `<span class="lot-badge">Lot ${escapeHtml(l)}</span>`)
+            .join("")}
         </div>
+        <div class="muted" style="font-size:12px;margin-bottom:10px">${escapeHtml([...v.consignors].join(", "))}</div>
         <div class="frame-picker">
-          <span class="hint">Pick frame:</span>
+          <span class="hint">Pick clip${v.lots.length > 1 ? " (applies to all " + v.lots.length + " lots)" : ""}:</span>
           ${[1, 2, 3]
             .map(
               (n) => `
-            <img class="frame-thumb ${n === l.frame ? "selected" : ""}"
+            <img class="frame-thumb ${n === v.frame ? "selected" : ""}"
                  data-frame="${n}"
-                 src="https://i.ytimg.com/vi/${l.videoId}/hq${n}.jpg"
+                 src="https://i.ytimg.com/vi/${v.id}/hq${n}.jpg"
                  alt="Frame option ${n}" loading="lazy">`
             )
             .join("")}
         </div>
-        <a class="video-link" href="https://www.youtube.com/watch?v=${l.videoId}"
+        <a class="video-link" href="https://www.youtube.com/watch?v=${v.id}"
            target="_blank" rel="noopener">Open video ↗</a>
       </div>
     </div>`
@@ -200,19 +215,20 @@ function onGridClick(e) {
   const thumb = e.target.closest(".frame-thumb");
   if (!thumb) return;
   const card = thumb.closest(".video-card");
-  const lot = lots[Number(card.dataset.index)];
-  lot.frame = Number(thumb.dataset.frame);
+  const video = videos[Number(card.dataset.index)];
+  video.frame = Number(thumb.dataset.frame);
 
-  card.querySelector(".main-frame").src = `https://i.ytimg.com/vi/${lot.videoId}/hq${lot.frame}.jpg`;
+  card.querySelector(".main-frame").src = `https://i.ytimg.com/vi/${video.id}/hq${video.frame}.jpg`;
   card
     .querySelectorAll(".frame-thumb")
     .forEach((t) =>
-      t.classList.toggle("selected", Number(t.dataset.frame) === lot.frame)
+      t.classList.toggle("selected", Number(t.dataset.frame) === video.frame)
     );
 }
 
 function reset() {
   lots = [];
+  videos = [];
   missing = [];
   fileInput.value = "";
   grid.innerHTML = "";
@@ -226,6 +242,11 @@ function reset() {
  * Downloads
  * ============================================================= */
 
+function frameFor(videoId) {
+  const v = videos.find((x) => x.id === videoId);
+  return v ? v.frame : DEFAULT_FRAME;
+}
+
 function manifestCsv() {
   const header = "lot_number,consignor,filename,video_link,frame\n";
   const rows = lots.map((l) =>
@@ -234,7 +255,7 @@ function manifestCsv() {
       csvCell(l.consignor),
       csvCell(`Lot_${l.lot}.jpg`),
       csvCell(l.link),
-      l.frame,
+      frameFor(l.videoId),
     ].join(",")
   );
   return header + rows.join("\n") + "\n";
@@ -279,36 +300,29 @@ async function downloadZip() {
   progressCard.hidden = false;
 
   const zip = new JSZip();
-  const cache = new Map(); // "videoId-frame" -> blob
+  const cache = new Map(); // videoId -> blob
   const failedLots = [];
 
-  // Unique video+frame pairs to download (max 5 at a time).
-  // Video IDs are exactly 11 chars and may themselves contain "-",
-  // so slice by position instead of splitting on "-".
-  const pairs = [...new Set(lots.map((l) => `${l.videoId}-${l.frame}`))].map(
-    (k) => ({ key: k, videoId: k.slice(0, 11), frame: Number(k.slice(12)) })
-  );
-  const queue = [...pairs];
+  const queue = [...videos];
   let done = 0;
   const workers = Array.from({ length: 5 }, async () => {
     while (queue.length) {
-      const p = queue.shift();
+      const v = queue.shift();
       try {
-        cache.set(p.key, await fetchFrameBlob(p.videoId, p.frame));
+        cache.set(v.id, await fetchFrameBlob(v.id, v.frame));
       } catch {
         /* marked missing below per-lot */
       }
       done++;
-      progressLabel.textContent = `Downloading frames… ${done} of ${pairs.length}`;
-      progressFill.style.width = `${(done / pairs.length) * 90}%`;
+      progressLabel.textContent = `Downloading clips… ${done} of ${videos.length}`;
+      progressFill.style.width = `${(done / videos.length) * 90}%`;
     }
   });
   await Promise.all(workers);
 
-  // One named copy per lot
   progressLabel.textContent = "Building zip…";
   for (const l of lots) {
-    const blob = cache.get(`${l.videoId}-${l.frame}`);
+    const blob = cache.get(l.videoId);
     if (blob) zip.file(`Lot_${l.lot}.jpg`, blob);
     else failedLots.push(l.lot);
   }
