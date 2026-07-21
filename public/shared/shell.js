@@ -23,6 +23,7 @@ import { FIREBASE_CONFIGURED } from './firebase-config.js';
 
 const TABS = [
   { id: 'listings',     label: 'Listings',     src: './listings/index.html',                ready: true },
+  { id: 'lot-images',   label: 'Lot Images',   src: './lot-images/index.html',              ready: true },
   { id: 'banners',      label: 'Banners',      src: './banners/index.html',                 ready: true },
   { id: 'pre-auction',  label: 'Pre Auction',  src: './post-auction/index.html?mode=pre',   ready: true },
   { id: 'post-auction', label: 'Post Auction', src: './post-auction/index.html?mode=post',  ready: true },
@@ -150,6 +151,10 @@ function iconFor(id) {
       return svg`<rect x="3" y="4" width="14" height="2" rx="0.5"/>
                  <rect x="3" y="9" width="14" height="2" rx="0.5"/>
                  <rect x="3" y="14" width="14" height="2" rx="0.5"/>`;
+    case 'lot-images':
+      return svg`<rect x="2.5" y="4.5" width="15" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+                 <circle cx="10" cy="10" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+                 <circle cx="14.8" cy="7.2" r="0.9" fill="currentColor"/>`;
     case 'banners':
       return svg`<rect x="2.5" y="3.5" width="15" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
                  <circle cx="7" cy="8" r="1.3" fill="currentColor"/>

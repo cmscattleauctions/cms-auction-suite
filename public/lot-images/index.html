@@ -1,0 +1,52 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>CMS Auction Suite — Lot Images</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../shared/theme.css">
+<link rel="stylesheet" href="./styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Lot Images</h1>
+    </div>
+    <div class="header-actions" id="header-actions" hidden>
+      <button class="btn btn-secondary" id="btn-csv" type="button">Download CSV</button>
+      <button class="btn btn-primary" id="btn-zip" type="button">Download Images + CSV (.zip)</button>
+    </div>
+  </header>
+
+  <!-- Upload state -->
+  <section class="card dropzone" id="dropzone">
+    <input type="file" id="file-input" accept=".csv" hidden>
+    <div class="dropzone-inner">
+      <div class="dropzone-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="5" width="18" height="14" rx="2"/>
+          <circle cx="8.5" cy="10" r="1.5" fill="currentColor" stroke="none"/>
+          <path d="M4 17 L9 12 L14 16 L17 13 L20 16"/>
+        </svg>
+      </div>
+      <h2>Upload your working sheet</h2>
+      <p class="muted">Drop the CSV here or click to browse. Every lot with a video
+      link gets a real frame from the footage — not the logo thumbnail.</p>
+      <button class="btn btn-primary" id="btn-browse" type="button">Choose CSV</button>
+    </div>
+  </section>
+
+  <!-- Summary bar after parse -->
+  <section class="summary" id="summary" hidden></section>
+
+  <!-- Progress while downloading -->
+  <section class="card progress-card" id="progress-card" hidden>
+    <div class="progress-label" id="progress-label">Preparing…</div>
+    <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+  </section>
+
+  <!-- Frame grid -->
+  <section class="grid" id="grid"></section>
+</div>
+
+<script type="module" src="./app.js"></script>

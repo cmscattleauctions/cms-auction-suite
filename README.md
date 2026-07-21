@@ -8,6 +8,7 @@ separate apps behind one shell with a single Firebase login.
 | Tab | URL | What it does |
 |-----|-----|--------------|
 | **Listings** | `/#listings` | Build the auction master listing PDF from a CSV |
+| **Lot Images** | `/#lot-images` | Upload a working CSV → get a named image per lot (real video frames, not the logo thumbnail) + manifest CSV |
 | **Banners** | `/#banners` | Generate OBS scene banners + scene collection from a working CSV |
 | **Pre Auction** | `/#pre-auction` | Pre-auction listing confirmations + condensed listings |
 | **Post Auction** | `/#post-auction` | Sales contracts, summaries, recaps |

@@ -9,6 +9,10 @@
   publish = "public"
   command = ""
 
+# Serverless functions (Lot Images thumbnail proxy lives here)
+[functions]
+  directory = "netlify/functions"
+
 # SPA-style fallback for the shell. If a user reloads at /listings,
 # /banners, etc. and there's no exact file match, fall through to
 # index.html so the shell can route them to the right tab.
