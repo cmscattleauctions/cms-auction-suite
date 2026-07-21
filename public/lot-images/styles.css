@@ -177,3 +177,12 @@ html, body {
   border-radius: var(--radius-md);
   font-size: 14px;
 }
+
+/* Scroll fix: shared/theme.css sets `overflow: hidden` on the body
+   because the shell manages its own scroll — but inside an iframe
+   this app IS the scroll container, so restore normal scrolling. */
+html, body {
+  height: auto;
+  min-height: 100%;
+  overflow-y: auto;
+}

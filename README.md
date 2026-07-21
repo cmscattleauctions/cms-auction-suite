@@ -11,7 +11,7 @@ separate apps behind one shell with a single Firebase login.
 | **Lot #'s** | `/#lot-numbers` | Upload a working CSV and auto-assign lot numbers by auction month, with A/B/C option-lot handling |
 | **Lot Images** | `/#lot-images` | Upload a working CSV → get a named image per lot (real video frames, not the logo thumbnail) + manifest CSV |
 | **Banners** | `/#banners` | Generate OBS scene banners + scene collection from a working CSV |
-| **Country Market** | `/#country-market` | CMS Country Page Manager — lot management + Country Page template export with images. Runs on the suite Firebase/Firestore backend with the same login. |
+| **Country Market** | `/#country-market` | CMS Country Page Manager — CSV lot import, lot management, Country Page template export with images. Runs on the suite Firebase/Firestore backend with the same login. |
 | **Pre Auction** | `/#pre-auction` | Pre-auction listing confirmations + condensed listings |
 | **Post Auction** | `/#post-auction` | Sales contracts, summaries, recaps |
 

@@ -323,3 +323,16 @@
 .nav-item[data-tab="country-market"].active {
   background: linear-gradient(90deg, rgba(212, 160, 23, 0.32), rgba(212, 160, 23, 0.10));
 }
+
+/* Sidebar section titles */
+.nav-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--sidebar-fg-muted);
+  padding: var(--space-4) var(--space-3) var(--space-2);
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--sidebar-divider);
+}
+.nav-section-title:first-child { border-top: 0; margin-top: 0; }

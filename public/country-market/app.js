@@ -2344,7 +2344,7 @@ function renderStagedPage() {
       <div class="page-header">
         <h1 class="page-title">Staged <span class="page-count">${lots.length}</span></h1>
         <div class="page-actions">
-          <button class="btn btn-ghost btn-sm" id="csv-all-btn">Download All CSV</button>\n          <button class="btn btn-ghost btn-sm" id="cp-zip-btn">Country Page CSV + Images</button>
+          <button class="btn btn-ghost btn-sm" id="import-csv-btn">Import Lots CSV</button>\n          <button class="btn btn-ghost btn-sm" id="csv-all-btn">Download All CSV</button>\n          <button class="btn btn-ghost btn-sm" id="cp-zip-btn">Country Page CSV + Images</button>
         </div>
       </div>
       <div class="table-wrap">
@@ -2409,7 +2409,7 @@ function renderActivePage() {
       <div class="page-header">
         <h1 class="page-title">Active <span class="page-count">${lots.length}</span></h1>
         <div class="page-actions">
-          <button class="btn btn-ghost btn-sm" id="csv-all-btn">Download All CSV</button>\n          <button class="btn btn-ghost btn-sm" id="cp-zip-btn">Country Page CSV + Images</button>
+          <button class="btn btn-ghost btn-sm" id="import-csv-btn">Import Lots CSV</button>\n          <button class="btn btn-ghost btn-sm" id="csv-all-btn">Download All CSV</button>\n          <button class="btn btn-ghost btn-sm" id="cp-zip-btn">Country Page CSV + Images</button>
         </div>
       </div>
       <div class="table-wrap">
@@ -4111,7 +4111,108 @@ async function saveAdminInfo() {
 
 // ── CSV BUTTONS ───────────────────────────────────────────────
 
+// ── CSV LOT IMPORT ────────────────────────────────────────────
+// Upload a numbered working-sheet CSV and create Staged lots.
+// Column matching is case-insensitive; lots whose Lot Number
+// already exists are skipped so re-imports are safe.
+
+function impCol(row, names) {
+  for (const name of names) {
+    const key = Object.keys(row).find(k => k.toLowerCase().trim() === name.toLowerCase());
+    if (key != null) {
+      const v = String(row[key] ?? '').trim();
+      if (v !== '') return v;
+    }
+  }
+  return '';
+}
+
+function workingRowToLot(row, seq) {
+  const lotNum = impCol(row, ['Lot Number']);
+  const baseMatch = lotNum.match(/^(\d+)/);
+  return {
+    lot: lotNum,
+    seq,
+    gid: baseMatch ? baseMatch[1] : '',
+    sale: 'Timed Auction',
+    rep: impCol(row, ['Rep', 'Representative']),
+    con: impCol(row, ['Consignor', 'Seller']),
+    breed: impCol(row, ['Breed']),
+    sex: impCol(row, ['Sex']),
+    type: impCol(row, ['Type']),
+    loads: parseFloat(impCol(row, ['# of loads', 'Load Count'])) || 1,
+    head: parseInt(impCol(row, ['Head', 'Head Count']), 10) || 0,
+    wt: impCol(row, ['Weight', 'Base Weight']),
+    del: impCol(row, ['Delivery']),
+    loc: impCol(row, ['Location', 'Lot Location']),
+    shrink: impCol(row, ['Shrink']),
+    slide: impCol(row, ['Slide']),
+    notes: impCol(row, ['Description', 'LotDescription']),
+    secondDesc: impCol(row, ['Description 2', 'Second Description', 'Second Notes']),
+    yt: impCol(row, ['Automated Embedded Link', 'Preview Video Link', 'YouTube link']),
+    imgFrame: 2,
+    ask: '', buyNow: '', startBid: '',
+    listDate: new Date().toISOString().split('T')[0],
+    status: STATUS.STAGED,
+    log: [], intNotes: [], extNotes: []
+  };
+}
+
+async function importLotsCSV(file) {
+  if (!canCreateLot()) { toast('You do not have permission to create lots', true); return; }
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: 'greedy',
+    complete: async (results) => {
+      const candidates = [];
+      for (const row of results.data) {
+        const lot = impCol(row, ['Lot Number']);
+        const con = impCol(row, ['Consignor', 'Seller']);
+        const head = impCol(row, ['Head', 'Head Count']);
+        if (lot && con && head) candidates.push(row);
+      }
+      if (!candidates.length) {
+        toast('No importable rows found — make sure the CSV has Lot Number, Consignor, and Head columns (run it through the Lot #\u2019s tab first if it isn\u2019t numbered).', true);
+        return;
+      }
+      const existing = new Set(state.lots.map(l => String(l.lot).trim()));
+      const fresh = candidates.filter(r => !existing.has(impCol(r, ['Lot Number'])));
+      const skipped = candidates.length - fresh.length;
+      if (!fresh.length) { toast('All ' + candidates.length + ' lots already exist — nothing to import', true); return; }
+      const msg = 'Import ' + fresh.length + ' lot(s) to Staged?' + (skipped ? '\n(' + skipped + ' skipped — lot number already exists)' : '');
+      if (!confirm(msg)) return;
+
+      toast('Importing ' + fresh.length + ' lots\u2026');
+      let ok = 0, failed = [];
+      let seq = 10 + Math.max(0, ...state.lots.map(l => +l.seq || 0));
+      for (const row of fresh) {
+        try {
+          const saved = await insertLot(workingRowToLot(row, seq));
+          upsertLot(saved);
+          logActivity(saved.id, 'Imported from CSV', getUserDisplayName());
+          seq += 10; ok++;
+        } catch (e) {
+          failed.push(impCol(row, ['Lot Number']) + ' (' + (e.message || 'error') + ')');
+        }
+      }
+      updateBadges();
+      rerenderCurrentPage();
+      if (failed.length) toast('Imported ' + ok + '; failed: ' + failed.join(', '), true);
+      else toast('Imported ' + ok + ' lot(s) to Staged');
+    },
+    error: (err) => toast('Could not read CSV: ' + err.message, true)
+  });
+}
+
 function setupCSVButtons() {
+  document.getElementById('import-csv-btn')?.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    input.addEventListener('change', () => { if (input.files[0]) importLotsCSV(input.files[0]); });
+    input.click();
+  });
+
   document.getElementById('csv-all-btn')?.addEventListener('click', () => {
     const page = state.ui.activePage;
     if (page === 'staged') downloadStagedCSV(state.lots);

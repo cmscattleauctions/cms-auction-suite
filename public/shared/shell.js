@@ -22,13 +22,13 @@ import * as AuthUI from './auth-ui.js';
 import { FIREBASE_CONFIGURED } from './firebase-config.js';
 
 const TABS = [
-  { id: 'listings',     label: 'Listings',     src: './listings/index.html',                ready: true },
-  { id: 'lot-numbers',  label: "Lot #'s",      src: './lot-numbers/index.html',             ready: true },
-  { id: 'lot-images',   label: 'Lot Images',   src: './lot-images/index.html',              ready: true },
-  { id: 'banners',      label: 'Banners',      src: './banners/index.html',                 ready: true },
-  { id: 'country-market', label: 'Country Market', src: './country-market/index.html',        ready: true },
-  { id: 'pre-auction',  label: 'Pre Auction',  src: './post-auction/index.html?mode=pre',   ready: true },
-  { id: 'post-auction', label: 'Post Auction', src: './post-auction/index.html?mode=post',  ready: true },
+  { id: 'listings',     label: 'Listings',     src: './listings/index.html',                ready: true, section: 'Auction Management' },
+  { id: 'lot-numbers',  label: "Lot #'s",      src: './lot-numbers/index.html',             ready: true, section: 'Auction Management' },
+  { id: 'lot-images',   label: 'Lot Images',   src: './lot-images/index.html',              ready: true, section: 'Auction Management' },
+  { id: 'banners',      label: 'Banners',      src: './banners/index.html',                 ready: true, section: 'Auction Management' },
+  { id: 'pre-auction',  label: 'Pre Auction',  src: './post-auction/index.html?mode=pre',   ready: true, section: 'Auction Management' },
+  { id: 'post-auction', label: 'Post Auction', src: './post-auction/index.html?mode=post',  ready: true, section: 'Auction Management' },
+  { id: 'country-market', label: 'Country Market', src: './country-market/index.html',        ready: true, section: 'Country Market Management' },
 ];
 
 const DEFAULT_TAB = 'listings';
@@ -132,12 +132,20 @@ function renderShell(root) {
 
 function renderNav() {
   const navContainer = document.getElementById('sidebar-nav');
-  navContainer.innerHTML = TABS.map(tab => `
+  let html = '';
+  let currentSection = null;
+  for (const tab of TABS) {
+    if (tab.section && tab.section !== currentSection) {
+      currentSection = tab.section;
+      html += `<div class="nav-section-title">${tab.section}</div>`;
+    }
+    html += `
     <button class="nav-item" data-tab="${tab.id}" type="button">
       <span class="nav-item-icon">${iconFor(tab.id)}</span>
       <span>${tab.label}</span>
-    </button>
-  `).join('');
+    </button>`;
+  }
+  navContainer.innerHTML = html;
 
   navContainer.addEventListener('click', e => {
     const btn = e.target.closest('.nav-item');

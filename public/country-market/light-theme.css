@@ -1,0 +1,63 @@
+/* =============================================================
+ * CMS Country Market — Suite theme override
+ * -------------------------------------------------------------
+ * Loaded AFTER styles.css. Remaps the app's design tokens to the
+ * suite's shared look (shared/theme.css): warm off-white canvas,
+ * amber accent, dark navy chrome — so this tab feels like part
+ * of the suite instead of a separate blue app.
+ * ============================================================= */
+
+:root {
+  /* Brand: blue → suite amber */
+  --brand:       #b8860b;
+  --brand-dark:  #9a7209;
+  --brand-light: #d4a017;
+  --brand-pale:  #f3e7c8;
+  --brand-faint: #f8f2e2;
+
+  /* Neutrals: cool gray → warm suite canvas */
+  --bg:          #f5f1ea;
+  --surface:     #ffffff;
+  --surface-alt: #fafaf7;
+  --border:      #e6e0d4;
+  --border-mid:  #d4cdbd;
+
+  /* Text: suite grays */
+  --text:        #1a1d23;
+  --text-mid:    #555b66;
+  --text-muted:  #8a8f99;
+  --text-faint:  #b8bcc4;
+
+  /* Status: suite semantic colors */
+  --ok:          #2d7a4a;
+  --ok-bg:       #e8f3ec;
+  --ok-border:   #a9d4b8;
+  --warn:        #b45309;
+  --warn-bg:     #fef3c7;
+  --warn-border: #f6c96b;
+  --err:         #b91c1c;
+  --err-bg:      #fee2e2;
+  --err-border:  #f4a49e;
+  --info-bg:     #f3e7c8;
+  --info-border: #e0cd9a;
+
+  /* Status badges: keep readable, warm the active state to amber */
+  --active-color: #b8860b;
+  --active-bg:    #f3e7c8;
+
+  /* Type: match the suite font stack */
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+}
+
+/* App header: blue → the suite's dark navy chrome */
+.app-header {
+  background: #131820;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.brand-star { color: #d4a017; }
+.brand-name { color: #e8eaee; }
+.brand-sub  { color: #8b919c; }
+.header-search input { background: rgba(255,255,255,.08); color: #e8eaee; }
+.header-search input::placeholder { color: #8b919c; }
+.header-search input:focus { background: rgba(255,255,255,.14); border-color: #d4a017; }

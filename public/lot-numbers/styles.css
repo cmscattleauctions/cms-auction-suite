@@ -202,3 +202,12 @@ html, body {
 .num-table .newlot { font-weight: 800; color: var(--accent); white-space: nowrap; }
 .num-table .opt { font-weight: 700; }
 .skip td { color: var(--text-muted); font-style: italic; }
+
+/* Scroll fix: shared/theme.css sets `overflow: hidden` on the body
+   because the shell manages its own scroll — but inside an iframe
+   this app IS the scroll container, so restore normal scrolling. */
+html, body {
+  height: auto;
+  min-height: 100%;
+  overflow-y: auto;
+}
