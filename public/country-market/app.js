@@ -572,6 +572,7 @@ function lotToDb(l) {
     startBidDate: 'start_bid_date', startBidTime: 'start_bid_time',
     ask: 'ask', buyNow: 'buy_now', startBid: 'start_bid',
     highBid: 'high_bid', highBidNote: 'high_bid_note',
+    highBidBy: 'high_bid_by', highBidAt: 'high_bid_at',
     status: 'status', listDate: 'list_date',
     buyer: 'buyer', soldDate: 'sold_date', soldSt: 'sold_st',
     shipDate: 'ship_date', price: 'price', down: 'down',
@@ -625,6 +626,8 @@ function dbToLot(d) {
     startBid: d.start_bid,
     highBid: d.high_bid,
     highBidNote: d.high_bid_note,
+    highBidBy: d.high_bid_by || '',
+    highBidAt: d.high_bid_at || '',
     status: d.status,
     listDate: d.list_date,
     buyer: d.buyer,
@@ -779,10 +782,12 @@ function escapeCSV(val) {
 }
 
 function buildCSV(lots) {
-  const header = BP_COLUMNS.map(escapeCSV).join(',');
+  // Exports now use the Country Page 33-column template format
+  // (matches the team's BidPath upload template exactly).
+  const header = CP_COLUMNS.map(escapeCSV).join(',');
   const rows = lots.map(lot => {
-    const row = lotToRow(lot);
-    return BP_COLUMNS.map(col => escapeCSV(row[col] ?? '')).join(',');
+    const row = lotToCountryRow(lot);
+    return CP_COLUMNS.map(col => escapeCSV(row[col] ?? '')).join(',');
   });
   return [header, ...rows].join('\r\n');
 }
@@ -806,6 +811,29 @@ const CP_COLUMNS = [
   'Direct Bid?','BestOffer'
 ];
 
+// Format a lot's date+time for the template: "YYYY-MM-DD HH:MM:SS UTC".
+// Times are entered as US Central; convert using the browser's tz data
+// (handles CST/CDT automatically; falls back to CST -6 if unavailable).
+function cpUtcDate(dateStr, timeStr) {
+  if (!dateStr) return '';
+  const t = (timeStr || '00:00').substring(0, 5);
+  let offsetHours = -6; // CST fallback
+  try {
+    const probe = new Date(`${dateStr}T${t}:00Z`);
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Chicago', timeZoneName: 'shortOffset'
+    }).formatToParts(probe);
+    const tzName = parts.find(p => p.type === 'timeZoneName')?.value || '';
+    const m = tzName.match(/GMT([+-]\d+)/);
+    if (m) offsetHours = parseInt(m[1], 10);
+  } catch (e) { /* keep CST fallback */ }
+  const local = new Date(`${dateStr}T${t}:00Z`); // wall time, pretend-UTC
+  const utc = new Date(local.getTime() - offsetHours * 3600 * 1000);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${utc.getUTCFullYear()}-${p(utc.getUTCMonth() + 1)}-${p(utc.getUTCDate())} ` +
+         `${p(utc.getUTCHours())}:${p(utc.getUTCMinutes())}:00 UTC`;
+}
+
 function cpVideoId(url) {
   const m = String(url || '').match(/(?:youtu\.be\/|watch\?v=|embed\/)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : null;
@@ -825,9 +853,10 @@ function lotToCountryRow(l) {
     return 'Steers/ Heifers';
   };
   const loads = l.loads || 1;
-  const closeDt = bpDate(l.closeDate, l.closeTime);
-  const startBidDt = bpDate(l.startBidDate || l.closeDate, l.startBidTime || l.closeTime);
+  const closeDt = cpUtcDate(l.closeDate, l.closeTime);
+  const startBidDt = cpUtcDate(l.startBidDate || l.closeDate, l.startBidTime || l.closeTime);
   const hasVideo = !!cpVideoId(l.yt);
+  const isDirect = l.sale === 'Direct Bid Auction';
 
   return {
     'LotFullNumber':     l.lot || '',
@@ -856,13 +885,13 @@ function lotToCountryRow(l) {
     'StartingBid*':      l.startBid || '',
     'ReservePrice':      l.ask || '',
     'BuyNowAmount':      l.buyNow || '',
-    'Make Offer Amount': 0,
+    'Make Offer Amount': l.startBid || '',
     'StartBiddingDate':  startBidDt,
-    'PublishDate':       startBidDt,
+    'PublishDate':       '',
     'UnpublishDate':     '',
     'StartClosingDate':  closeDt,
-    'Direct Bid?':       l.sale === 'Direct Bid Auction' ? 'Yes' : 'No',
-    'BestOffer':         1
+    'Direct Bid?':       isDirect ? 'Yes' : 'No',
+    'BestOffer':         isDirect ? 1 : 2
   };
 }
 
@@ -949,6 +978,88 @@ function downloadCSV(lots, filename) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+
+// ============================================================
+// DIRECT BID — current high bid tracking
+// ============================================================
+
+function offerAge(iso) {
+  if (!iso) return '';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (isNaN(ms) || ms < 0) return '';
+  const m = Math.floor(ms / 60000);
+  if (m < 1)  return 'just now';
+  if (m < 60) return m + 'm ago';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h ago';
+  const d = Math.floor(h / 24);
+  return d + 'd ago';
+}
+function offerAgeColor(iso) {
+  if (!iso) return 'var(--text-muted)';
+  const h = (Date.now() - new Date(iso).getTime()) / 3600000;
+  if (h < 24) return 'var(--ok)';
+  if (h < 72) return 'var(--warn)';
+  return 'var(--err)';
+}
+
+function showBidModal(lotId) {
+  const l = getLot(lotId);
+  if (!l) return;
+  document.getElementById('bid-modal-overlay')?.remove();
+  const nowLocal = (() => {
+    const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  })();
+  const existingAt = l.highBidAt ? (() => {
+    const d = new Date(l.highBidAt); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  })() : nowLocal;
+
+  const wrap = document.createElement('div');
+  wrap.id = 'bid-modal-overlay';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(19,24,32,.55);z-index:2000;display:flex;align-items:center;justify-content:center;';
+  wrap.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--rl);box-shadow:var(--s3);padding:22px;width:340px;max-width:92vw;">
+      <div style="font-weight:800;font-size:16px;margin-bottom:2px;">Record High Bid — Lot ${esc(l.lot)}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">${esc(l.con || '')}</div>
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Bid amount ($/cwt)</label>
+      <input id="bid-amount" type="number" step="0.01" min="0" value="${esc(l.highBid || '')}"
+             style="width:100%;padding:8px 10px;border:1px solid var(--border-mid);border-radius:var(--r);font:inherit;margin-bottom:12px;">
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Who made the offer</label>
+      <input id="bid-by" type="text" value="${esc(l.highBidBy || '')}" placeholder="Buyer name"
+             style="width:100%;padding:8px 10px;border:1px solid var(--border-mid);border-radius:var(--r);font:inherit;margin-bottom:12px;">
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">When the offer was made</label>
+      <input id="bid-at" type="datetime-local" value="${existingAt}"
+             style="width:100%;padding:8px 10px;border:1px solid var(--border-mid);border-radius:var(--r);font:inherit;margin-bottom:16px;">
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-ghost btn-sm" id="bid-cancel">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="bid-save">Save Bid</button>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) wrap.remove(); });
+  document.getElementById('bid-cancel').addEventListener('click', () => wrap.remove());
+  document.getElementById('bid-amount').focus();
+  document.getElementById('bid-save').addEventListener('click', async () => {
+    const amount = document.getElementById('bid-amount').value.trim();
+    const by = document.getElementById('bid-by').value.trim();
+    const atLocal = document.getElementById('bid-at').value;
+    if (!amount || isNaN(+amount)) { toast('Enter a bid amount', true); return; }
+    const atIso = atLocal ? new Date(atLocal).toISOString() : new Date().toISOString();
+    try {
+      const saved = await updateLot(l.id, { highBid: amount, highBidBy: by, highBidAt: atIso });
+      upsertLot(saved);
+      logActivity(l.id, `High bid $${amount}${by ? ' from ' + by : ''}`, getUserDisplayName());
+      wrap.remove();
+      rerenderCurrentPage();
+      toast('High bid recorded');
+    } catch (e) {
+      toast(e.message || 'Failed to save bid', true);
+    }
+  });
 }
 
 function downloadSingleLotCSV(lot) {
@@ -2321,6 +2432,22 @@ function renderStagedPage() {
     return `<span style="${cls}">${txt}</span>`;
   };
 
+  const bidCell = (l) => {
+    if (l.sale !== 'Direct Bid Auction') return '<td style="color:var(--text-faint);">—</td>';
+    if (!l.highBid) {
+      return `<td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();showBidModal(${l.id})">+ Bid</button></td>`;
+    }
+    return `<td style="white-space:nowrap;">
+      <div style="display:inline-block;background:var(--brand-pale);border:1.5px solid var(--brand);border-radius:var(--r);padding:4px 10px;cursor:pointer;"
+           onclick="event.stopPropagation();showBidModal(${l.id})" title="Click to update">
+        <div style="font-size:16px;font-weight:800;color:var(--brand-dark);line-height:1.1;">$${esc(l.highBid)}</div>
+        <div style="font-size:11px;color:var(--text-mid);">${esc(l.highBidBy || 'Unknown buyer')}
+          <span style="color:${offerAgeColor(l.highBidAt)};font-weight:700;"> · ${offerAge(l.highBidAt) || 'no time'}</span>
+        </div>
+      </div>
+    </td>`;
+  };
+
   const rows = lots.map(l => `
     <tr data-id="${l.id}" style="cursor:pointer;" onclick="if(!event.target.closest('button,select'))renderLDP(${l.id})">
       <td style="font-family:var(--mono);font-weight:700;color:var(--brand);">${esc(l.sale) || '—'}</td>
@@ -2400,6 +2527,7 @@ function renderActivePage() {
       <td class="col-hide-md">${esc(l.del)||'—'}</td>
       <td class="col-hide-sm">${l.ask?'$'+esc(l.ask):'—'}</td>
       <td class="col-hide-sm">${l.buyNow?'$'+esc(l.buyNow):'—'}</td>
+      ${bidCell(l)}
       <td>${closeFmt(l)}</td>
       
     </tr>`).join('');
@@ -2427,6 +2555,7 @@ function renderActivePage() {
             <th class="col-hide-md">Delivery</th>
             <th class="col-hide-sm">Asking</th>
             <th class="col-hide-sm">Buy Now</th>
+            ${sh('High Bid','highBid')}
             <th class="sortable-th" data-sort="closeDate" style="cursor:pointer;user-select:none;">Closes${sortIcon('closeDate')}</th>
           </tr></thead>
           <tbody>${rows || '<tr><td colspan="14" class="empty-row">No active lots.</td></tr>'}</tbody>
@@ -3452,8 +3581,8 @@ async function doSaveLot(e) {
     clearBuilderForm();
     updateBadges();
     // Prompt to download CSV
-    if (confirm(esc(saved.lot) + " saved to Staged.\n\nDownload BidPath CSV now?")) {
-      downloadSingleLotCSV(saved);
+    if (confirm(esc(saved.lot) + " saved to Staged.\n\nDownload the lot CSV + image now?")) {
+      downloadCountryZip([saved]);
     }
   } catch (e) {
     toast(e.message || 'Failed to save lot', true);
