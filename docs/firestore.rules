@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+
+    // A user is "approved" if their users/{uid} doc says so
+    // (how auth.js gates the app) OR they carry an approved custom claim.
+    function isApproved() {
+      return isSignedIn() && (
+        request.auth.token.approved == true ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.approved == true)
+      );
+    }
+
+    // Country Market admin = profiles/{uid}.role == 'admin'
+    function cmIsAdmin() {
+      return exists(/databases/$(database)/documents/profiles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Each person can read and create only their OWN approval record,
+    // and only with approved:false. Flipping it to true happens in the
+    // Firebase Console (or Admin SDK), which bypasses these rules.
+    match /users/{uid} {
+      allow read:   if isSignedIn() && request.auth.uid == uid;
+      allow create: if isSignedIn() && request.auth.uid == uid
+                    && request.resource.data.approved == false;
+      allow update, delete: if false;
+    }
+
+    // Shared team data — any approved user can read and write.
+    match /listingProjects/{docId} { allow read, write: if isApproved(); }
+    match /stateImages/{abbr}      { allow read, write: if isApproved(); }
+    match /appSettings/{key}       { allow read, write: if isApproved(); }
+
+    // ── Country Market ─────────────────────────────────────────
+    match /cmLots/{id}        { allow read, write: if isApproved(); }
+    match /cmActivityLog/{id} { allow read, write: if isApproved(); }
+    match /cmConsignors/{id} {
+      allow read:  if isApproved();
+      allow write: if isApproved() && cmIsAdmin();
+    }
+    match /cmSettings/{id} {
+      allow read:  if isApproved();
+      allow write: if isApproved() && cmIsAdmin();
+    }
+    match /profiles/{uid} {
+      // Approved users can read all profiles; you can create your own
+      // (first-login bootstrap); only admins can change roles.
+      allow read:   if isApproved();
+      allow create: if isApproved() && request.auth.uid == uid;
+      allow update: if isApproved() && cmIsAdmin();
+      allow delete: if false;
+    }
+  }
+}

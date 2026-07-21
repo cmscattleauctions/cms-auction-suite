@@ -1,0 +1,51 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>CMS Auction Suite — Lot #'s</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../shared/theme.css">
+<link rel="stylesheet" href="./styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<div class="page">
+  <header class="page-header">
+    <div><h1>Lot #'s</h1></div>
+    <div class="header-actions" id="header-actions" hidden>
+      <button class="btn btn-primary" id="btn-export" type="button">Download Numbered CSV</button>
+    </div>
+  </header>
+
+  <section class="card dropzone" id="dropzone">
+    <input type="file" id="file-input" accept=".csv" hidden>
+    <div class="dropzone-inner">
+      <div class="dropzone-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+          <path d="M9.5 4 L7.5 20 M16.5 4 L14.5 20 M5 9.5 H20 M4 15 H19"/>
+        </svg>
+      </div>
+      <h2>Upload the working sheet</h2>
+      <p class="muted">Drop the CSV here and lot numbers are assigned automatically from the
+      auction month — 801, 802, 803A, 803B for August. Option lots (rows marked A/B/C in
+      the Option column) share a base number.</p>
+      <button class="btn btn-primary" id="btn-browse" type="button">Choose CSV</button>
+    </div>
+  </section>
+
+  <section class="controls card" id="controls" hidden>
+    <div class="control">
+      <label for="month">Auction month</label>
+      <select id="month"></select>
+    </div>
+    <div class="control">
+      <label for="start-num">First lot number</label>
+      <input type="number" id="start-num" min="1" step="1" style="max-width:120px">
+    </div>
+    <div class="control hint-block muted" style="max-width:420px;font-size:13px;align-self:center">
+      Changing the month resets the first number to match (August → 801).
+      You can override the first number for split sales or continuations.
+    </div>
+  </section>
+
+  <section id="table-wrap"></section>
+</div>
+
+<script type="module" src="./app.js"></script>

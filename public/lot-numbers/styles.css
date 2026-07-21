@@ -1,0 +1,204 @@
+/* =============================================================
+ * CMS Auction Suite — Lot Images tab
+ * All colors/spacing reference shared/theme.css tokens.
+ * ============================================================= */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-5);
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.muted { color: var(--text-secondary); }
+
+.header-actions { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+
+/* ----- buttons ----- */
+.btn {
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary:disabled { background: var(--text-disabled); cursor: default; }
+.btn-secondary {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+.btn-secondary:hover { background: var(--bg-surface-hover); }
+
+/* ----- cards ----- */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs, 0 1px 2px rgba(0,0,0,.04));
+}
+
+/* ----- dropzone ----- */
+.dropzone {
+  padding: var(--space-7) var(--space-5);
+  text-align: center;
+  border: 2px dashed var(--border-strong);
+  background: var(--bg-muted);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.dropzone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.dropzone-icon svg {
+  width: 44px; height: 44px;
+  color: var(--text-muted);
+}
+.dropzone h2 { margin: var(--space-3) 0 var(--space-2); font-size: 18px; }
+.dropzone p { margin: 0 0 var(--space-4); }
+
+/* ----- summary bar ----- */
+.summary {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+.summary .stat {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: 14px;
+}
+.summary .stat b { font-size: 18px; display: block; }
+.summary .stat.warn { background: var(--warning-bg); border-color: var(--warning); }
+
+/* ----- progress ----- */
+.progress-card { padding: var(--space-4) var(--space-5); margin-bottom: var(--space-5); }
+.progress-label { font-size: 14px; margin-bottom: var(--space-2); color: var(--text-secondary); }
+.progress-track {
+  height: 8px; border-radius: 999px; background: var(--bg-muted); overflow: hidden;
+}
+.progress-fill {
+  height: 100%; width: 0%;
+  background: var(--accent);
+  transition: width .2s;
+}
+
+/* ----- video/frame grid ----- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-4);
+}
+
+.video-card { overflow: hidden; }
+.video-card .main-frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  background: #000;
+}
+.video-card .body { padding: var(--space-3) var(--space-4) var(--space-4); }
+
+.lot-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--space-3); }
+.lot-badge {
+  background: var(--sidebar-bg);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.frame-picker { display: flex; gap: var(--space-2); align-items: center; }
+.frame-picker .hint { font-size: 12px; color: var(--text-muted); margin-right: 2px; }
+.frame-thumb {
+  width: 72px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 2px solid transparent;
+  cursor: pointer;
+  opacity: .65;
+  background: #000;
+}
+.frame-thumb:hover { opacity: 1; }
+.frame-thumb.selected {
+  border-color: var(--accent);
+  opacity: 1;
+}
+
+.video-link {
+  display: inline-block;
+  margin-top: var(--space-3);
+  font-size: 12px;
+  color: var(--info);
+  text-decoration: none;
+}
+.video-link:hover { text-decoration: underline; }
+
+.missing-note {
+  padding: var(--space-3) var(--space-4);
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+}
+
+/* ----- lot numbers ----- */
+.controls {
+  display: flex; gap: var(--space-5); flex-wrap: wrap; align-items: flex-end;
+  padding: var(--space-4) var(--space-5); margin-bottom: var(--space-5);
+}
+.control label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.control select, .control input {
+  font: inherit; padding: 8px 10px; border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md); background: var(--bg-input);
+}
+.num-table {
+  width: 100%; border-collapse: collapse; background: var(--bg-surface);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  overflow: hidden; font-size: 14px;
+}
+.num-table th {
+  text-align: left; padding: 10px 12px; background: var(--sidebar-bg); color: #fff;
+  font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+}
+.num-table td { padding: 8px 12px; border-top: 1px solid var(--border-subtle); }
+.num-table tr.group-start td { border-top: 2px solid var(--border-strong); }
+.num-table .newlot { font-weight: 800; color: var(--accent); white-space: nowrap; }
+.num-table .opt { font-weight: 700; }
+.skip td { color: var(--text-muted); font-style: italic; }

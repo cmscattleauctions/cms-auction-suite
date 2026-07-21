@@ -299,3 +299,27 @@
 @media (min-width: 769px) {
   .mobile-topbar { display: none; }
 }
+
+/* =============================================================
+ * Country Market — standout tab treatment
+ * The one outward-facing app in the suite gets the amber accent.
+ * ============================================================= */
+.nav-item[data-tab="country-market"] {
+  background: linear-gradient(90deg, rgba(212, 160, 23, 0.14), rgba(212, 160, 23, 0.03));
+  border-left: 3px solid var(--sidebar-active-border, #d4a017);
+  color: var(--sidebar-active-fg, #f5d491);
+  font-weight: 700;
+  margin: 6px 0;
+}
+.nav-item[data-tab="country-market"]::after {
+  content: "★";
+  margin-left: auto;
+  color: var(--sidebar-active-border, #d4a017);
+  font-size: 12px;
+}
+.nav-item[data-tab="country-market"]:hover {
+  background: linear-gradient(90deg, rgba(212, 160, 23, 0.24), rgba(212, 160, 23, 0.06));
+}
+.nav-item[data-tab="country-market"].active {
+  background: linear-gradient(90deg, rgba(212, 160, 23, 0.32), rgba(212, 160, 23, 0.10));
+}
