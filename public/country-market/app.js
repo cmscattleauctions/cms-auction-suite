@@ -1028,7 +1028,7 @@ function bidCell(l) {
   // Timestamp is set automatically to now. Clock icon opens the full
   // dialog for backdating an offer that came in earlier.
   if (!l.highBid || _qbEditing === l.id) {
-    return `<td class="bid-wrap" onclick="event.stopPropagation()">
+    return `<td class="bid-wrap">
       <span class="quick-bid" data-id="${l.id}" style="display:inline-flex;gap:4px;align-items:center;white-space:nowrap;">
         <input type="number" step="0.01" min="0" class="qb-amt" placeholder="$ bid" value="${esc(l.highBid || '')}"
                style="width:74px;padding:6px 8px;border:1.5px solid var(--brand);border-radius:var(--r);font:inherit;font-weight:700;">
@@ -1041,7 +1041,7 @@ function bidCell(l) {
   }
 
   // Saved bid: prominent chip; click to quick-edit
-  return `<td class="bid-wrap" onclick="event.stopPropagation()">
+  return `<td class="bid-wrap">
     <div class="bid-chip" data-id="${l.id}" title="Click to update"
          style="display:inline-block;background:var(--brand-pale);border:1.5px solid var(--brand);border-radius:var(--r);padding:4px 10px;cursor:pointer;">
       <div style="font-size:16px;font-weight:800;color:var(--brand-dark);line-height:1.1;">$${esc(l.highBid)}</div>
@@ -2540,7 +2540,7 @@ function renderStagedPage() {
 
 
   const rows = lots.map(l => `
-    <tr data-id="${l.id}" style="cursor:pointer;" onclick="if(!event.target.closest('button,select'))renderLDP(${l.id})">
+    <tr data-id="${l.id}" style="cursor:pointer;" onclick="if(!event.target.closest('button,select,input,.bid-wrap'))renderLDP(${l.id})">
       <td style="font-family:var(--mono);font-weight:700;color:var(--brand);">${esc(l.sale) || '—'}</td>
       <td><strong style="color:var(--brand);cursor:pointer;">${esc(l.lot)}</strong></td>
       <td style="color:var(--text-muted);">${esc(l.seq) || '—'}</td>
@@ -2605,7 +2605,7 @@ function renderActivePage() {
   };
 
   const rows = lots.map(l => `
-    <tr data-id="${l.id}" style="cursor:pointer;" onclick="if(!event.target.closest('button,select'))renderLDP(${l.id})">
+    <tr data-id="${l.id}" style="cursor:pointer;" onclick="if(!event.target.closest('button,select,input,.bid-wrap'))renderLDP(${l.id})">
       <td style="font-family:var(--mono);font-weight:700;color:var(--brand);">${esc(l.sale) || '—'}</td>
       <td><strong style="color:var(--brand);">${esc(l.lot)}</strong></td>
       <td style="color:var(--text-muted);">${l.seq || '—'}</td>
