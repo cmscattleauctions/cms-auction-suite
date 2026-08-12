@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMS Video Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div id="app">
+    <header class="vm-topbar">
+      <div class="vm-topbar-title">
+        <span class="vm-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6"/><path d="M17 10.5 22 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </span>
+        <div>
+          <h1>Video Manager</h1>
+          <p class="vm-subtitle">CMS Livestock Auction — cattle video library</p>
+        </div>
+      </div>
+      <div class="vm-topbar-actions">
+        <button class="btn btn-ghost" type="button" id="vm-btn-notifications">Notifications</button>
+        <button class="btn btn-ghost" type="button" id="vm-btn-import-csv">Import Usage CSV</button>
+        <button class="btn btn-primary" type="button" id="vm-btn-upload">+ Upload Video</button>
+      </div>
+    </header>
+
+    <nav class="vm-tabs" id="vm-tabs" aria-label="Status"></nav>
+
+    <div class="vm-toolbar">
+      <div class="vm-search">
+        <svg class="vm-search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.6"/><path d="M18 18l-4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input type="text" id="vm-search-input" autocomplete="off"
+          placeholder="Search Video ID, consignor, lot, auction, video maker, sex, breed, weight, date, YouTube link…" />
+      </div>
+
+      <div class="vm-filters-wrap">
+        <button class="btn btn-ghost vm-filters-btn" type="button" id="vm-btn-filters">
+          Filters <span class="vm-filter-badge" id="vm-filter-badge" hidden>0</span>
+        </button>
+        <div class="vm-filters-panel" id="vm-filters-panel" hidden></div>
+      </div>
+
+      <div class="vm-view-toggle" id="vm-view-toggle" role="tablist" aria-label="View">
+        <button class="vm-view-btn active" type="button" data-view="table">Table</button>
+        <button class="vm-view-btn" type="button" data-view="grid">Grid</button>
+      </div>
+    </div>
+
+    <div class="vm-active-filters" id="vm-active-filters"></div>
+    <div class="vm-meta" id="vm-meta"></div>
+
+    <main class="vm-content" id="vm-content"></main>
+  </div>
+
+  <div id="vm-drawer-root"></div>
+  <div id="vm-modal-root"></div>
+  <div id="vm-toast-root" class="vm-toast-root"></div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
