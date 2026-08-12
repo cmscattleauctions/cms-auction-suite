@@ -14,6 +14,7 @@ separate apps behind one shell with a single Firebase login.
 | **Country Market** | `/#country-market` | CMS Country Page Manager — CSV lot import, lot management, Country Page template export with images. Runs on the suite Firebase/Firestore backend with the same login. |
 | **Pre Auction** | `/#pre-auction` | Pre-auction listing confirmations + condensed listings |
 | **Post Auction** | `/#post-auction` | Sales contracts, summaries, recaps |
+| **Video Manager** | `/#video-manager` | Cattle video library — table/grid views, Video ID system, clip management, auction usage. Phase 1: UI + mock data only, not yet wired to Firebase (see `public/video-manager/repository.js`). Rep upload portal lives separately at `/video-upload` (unauthenticated route, no suite chrome). |
 
 Pre and Post Auction tabs both load the same underlying app
 (`post-auction/index.html`) with different `?mode=` query params, which

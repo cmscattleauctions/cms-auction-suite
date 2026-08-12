@@ -29,6 +29,7 @@ const TABS = [
   { id: 'pre-auction',  label: 'Pre Auction',  src: './post-auction/index.html?mode=pre',   ready: true, section: 'Auction Management' },
   { id: 'post-auction', label: 'Post Auction', src: './post-auction/index.html?mode=post',  ready: true, section: 'Auction Management' },
   { id: 'country-market', label: 'Country Market', src: './country-market/index.html',        ready: true, section: 'Country Market Management' },
+  { id: 'video-manager', label: 'Video Manager', src: './video-manager/index.html',          ready: true, section: 'Video Management' },
 ];
 
 const DEFAULT_TAB = 'listings';
@@ -183,6 +184,9 @@ function iconFor(id) {
       return svg`<rect x="3.5" y="3.5" width="13" height="13" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/>
                  <path d="M6 8 H14 M6 11 H14 M6 14 H11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
                  <path d="M13 13 L15 15 L18 11" fill="none" stroke="var(--success, currentColor)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+    case 'video-manager':
+      return svg`<rect x="2.5" y="4.5" width="12" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+                 <path d="M14.5 8.5 18.5 6v8l-4-2.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>`;
     default:
       return '';
   }
