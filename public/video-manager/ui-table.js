@@ -24,7 +24,7 @@ export function renderTable(container, records, ctx) {
         <thead><tr>
           <th>Video ID</th><th>Consignor</th><th>Sex</th><th>Sire Breed</th><th>Dam Breed</th>
           <th>Weight</th><th>Month/Year</th><th>Clips</th><th>Video Maker</th><th>Date Added</th>
-          <th>Notes</th><th>Video Link</th><th>Embed Link</th><th>Actions</th>
+          <th>Notes</th><th>Video Link</th><th>Embed Link</th><th>Format</th><th>Actions</th>
         </tr></thead>
         <tbody id="vm-table-body"></tbody>
       </table>
@@ -65,9 +65,21 @@ function rowHtml(r, ctx) {
       <td class="wrap">${editableCell(r, 'notes', r.notes ? escapeHtml(r.notes) : '', !r.notes)}</td>
       <td>${videoLinkCell(r)}</td>
       <td>${embedLinkCell(r)}</td>
+      <td>${videoFormatCell(r, ctx)}</td>
       <td>${actionsCell(r)}</td>
     </tr>
   `;
+}
+
+const FORMAT_BADGE_CLASS = {
+  clean: 'format-clean', 'legacy-tagged': 'format-legacy', 'needs-redo': 'format-redo', unknown: 'format-unknown',
+};
+
+function videoFormatCell(r, ctx) {
+  const meta = ctx.ref.videoFormatMeta(r.videoFormat);
+  const short = meta ? meta.short : r.videoFormat;
+  const full = meta ? meta.desc : '';
+  return `<span class="format-pill ${FORMAT_BADGE_CLASS[r.videoFormat] || ''}" title="${escapeHtml(full)}">${escapeHtml(short)}</span>`;
 }
 
 function editableCell(r, field, display, isEmpty = false) {
@@ -127,11 +139,11 @@ function actionsCell(r) {
  * ============================================================= */
 function addRowHtml(ctx) {
   if (!addRowOpen) {
-    return `<tr class="vm-addrow-row"><td colspan="14"><button class="vm-addrow-btn" id="vm-open-addrow" type="button">+ Add row</button></td></tr>`;
+    return `<tr class="vm-addrow-row"><td colspan="15"><button class="vm-addrow-btn" id="vm-open-addrow" type="button">+ Add row</button></td></tr>`;
   }
   return `
     <tr class="vm-addrow-row">
-      <td colspan="14">
+      <td colspan="15">
         <div style="display:flex;align-items:center;gap:10px;">
           <input type="text" id="vm-addrow-input" class="vm-videoid-input" placeholder="Type Video ID, e.g. 21.2.2.2.450.0826, then press Tab or Enter" autocomplete="off" />
           <button class="btn btn-sm btn-ghost" id="vm-close-addrow" type="button">Cancel</button>

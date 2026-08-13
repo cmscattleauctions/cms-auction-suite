@@ -8,6 +8,10 @@
 
 import { escapeHtml, sexShort } from './format.js';
 
+const FORMAT_BADGE_CLASS = {
+  clean: 'format-clean', 'legacy-tagged': 'format-legacy', 'needs-redo': 'format-redo', unknown: 'format-unknown',
+};
+
 export function renderGrid(container, records, ctx) {
   container.innerHTML = `<div class="vm-grid">${records.map(r => cardHtml(r, ctx)).join('')}</div>`;
 
@@ -21,6 +25,7 @@ function cardHtml(r, ctx) {
   const sireLabel = ctx.ref.sireLabel(r.sireCode) || `Code ${r.sireCode}`;
   const damLabel = ctx.ref.damLabel(r.damCode) || `Code ${r.damCode}`;
   const originalClips = r.clips.filter(c => c.isOriginal);
+  const formatMeta = ctx.ref.videoFormatMeta(r.videoFormat);
 
   return `
     <div class="vm-card" data-id="${r.id}">
@@ -30,6 +35,7 @@ function cardHtml(r, ctx) {
         <div class="vm-card-consignor">${escapeHtml(r.consignorName)}${r.needsReview ? '<span class="vm-new-badge">NEW</span>' : ''}</div>
         <div class="vm-card-meta-row">
           <span class="sex-chip sex-${r.sexCode}">${sexShort(sexLabel)}</span>
+          <span class="format-pill ${FORMAT_BADGE_CLASS[r.videoFormat] || ''}" title="${escapeHtml(formatMeta ? formatMeta.desc : '')}">${escapeHtml(formatMeta ? formatMeta.short : r.videoFormat)}</span>
           <span class="vm-card-breed">${escapeHtml(sireLabel)} × ${escapeHtml(damLabel)}</span>
         </div>
         <div class="vm-card-foot">

@@ -15,6 +15,7 @@
 
 import {
   SEX_TYPES, SIRE_TYPES, DAM_TYPES, CONSIGNORS, VIDEO_MAKERS, STAFF,
+  VIDEO_FORMATS, OVERLAY_MODES, PROGRAM_TAGS,
   generateMockVideos, labelFor, consignorFor,
 } from './mock-data.js';
 import { buildBaseId, nextAvailableSuffix, formatMonthYear, generateInternalId } from './video-id.js';
@@ -80,6 +81,24 @@ export const ReferenceDataRepository = {
     return rec;
   },
 
+  renameConsignor(code, name) {
+    const rec = CONSIGNORS.find(c => c.code === String(code));
+    if (!rec) throw new Error('Consignor not found');
+    rec.name = name;
+    videos.forEach(v => { if (v.consignorCode === String(code)) v.consignorName = name; });
+    emitter.emit({ type: 'reference-changed' });
+    emitter.emit({ type: 'videos-changed' });
+    return rec;
+  },
+
+  clearConsignorFlag(code) {
+    const rec = CONSIGNORS.find(c => c.code === String(code));
+    if (!rec) throw new Error('Consignor not found');
+    rec.flaggedNew = false;
+    emitter.emit({ type: 'reference-changed' });
+    return rec;
+  },
+
   addSireType(code, label) {
     if (SIRE_TYPES.some(s => s.code === String(code))) throw new Error('Sire code already exists');
     const rec = { code: String(code), label };
@@ -97,6 +116,24 @@ export const ReferenceDataRepository = {
   },
 
   getVideoMakers() { return [...VIDEO_MAKERS]; },
+
+  /* ----- Video Format / Overlay Mode / program tag library -----
+   * Mock/local for now. Real schema will carry over unchanged when
+   * this becomes a Firestore-backed `programTags` collection. */
+  getVideoFormats() { return [...VIDEO_FORMATS]; },
+  videoFormatMeta(code) { return VIDEO_FORMATS.find(f => f.code === code) || null; },
+  getOverlayModes() { return [...OVERLAY_MODES]; },
+
+  getProgramTags() { return [...PROGRAM_TAGS].sort((a, b) => a.displayOrder - b.displayOrder); },
+  addProgramTag(name) {
+    if (PROGRAM_TAGS.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+      throw new Error(`"${name}" is already in the tag library`);
+    }
+    const rec = { id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name, image: null, active: true, displayOrder: PROGRAM_TAGS.length + 1 };
+    PROGRAM_TAGS.push(rec);
+    emitter.emit({ type: 'reference-changed' });
+    return rec;
+  },
 };
 
 /* =============================================================
@@ -184,7 +221,7 @@ export const UsageRepository = {
       const v = r.video;
       if (!touched.has(v.id)) touched.set(v.id, new Map());
       const byDate = touched.get(v.id);
-      if (!byDate.has(r.auctionDate)) byDate.set(r.auctionDate, { auctionDate: r.auctionDate, auctionName: r.auctionName || 'Imported Auction', lots: [] });
+      if (!byDate.has(r.auctionDate)) byDate.set(r.auctionDate, { auctionDate: r.auctionDate, auctionName: r.auctionName || 'Imported Auction', lots: [], youtubeVersionId: v.youtubeId });
       byDate.get(r.auctionDate).lots.push(r.lot);
     });
 
@@ -245,6 +282,7 @@ function searchText(v) {
     v.videoMaker, v.notes, v.youtubeUrl, v.youtubeId,
     new Date(v.dateAdded).toLocaleDateString(),
     usage,
+    ReferenceDataRepository.videoFormatMeta(v.videoFormat)?.label, v.bakedInTags.join(' '),
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
@@ -271,6 +309,7 @@ function matchesFilters(v, filters = {}) {
   if (filters.hasUsage === true && v.usage.length === 0) return false;
   if (filters.hasUsage === false && v.usage.length > 0) return false;
   if (filters.isDraft === true && !v.isDraft) return false;
+  if (filters.videoFormat && v.videoFormat !== filters.videoFormat) return false;
   return true;
 }
 
@@ -333,6 +372,14 @@ export const VideoRepository = {
       clips: fields.clips || [],
       listingImageUrl: fields.listingImageUrl || null,
       youtubeId: null, youtubeUrl: null, embedUrl: null, embedCode: null,
+      previousYouTubeVideos: [],
+      // New-video policy: everything created from here forward is
+      // assumed Clean (no baked-in intro/program logos) until staff
+      // says otherwise. Historical/migrated records default to
+      // Unknown instead — see mock-data.js buildRecord().
+      videoFormat: fields.videoFormat || 'clean',
+      bakedInTags: [],
+      overlayMode: fields.overlayMode || 'dynamic',
       usage: [],
       activity: [{ ts: now, actor, type: 'created', message: fields.suffix
         ? `Record created as ${finalId} (Video ID collision with ${baseId})`
@@ -407,14 +454,71 @@ export const VideoRepository = {
     return { ...v };
   },
 
-  async setYoutube(id, { youtubeUrl, youtubeId }, actor = 'Staff') {
+  /**
+   * Set (or replace) the current YouTube video. If one is already set
+   * and differs, it's pushed into previousYouTubeVideos first — we
+   * never silently overwrite a completed version, since historical
+   * auction usage may point at it (see UsageRepository.confirmImport
+   * and usage.youtubeVersionId).
+   */
+  async setYoutube(id, { youtubeUrl, youtubeId }, actor = 'Staff', reason = '') {
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
+    const isReplacement = !!v.youtubeId && v.youtubeId !== youtubeId;
+
+    if (isReplacement) {
+      v.previousYouTubeVideos.unshift({
+        id: v.youtubeId, url: v.youtubeUrl, embedUrl: v.embedUrl, embedCode: v.embedCode,
+        replacedAt: new Date().toISOString(), replacedBy: actor, reason: reason || '',
+      });
+    }
+
     v.youtubeUrl = youtubeUrl;
     v.youtubeId = youtubeId;
     v.embedUrl = `https://www.youtube.com/embed/${youtubeId}`;
     v.embedCode = `<iframe width="560" height="315" src="${v.embedUrl}" title="CMS Auction Video" frameborder="0" allowfullscreen></iframe>`;
-    logActivity(v, actor, 'youtube', 'YouTube link added');
+    logActivity(v, actor, 'youtube', isReplacement
+      ? `YouTube video replaced — previous version retained in history${reason ? ` (${reason})` : ''}`
+      : 'YouTube link added');
+    touch(v, actor);
+    emitter.emit({ type: 'videos-changed' });
+    return { ...v };
+  },
+
+  async setVideoFormat(id, format, actor = 'Staff') {
+    const v = videos.find(v => v.id === id);
+    if (!v) throw new Error('Video not found');
+    const meta = ReferenceDataRepository.videoFormatMeta(format);
+    v.videoFormat = format;
+    // Sensible default when format changes — still independently editable after.
+    v.overlayMode = format === 'legacy-tagged' ? 'baked-in' : 'dynamic';
+    logActivity(v, actor, 'format', format === 'needs-redo'
+      ? 'Marked Needs Redo'
+      : `Video Format changed to ${meta ? meta.label : format}`);
+    touch(v, actor);
+    emitter.emit({ type: 'videos-changed' });
+    return { ...v };
+  },
+
+  /** Convenience wrapper — does not delete or touch clips/YouTube/usage/history, only the format. */
+  async markNeedsRedo(id, actor = 'Staff') {
+    return VideoRepository.setVideoFormat(id, 'needs-redo', actor);
+  },
+
+  async setBakedInTags(id, tags, actor = 'Staff') {
+    const v = videos.find(v => v.id === id);
+    if (!v) throw new Error('Video not found');
+    v.bakedInTags = [...tags];
+    logActivity(v, actor, 'format', `Baked-in tags set: ${tags.length ? tags.join(', ') : '(none)'}`);
+    touch(v, actor);
+    emitter.emit({ type: 'videos-changed' });
+    return { ...v };
+  },
+
+  async setOverlayMode(id, mode, actor = 'Staff') {
+    const v = videos.find(v => v.id === id);
+    if (!v) throw new Error('Video not found');
+    v.overlayMode = mode;
     touch(v, actor);
     emitter.emit({ type: 'videos-changed' });
     return { ...v };

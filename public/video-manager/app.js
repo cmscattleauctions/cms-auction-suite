@@ -10,7 +10,7 @@ import { VideoRepository, ReferenceDataRepository, UsageRepository, Notification
 import { renderTable } from './ui-table.js';
 import { renderGrid } from './ui-grid.js';
 import { openDrawer, closeDrawer } from './ui-drawer.js';
-import { openUploadModal, openCsvImportModal, openNotificationsModal } from './ui-modals.js';
+import { openUploadModal, openCsvImportModal, openNotificationsModal, openManageConsignorsModal } from './ui-modals.js';
 
 const state = {
   statusTab: 'ready',
@@ -44,7 +44,10 @@ async function boot() {
   renderTabsShell();
   renderFiltersPanel();
   wireToolbar();
-  VideoRepository.subscribe(() => refresh());
+  VideoRepository.subscribe(evt => {
+    if (evt && evt.type === 'reference-changed') refreshConsignorFilterOptions();
+    refresh();
+  });
   await refresh();
 }
 
@@ -172,6 +175,7 @@ function wireToolbar() {
     }
   });
 
+  document.getElementById('vm-btn-consignors').addEventListener('click', () => openManageConsignorsModal(ctx));
   document.getElementById('vm-btn-upload').addEventListener('click', () => openUploadModal(ctx));
   document.getElementById('vm-btn-import-csv').addEventListener('click', () => openCsvImportModal(ctx));
   document.getElementById('vm-btn-notifications').addEventListener('click', () => openNotificationsModal(ctx));
@@ -250,6 +254,12 @@ function renderFiltersPanel() {
       <span class="switch-label">Has auction usage</span>
       <select id="f-usage" style="width:auto"><option value="">Any</option><option value="yes">Used</option><option value="no">Never used</option></select>
     </div>
+    <div class="vm-filters-panel-row">
+      <label>Video Format</label>
+      <select id="f-format"><option value="">All</option>
+        ${ReferenceDataRepository.getVideoFormats().map(f => `<option value="${f.code}">${f.label}</option>`).join('')}
+      </select>
+    </div>
     <div class="vm-filters-panel-footer">
       <button class="btn btn-ghost btn-block" id="f-clear" type="button">Clear all</button>
       <button class="btn btn-primary btn-block" id="f-apply" type="button">Apply</button>
@@ -278,12 +288,23 @@ function renderFiltersPanel() {
     const yt = panel.querySelector('#f-has-youtube').value; if (yt) filters.hasYoutube = yt === 'yes';
     const review = panel.querySelector('#f-needs-review').checked; if (review) filters.needsReview = true;
     const usage = panel.querySelector('#f-usage').value; if (usage) filters.hasUsage = usage === 'yes';
+    const format = panel.querySelector('#f-format').value; if (format) filters.videoFormat = format;
 
     state.filters = filters;
     updateFilterBadge();
     panel.hidden = true;
     refresh();
   });
+}
+
+function refreshConsignorFilterOptions() {
+  const sel = document.getElementById('f-consignor');
+  if (!sel) return;
+  const current = sel.value;
+  const consignors = ReferenceDataRepository.getConsignors();
+  sel.innerHTML = `<option value="">All consignors</option>` +
+    consignors.map(c => `<option value="${c.code}">${c.name}</option>`).join('');
+  sel.value = current;
 }
 
 function updateFilterBadge() {
@@ -306,6 +327,7 @@ const FILTER_LABELS = {
   hasYoutube: v => v ? 'Has YouTube' : 'No YouTube',
   needsReview: () => 'Needs review',
   hasUsage: v => v ? 'Used in auctions' : 'Never used',
+  videoFormat: code => `Format: ${ReferenceDataRepository.videoFormatMeta(code)?.label || code}`,
 };
 
 function renderActiveFilterChips() {
