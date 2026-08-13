@@ -10,7 +10,7 @@ import { VideoRepository, ReferenceDataRepository, UsageRepository, Notification
 import { renderTable } from './ui-table.js';
 import { renderGrid } from './ui-grid.js';
 import { openDrawer, closeDrawer } from './ui-drawer.js';
-import { openUploadModal, openCsvImportModal, openNotificationsModal } from './ui-modals.js';
+import { openUploadModal, openCsvImportModal, openNotificationsModal, openManageConsignorsModal } from './ui-modals.js';
 
 const state = {
   statusTab: 'ready',
@@ -44,7 +44,10 @@ async function boot() {
   renderTabsShell();
   renderFiltersPanel();
   wireToolbar();
-  VideoRepository.subscribe(() => refresh());
+  VideoRepository.subscribe(evt => {
+    if (evt && evt.type === 'reference-changed') refreshConsignorFilterOptions();
+    refresh();
+  });
   await refresh();
 }
 
@@ -172,6 +175,7 @@ function wireToolbar() {
     }
   });
 
+  document.getElementById('vm-btn-consignors').addEventListener('click', () => openManageConsignorsModal(ctx));
   document.getElementById('vm-btn-upload').addEventListener('click', () => openUploadModal(ctx));
   document.getElementById('vm-btn-import-csv').addEventListener('click', () => openCsvImportModal(ctx));
   document.getElementById('vm-btn-notifications').addEventListener('click', () => openNotificationsModal(ctx));
@@ -291,6 +295,16 @@ function renderFiltersPanel() {
     panel.hidden = true;
     refresh();
   });
+}
+
+function refreshConsignorFilterOptions() {
+  const sel = document.getElementById('f-consignor');
+  if (!sel) return;
+  const current = sel.value;
+  const consignors = ReferenceDataRepository.getConsignors();
+  sel.innerHTML = `<option value="">All consignors</option>` +
+    consignors.map(c => `<option value="${c.code}">${c.name}</option>`).join('');
+  sel.value = current;
 }
 
 function updateFilterBadge() {

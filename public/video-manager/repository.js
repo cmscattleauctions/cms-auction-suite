@@ -81,6 +81,24 @@ export const ReferenceDataRepository = {
     return rec;
   },
 
+  renameConsignor(code, name) {
+    const rec = CONSIGNORS.find(c => c.code === String(code));
+    if (!rec) throw new Error('Consignor not found');
+    rec.name = name;
+    videos.forEach(v => { if (v.consignorCode === String(code)) v.consignorName = name; });
+    emitter.emit({ type: 'reference-changed' });
+    emitter.emit({ type: 'videos-changed' });
+    return rec;
+  },
+
+  clearConsignorFlag(code) {
+    const rec = CONSIGNORS.find(c => c.code === String(code));
+    if (!rec) throw new Error('Consignor not found');
+    rec.flaggedNew = false;
+    emitter.emit({ type: 'reference-changed' });
+    return rec;
+  },
+
   addSireType(code, label) {
     if (SIRE_TYPES.some(s => s.code === String(code))) throw new Error('Sire code already exists');
     const rec = { code: String(code), label };

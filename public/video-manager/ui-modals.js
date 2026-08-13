@@ -144,6 +144,70 @@ export function openNewConsignorModal(ctx) {
 }
 
 /* =============================================================
+ * Manage Consignors — list + inline rename + add new
+ * ============================================================= */
+export function openManageConsignorsModal(ctx) {
+  const { modal } = mountModal(`
+    <div class="vm-modal-header"><h2>Consignors</h2><button class="vm-modal-close" data-modal-close>&times;</button></div>
+    <div class="vm-modal-body">
+      <p class="muted" style="margin-bottom:12px;">Rename a consignor to fix a typo or update how their name appears — this updates every video already on file for them.</p>
+      <div id="mc-list"></div>
+    </div>
+    <div class="vm-modal-footer">
+      <button class="btn btn-ghost" id="mc-add" type="button">+ New Consignor</button>
+      <button class="btn btn-primary" data-modal-close>Done</button>
+    </div>
+  `, { wide: true });
+
+  const list = modal.querySelector('#mc-list');
+
+  function paint() {
+    const consignors = ctx.ref.getConsignors();
+    list.innerHTML = consignors.map(c => `
+      <div class="vm-notify-row" data-code="${escapeHtml(c.code)}">
+        <div style="flex:1;display:flex;align-items:center;gap:8px;">
+          <input type="text" class="mc-name-input" value="${escapeHtml(c.name)}" style="width:100%;max-width:280px;" />
+          <span class="field-hint">#${escapeHtml(c.code)}</span>
+          ${c.flaggedNew ? '<span class="status-pill status-hold">NEW — needs review</span>' : ''}
+        </div>
+        <div style="display:flex;gap:6px;">
+          ${c.flaggedNew ? `<button class="btn btn-sm btn-ghost" data-review="${escapeHtml(c.code)}" type="button">Mark reviewed</button>` : ''}
+          <button class="btn btn-sm" data-save="${escapeHtml(c.code)}" type="button">Save</button>
+        </div>
+      </div>
+    `).join('') || '<p class="muted">No consignors yet.</p>';
+
+    list.querySelectorAll('[data-save]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const code = btn.dataset.save;
+        const input = list.querySelector(`.vm-notify-row[data-code="${CSS.escape(code)}"] .mc-name-input`);
+        const name = input.value.trim();
+        if (!name) { showToast('Name cannot be empty'); return; }
+        try {
+          ctx.ref.renameConsignor(code, name);
+          showToast(`Updated ${name}`);
+          ctx.refresh();
+        } catch (err) {
+          showToast(err.message);
+        }
+      });
+    });
+    list.querySelectorAll('[data-review]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        ctx.ref.clearConsignorFlag(btn.dataset.review);
+        paint();
+      });
+    });
+  }
+  paint();
+
+  modal.querySelector('#mc-add').addEventListener('click', async () => {
+    const rec = await openNewConsignorModal(ctx);
+    if (rec) paint();
+  });
+}
+
+/* =============================================================
  * Full Upload Screen
  * ============================================================= */
 export function openUploadModal(ctx) {
