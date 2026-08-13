@@ -6,7 +6,7 @@
 
 import { escapeHtml, formatDate, formatBytes } from './format.js';
 import { showToast } from './toast.js';
-import { resolveVideoIdEntry, CODE_KIND_LABELS } from './id-workflow.js';
+import { resolveVideoIdEntry, CODE_KIND_LABELS, CODE_KIND_SHORT_LABELS } from './id-workflow.js';
 import { buildBaseId, formatMonthYear } from './video-id.js';
 
 /* ----- generic modal shell ----- */
@@ -71,9 +71,10 @@ export function openCollisionModal(existing, baseId, ctx) {
 export function openQuickAddCodeModal(kind, code, ctx) {
   return new Promise(resolve => {
     const label = CODE_KIND_LABELS[kind] || kind;
+    const shortLabel = CODE_KIND_SHORT_LABELS[kind] || kind;
     const needsName = kind === 'consignor';
     const { modal, close } = mountModal(`
-      <div class="vm-modal-header"><h2>${label} code ${escapeHtml(code)} is not recognized</h2><button class="vm-modal-close" data-modal-close>&times;</button></div>
+      <div class="vm-modal-header"><h2>${shortLabel} code ${escapeHtml(code)} is not recognized</h2><button class="vm-modal-close" data-modal-close>&times;</button></div>
       <div class="vm-modal-body">
         <p class="muted" style="margin-bottom:14px;">Add it now without leaving what you were doing.</p>
         ${needsName ? `
@@ -144,67 +145,238 @@ export function openNewConsignorModal(ctx) {
 }
 
 /* =============================================================
- * Manage Consignors — list + inline rename + add new
+ * Video ID Manager — staff-only reference system
+ * -------------------------------------------------------------
+ * Manages the code dictionaries (Consignors, Sex, Sire Types, Dam
+ * Types) that build and parse Video IDs, plus a plain-language
+ * explainer. This is the reference system, NOT the video records
+ * themselves — see repository.js's VideoRepository for that.
+ *
+ * Code safety: existing numeric codes are permanent. This UI only
+ * ever lets staff add a new code, correct a display-name spelling,
+ * or mark a value inactive — never reassign or delete a code that's
+ * already been used, since that would make historical Video IDs
+ * ambiguous. Reps never see this tool (rep portal has its own
+ * separate, code-free UI — see /video-upload).
  * ============================================================= */
-export function openManageConsignorsModal(ctx) {
+const ID_MANAGER_TABS = [
+  ['consignors', 'Consignors'], ['sex', 'Sex'], ['sire', 'Sire Types'], ['dam', 'Dam Types'], ['how', 'How IDs Work'],
+];
+
+export function openVideoIdManagerModal(ctx) {
+  let tab = 'consignors';
   const { modal } = mountModal(`
-    <div class="vm-modal-header"><h2>Consignors</h2><button class="vm-modal-close" data-modal-close>&times;</button></div>
-    <div class="vm-modal-body">
-      <p class="muted" style="margin-bottom:12px;">Rename a consignor to fix a typo or update how their name appears — this updates every video already on file for them.</p>
-      <div id="mc-list"></div>
+    <div class="vm-modal-header"><h2>Video ID Manager</h2><button class="vm-modal-close" data-modal-close>&times;</button></div>
+    <div class="vm-idmgr-tabs" id="idmgr-tabs">
+      ${ID_MANAGER_TABS.map(([id, label]) => `<button type="button" class="vm-idmgr-tab ${id === tab ? 'active' : ''}" data-idmgr-tab="${id}">${label}</button>`).join('')}
     </div>
-    <div class="vm-modal-footer">
-      <button class="btn btn-ghost" id="mc-add" type="button">+ New Consignor</button>
-      <button class="btn btn-primary" data-modal-close>Done</button>
-    </div>
+    <div class="vm-modal-body" id="idmgr-body"></div>
+    <div class="vm-modal-footer"><button class="btn btn-primary" data-modal-close>Done</button></div>
   `, { wide: true });
 
-  const list = modal.querySelector('#mc-list');
+  modal.querySelector('#idmgr-tabs').addEventListener('click', e => {
+    const btn = e.target.closest('[data-idmgr-tab]');
+    if (!btn) return;
+    tab = btn.dataset.idmgrTab;
+    modal.querySelectorAll('[data-idmgr-tab]').forEach(b => b.classList.toggle('active', b.dataset.idmgrTab === tab));
+    paintTab();
+  });
+
+  function paintTab() {
+    const body = modal.querySelector('#idmgr-body');
+    if (tab === 'consignors') renderConsignorsTab(body, ctx);
+    else if (tab === 'sex') renderSexTab(body, ctx);
+    else if (tab === 'sire') renderCodeTab(body, ctx, {
+      title: 'Sire Type', get: () => ctx.ref.getSireTypes(),
+      add: (code, label) => ctx.ref.addSireType(code, label),
+      rename: (code, label) => ctx.ref.renameSireType(code, label),
+      setActive: (code, active) => ctx.ref.setSireActive(code, active),
+    });
+    else if (tab === 'dam') renderCodeTab(body, ctx, {
+      title: 'Dam Type', get: () => ctx.ref.getDamTypes(),
+      add: (code, label) => ctx.ref.addDamType(code, label),
+      rename: (code, label) => ctx.ref.renameDamType(code, label),
+      setActive: (code, active) => ctx.ref.setDamActive(code, active),
+    });
+    else if (tab === 'how') renderHowIdsWorkTab(body, ctx);
+  }
+  paintTab();
+}
+
+function renderConsignorsTab(container, ctx) {
+  let query = '';
+  let sortBy = 'name';
+  container.innerHTML = `
+    <p class="muted" style="margin-bottom:12px;">The code behind the Consignor segment of every Video ID. Renaming updates every video already on file for that consignor — codes themselves can't be reassigned once in use.</p>
+    <div style="display:flex;gap:10px;margin-bottom:12px;">
+      <input type="text" id="idmgr-c-search" placeholder="Search consignors…" style="flex:1;" />
+      <select id="idmgr-c-sort" style="width:auto;">
+        <option value="name">Sort: Name</option>
+        <option value="code">Sort: Code</option>
+      </select>
+    </div>
+    <div id="idmgr-c-list"></div>
+    <button class="btn btn-ghost" id="idmgr-c-add" type="button" style="margin-top:12px;">+ Add Consignor</button>
+  `;
+  const list = container.querySelector('#idmgr-c-list');
 
   function paint() {
-    const consignors = ctx.ref.getConsignors();
-    list.innerHTML = consignors.map(c => `
+    let rows = ctx.ref.getConsignors();
+    if (sortBy === 'code') rows = [...rows].sort((a, b) => Number(a.code) - Number(b.code));
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      rows = rows.filter(c => c.name.toLowerCase().includes(q) || c.code.includes(q));
+    }
+    list.innerHTML = rows.map(c => `
       <div class="vm-notify-row" data-code="${escapeHtml(c.code)}">
         <div style="flex:1;display:flex;align-items:center;gap:8px;">
-          <input type="text" class="mc-name-input" value="${escapeHtml(c.name)}" style="width:100%;max-width:280px;" />
-          <span class="field-hint">#${escapeHtml(c.code)}</span>
-          ${c.flaggedNew ? '<span class="status-pill status-hold">NEW — needs review</span>' : ''}
+          <span class="vm-idmgr-code">${escapeHtml(c.code)}</span>
+          <input type="text" class="idmgr-name-input" value="${escapeHtml(c.name)}" style="flex:1;max-width:260px;" />
+          ${c.flaggedNew ? '<span class="status-pill status-hold">NEEDS REVIEW</span>' : ''}
+          ${c.active === false ? '<span class="status-pill" style="background:var(--bg-muted);color:var(--text-muted);">INACTIVE</span>' : ''}
         </div>
         <div style="display:flex;gap:6px;">
           ${c.flaggedNew ? `<button class="btn btn-sm btn-ghost" data-review="${escapeHtml(c.code)}" type="button">Mark reviewed</button>` : ''}
+          <button class="btn btn-sm btn-ghost" data-toggle-active="${escapeHtml(c.code)}" type="button">${c.active === false ? 'Activate' : 'Deactivate'}</button>
           <button class="btn btn-sm" data-save="${escapeHtml(c.code)}" type="button">Save</button>
         </div>
       </div>
-    `).join('') || '<p class="muted">No consignors yet.</p>';
+    `).join('') || '<p class="muted">No consignors match.</p>';
 
-    list.querySelectorAll('[data-save]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const code = btn.dataset.save;
-        const input = list.querySelector(`.vm-notify-row[data-code="${CSS.escape(code)}"] .mc-name-input`);
-        const name = input.value.trim();
-        if (!name) { showToast('Name cannot be empty'); return; }
-        try {
-          ctx.ref.renameConsignor(code, name);
-          showToast(`Updated ${name}`);
-          ctx.refresh();
-        } catch (err) {
-          showToast(err.message);
-        }
-      });
-    });
-    list.querySelectorAll('[data-review]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        ctx.ref.clearConsignorFlag(btn.dataset.review);
-        paint();
-      });
-    });
+    list.querySelectorAll('[data-save]').forEach(btn => btn.addEventListener('click', () => {
+      const code = btn.dataset.save;
+      const input = list.querySelector(`.vm-notify-row[data-code="${CSS.escape(code)}"] .idmgr-name-input`);
+      const name = input.value.trim();
+      if (!name) { showToast('Name cannot be empty'); return; }
+      try { ctx.ref.renameConsignor(code, name); showToast(`Updated ${name}`); ctx.refresh(); } catch (err) { showToast(err.message); }
+    }));
+    list.querySelectorAll('[data-review]').forEach(btn => btn.addEventListener('click', () => {
+      ctx.ref.clearConsignorFlag(btn.dataset.review); paint();
+    }));
+    list.querySelectorAll('[data-toggle-active]').forEach(btn => btn.addEventListener('click', () => {
+      const code = btn.dataset.toggleActive;
+      const rec = ctx.ref.getConsignors().find(c => c.code === code);
+      ctx.ref.setConsignorActive(code, rec.active === false);
+      ctx.refresh();
+      paint();
+    }));
   }
   paint();
 
-  modal.querySelector('#mc-add').addEventListener('click', async () => {
+  container.querySelector('#idmgr-c-search').addEventListener('input', e => { query = e.target.value; paint(); });
+  container.querySelector('#idmgr-c-sort').addEventListener('change', e => { sortBy = e.target.value; paint(); });
+  container.querySelector('#idmgr-c-add').addEventListener('click', async () => {
     const rec = await openNewConsignorModal(ctx);
-    if (rec) paint();
+    if (rec) { ctx.refresh(); paint(); }
   });
+}
+
+function renderSexTab(container, ctx) {
+  const rows = ctx.ref.getSexTypes();
+  container.innerHTML = `
+    <p class="muted" style="margin-bottom:12px;">Fixed reference values used to build the Sex segment of a Video ID.</p>
+    <table class="vm-idmgr-table">
+      <thead><tr><th>Code</th><th>Name</th><th>Active</th></tr></thead>
+      <tbody>
+        ${rows.map(s => `<tr><td class="vm-idmgr-code">${escapeHtml(s.code)}</td><td>${escapeHtml(s.label)}</td><td>${s.active === false ? 'Inactive' : 'Active'}</td></tr>`).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderCodeTab(container, ctx, cfg) {
+  container.innerHTML = `
+    <p class="muted" style="margin-bottom:12px;">Existing codes are permanent once assigned — correct a spelling or mark a value inactive rather than reassigning its meaning.</p>
+    <div id="idmgr-code-list"></div>
+    <div class="field-row" style="margin-top:14px;align-items:flex-end;">
+      <div><label>New Code</label><input type="text" id="idmgr-code-new-code" placeholder="e.g. 11" /></div>
+      <div><label>Name</label><input type="text" id="idmgr-code-new-name" placeholder="e.g. Red Angus" /></div>
+    </div>
+    <button class="btn btn-ghost" id="idmgr-code-add" type="button" style="margin-top:8px;">+ Add ${cfg.title}</button>
+  `;
+  const list = container.querySelector('#idmgr-code-list');
+
+  function paint() {
+    const rows = [...cfg.get()].sort((a, b) => Number(a.code) - Number(b.code));
+    list.innerHTML = `
+      <table class="vm-idmgr-table">
+        <thead><tr><th>Code</th><th>Name</th><th>Active</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr data-code="${escapeHtml(r.code)}">
+              <td class="vm-idmgr-code">${escapeHtml(r.code)}</td>
+              <td><input type="text" class="idmgr-code-name-input" value="${escapeHtml(r.label)}" /></td>
+              <td>${r.active === false ? 'Inactive' : 'Active'}</td>
+              <td>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn btn-sm" data-save="${escapeHtml(r.code)}" type="button">Save</button>
+                  <button class="btn btn-sm btn-ghost" data-toggle="${escapeHtml(r.code)}" type="button">${r.active === false ? 'Activate' : 'Deactivate'}</button>
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+    list.querySelectorAll('[data-save]').forEach(btn => btn.addEventListener('click', () => {
+      const code = btn.dataset.save;
+      const input = list.querySelector(`tr[data-code="${CSS.escape(code)}"] .idmgr-code-name-input`);
+      const label = input.value.trim();
+      if (!label) { showToast('Name cannot be empty'); return; }
+      try { cfg.rename(code, label); showToast(`Updated code ${code}`); ctx.refresh(); } catch (err) { showToast(err.message); }
+    }));
+    list.querySelectorAll('[data-toggle]').forEach(btn => btn.addEventListener('click', () => {
+      const code = btn.dataset.toggle;
+      const rec = cfg.get().find(r => r.code === code);
+      cfg.setActive(code, rec.active === false);
+      ctx.refresh();
+      paint();
+    }));
+  }
+  paint();
+
+  container.querySelector('#idmgr-code-add').addEventListener('click', () => {
+    const codeInput = container.querySelector('#idmgr-code-new-code');
+    const nameInput = container.querySelector('#idmgr-code-new-name');
+    const code = codeInput.value.trim();
+    const name = nameInput.value.trim();
+    if (!code || !name) { showToast('Enter both a code and a name'); return; }
+    try {
+      cfg.add(code, name);
+      showToast(`Added ${cfg.title.toLowerCase()} ${code}`);
+      codeInput.value = ''; nameInput.value = '';
+      paint();
+    } catch (err) { showToast(err.message); }
+  });
+}
+
+function renderHowIdsWorkTab(container, ctx) {
+  const example = { consignorCode: '21', sexCode: '2', sireCode: '2', damCode: '2', weight: '450', monthYear: '0826' };
+  const id = buildBaseId(example);
+  const consignorLabel = ctx.ref.findConsignor(example.consignorCode)?.name || 'TL Harvesting, Inc.';
+  const sexLabel = ctx.ref.sexLabel(example.sexCode) || 'Heifers';
+  const sireLabel = ctx.ref.sireLabel(example.sireCode) || 'Angus';
+  const damLabel = ctx.ref.damLabel(example.damCode) || 'Jersey';
+  container.innerHTML = `
+    <div class="vm-drawer-section-title">Video ID Format</div>
+    <p style="font-family:var(--font-mono);font-size:15px;font-weight:700;margin:6px 0 16px;">Consignor.Sex.Sire.Dam.Weight.MMYY</p>
+    <p class="muted" style="margin-bottom:6px;">Example:</p>
+    <p style="font-family:var(--font-mono);font-size:20px;font-weight:700;margin-bottom:16px;color:var(--accent);">${escapeHtml(id)}</p>
+    <table class="vm-idmgr-table" style="margin-bottom:20px;">
+      <tbody>
+        <tr><td class="vm-idmgr-code">${example.consignorCode}</td><td>→</td><td>${escapeHtml(consignorLabel)}</td></tr>
+        <tr><td class="vm-idmgr-code">${example.sexCode}</td><td>→</td><td>${escapeHtml(sexLabel)}</td></tr>
+        <tr><td class="vm-idmgr-code">${example.sireCode}</td><td>→</td><td>${escapeHtml(sireLabel)} (Sire)</td></tr>
+        <tr><td class="vm-idmgr-code">${example.damCode}</td><td>→</td><td>${escapeHtml(damLabel)} (Dam)</td></tr>
+        <tr><td class="vm-idmgr-code">${example.weight}</td><td>→</td><td>${example.weight} lbs</td></tr>
+        <tr><td class="vm-idmgr-code">${example.monthYear}</td><td>→</td><td>${escapeHtml(formatMonthYear(example.monthYear))}</td></tr>
+      </tbody>
+    </table>
+    <div class="vm-drawer-section-title">Suffixes for duplicate classifications</div>
+    <p class="muted" style="margin-top:8px;">If <strong style="font-family:var(--font-mono);color:var(--text-primary)">${escapeHtml(id)}</strong> already exists, a genuinely separate video with the exact same classification becomes:</p>
+    <p style="font-family:var(--font-mono);font-weight:700;margin:10px 0;">${escapeHtml(id)}-2</p>
+    <p class="muted">then <strong style="font-family:var(--font-mono);color:var(--text-primary)">-3</strong>, <strong style="font-family:var(--font-mono);color:var(--text-primary)">-4</strong>, and so on. The suffix is assigned automatically — staff never type it by hand.</p>
+  `;
 }
 
 /* =============================================================

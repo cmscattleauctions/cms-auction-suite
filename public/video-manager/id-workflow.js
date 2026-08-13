@@ -55,3 +55,9 @@ export async function resolveVideoIdEntry(rawId, ctx) {
 export const CODE_KIND_LABELS = {
   consignor: 'Consignor', sex: 'Sex', sire: 'Sire Type', dam: 'Dam Type',
 };
+
+// Shorter form used in "X code 11 is not recognized" messages, where
+// "Sire Type code 11" reads clunkier than "Sire code 11".
+export const CODE_KIND_SHORT_LABELS = {
+  consignor: 'Consignor', sex: 'Sex', sire: 'Sire', dam: 'Dam',
+};
