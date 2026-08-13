@@ -171,19 +171,19 @@ input, select, textarea { font-family: inherit; }
 /* =============================================================
  * TABLE VIEW
  * ============================================================= */
-.vm-table-wrap { border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-surface); box-shadow: var(--shadow-xs); }
+.vm-table-wrap { border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); overflow-x: auto; background: var(--bg-surface); box-shadow: var(--shadow-xs); }
 table.vm-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .vm-table thead th {
   position: sticky; top: 0; z-index: 5; text-align: left; padding: 11px 10px; background: var(--sidebar-bg);
   border-bottom: 1px solid var(--sidebar-bg); font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em;
   text-transform: uppercase; color: #fff; white-space: nowrap;
 }
-.vm-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
+/* Every data row is the same height and background — Draft/Needs Review
+ * are communicated only via the badges in the Video ID cell, never by
+ * tinting the whole row, so the table doesn't look patchy. */
+.vm-table tbody tr { border-bottom: 1px solid var(--border-subtle); height: 46px; }
 .vm-table tbody tr:hover { background: var(--bg-surface-hover); }
-.vm-table tbody tr.is-draft { background: var(--warning-bg); }
-.vm-table tbody tr.is-review td:first-child { box-shadow: inset 3px 0 0 var(--warning); }
 .vm-table td { padding: 8px 10px; vertical-align: middle; white-space: nowrap; }
-.vm-table td.wrap { white-space: normal; }
 
 .vm-cell {
   display: block; min-height: 26px; padding: 4px 6px; border-radius: 5px; border: 1px solid transparent;
@@ -200,6 +200,7 @@ td:focus, .vm-cell:focus { outline: none; }
 .vm-videoid-input { min-width: 190px; font-family: inherit; }
 
 .vm-notes-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; color: var(--text-secondary); }
+.vm-notes-cell .vm-cell { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
 .status-pill.status-ready { color: var(--warning); background: var(--warning-bg); }

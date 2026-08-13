@@ -256,6 +256,7 @@ function buildRecord(overrides = {}) {
     dateAdded,
     lastUpdated: overrides.lastUpdated || dateAdded,
     notes: overrides.notes || '',
+    canvaLink: overrides.canvaLink || null,
     clips,
     listingImageUrl: overrides.listingImageUrl || null,
     // "Current" YouTube video. previousYouTubeVideos holds superseded

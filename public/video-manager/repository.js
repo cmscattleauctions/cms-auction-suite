@@ -298,7 +298,7 @@ function matchesFilters(v, filters = {}) {
   if (filters.sexCode && v.sexCode !== filters.sexCode) return false;
   if (filters.sireCode && v.sireCode !== filters.sireCode) return false;
   if (filters.damCode && v.damCode !== filters.damCode) return false;
-  if (filters.videoMaker && v.videoMaker !== filters.videoMaker) return false;
+  if (filters.videoMaker && (v.status !== 'created' || v.videoMaker !== filters.videoMaker)) return false;
   if (filters.weightMin != null && v.weight < filters.weightMin) return false;
   if (filters.weightMax != null && v.weight > filters.weightMax) return false;
   if (filters.dateFrom && v.dateAdded < filters.dateFrom) return false;
@@ -394,7 +394,7 @@ export const VideoRepository = {
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
 
-    const fieldLabels = { consignorName: 'Consignor', weight: 'Weight', notes: 'Notes', videoMaker: 'Video Maker' };
+    const fieldLabels = { consignorName: 'Consignor', weight: 'Weight', notes: 'Notes', videoMaker: 'Video Maker', canvaLink: 'Canva Link' };
     Object.entries(patch).forEach(([key, val]) => {
       if (val === undefined || v[key] === val) return;
       if (fieldLabels[key]) logActivity(v, actor, 'field', `${fieldLabels[key]} changed: ${v[key]} → ${val}`);

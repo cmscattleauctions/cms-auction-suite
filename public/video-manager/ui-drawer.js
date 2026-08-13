@@ -117,13 +117,24 @@ function detailsHtml(rec, ctx) {
 
     <div class="vm-drawer-section">
       <div class="vm-drawer-section-title">Details</div>
-      <div class="field"><label>Video Maker</label><input type="text" id="d-videomaker" value="${escapeHtml(rec.videoMaker)}" /></div>
+      ${rec.status === 'created' ? `
+        <div class="field"><label>Video Maker</label><input type="text" id="d-videomaker" value="${escapeHtml(rec.videoMaker)}" /></div>
+      ` : `
+        <div class="field"><label>Video Maker</label><input type="text" value="—" disabled /><p class="field-hint">Assigned once this video is moved to Created.</p></div>
+      `}
       <div class="field-row">
         <div><label>Created By</label><input type="text" value="${escapeHtml(rec.createdBy)}" disabled /></div>
         <div><label>Date Added</label><input type="text" value="${formatDate(rec.dateAdded)}" disabled /></div>
       </div>
       <div class="field"><label>Last Updated</label><input type="text" value="${formatDateTime(rec.lastUpdated)}" disabled /></div>
       <div class="field"><label>Notes</label><textarea id="d-notes" rows="3">${escapeHtml(rec.notes)}</textarea></div>
+      <div class="field">
+        <label>Canva Link</label>
+        <div class="vm-link-row">
+          <input type="text" id="d-canvalink" placeholder="Paste Canva design link…" value="${escapeHtml(rec.canvaLink || '')}" />
+          <button class="btn btn-sm" id="d-canva-copy" ${rec.canvaLink ? '' : 'disabled'}>Copy</button>
+        </div>
+      </div>
     </div>
 
     <div class="vm-drawer-section">
@@ -230,8 +241,20 @@ function wireDetails(body, rec, ctx) {
     paint(ctx);
   });
 
-  body.querySelector('#d-videomaker').addEventListener('blur', e => ctx.repo.updateVideo(rec.id, { videoMaker: e.target.value.trim() }, 'Staff'));
+  const videoMakerInput = body.querySelector('#d-videomaker');
+  if (videoMakerInput) videoMakerInput.addEventListener('blur', e => ctx.repo.updateVideo(rec.id, { videoMaker: e.target.value.trim() }, 'Staff'));
   body.querySelector('#d-notes').addEventListener('blur', e => ctx.repo.updateVideo(rec.id, { notes: e.target.value.trim() }, 'Staff'));
+  body.querySelector('#d-canvalink').addEventListener('blur', e => {
+    const val = e.target.value.trim();
+    ctx.repo.updateVideo(rec.id, { canvaLink: val || null }, 'Staff');
+    const copyBtn = body.querySelector('#d-canva-copy');
+    copyBtn.disabled = !val;
+  });
+  const canvaCopyBtn = body.querySelector('#d-canva-copy');
+  if (canvaCopyBtn) canvaCopyBtn.addEventListener('click', async () => {
+    await copyToClipboard(body.querySelector('#d-canvalink').value.trim());
+    showToast('Copied');
+  });
 
   body.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
     const map = { url: rec.youtubeUrl, embed: rec.embedUrl, code: rec.embedCode };

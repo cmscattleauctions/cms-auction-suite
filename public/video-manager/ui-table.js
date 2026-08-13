@@ -47,7 +47,7 @@ function rowHtml(r, ctx) {
   const damLabel = ctx.ref.damLabel(r.damCode) || `Code ${r.damCode}`;
 
   return `
-    <tr data-id="${r.id}" class="${r.isDraft ? 'is-draft' : ''} ${r.needsReview ? 'is-review' : ''}">
+    <tr data-id="${r.id}">
       <td>
         <span class="vm-videoid-cell">${escapeHtml(r.baseVideoId)}${r.suffix ? `<span class="suffix">-${r.suffix}</span>` : ''}</span>
         ${r.isDraft ? '<div class="status-pill status-draft" style="margin-top:4px;">Draft</div>' : ''}
@@ -60,9 +60,9 @@ function rowHtml(r, ctx) {
       <td>${editableCell(r, 'weight', `${r.weight} lbs`)}</td>
       <td>${escapeHtml(formatMonthYear(r.monthYear))}</td>
       <td>${clipsCell(r, ctx)}</td>
-      <td>${editableCell(r, 'videoMaker', escapeHtml(r.videoMaker))}</td>
+      <td>${r.status === 'created' ? editableCell(r, 'videoMaker', escapeHtml(r.videoMaker)) : `<span class="is-empty" title="Assigned once this video is moved to Created">—</span>`}</td>
       <td>${formatDate(r.dateAdded)}</td>
-      <td class="wrap">${editableCell(r, 'notes', r.notes ? escapeHtml(r.notes) : '', !r.notes)}</td>
+      <td class="vm-notes-cell" title="${r.notes ? escapeHtml(r.notes) : ''}">${editableCell(r, 'notes', r.notes ? escapeHtml(r.notes) : '', !r.notes)}</td>
       <td>${videoLinkCell(r)}</td>
       <td>${embedLinkCell(r)}</td>
       <td>${videoFormatCell(r, ctx)}</td>
