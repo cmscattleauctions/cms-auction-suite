@@ -30,6 +30,14 @@ button { font-family: inherit; cursor: pointer; }
 input, select, textarea { font-family: inherit; }
 
 :root {
+  /* Module-local accent override: this module uses blue rather than
+   * theme.css's default amber. Scoped to this document only (each
+   * sub-app runs in its own iframe) — shared/theme.css is untouched,
+   * so nothing else in the suite is affected. */
+  --accent:       #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-bg:    rgba(37, 99, 235, 0.10);
+
   /* ----- sex identification (not part of the shared token set) ----- */
   --steer-fg:  var(--info, #1e40af);
   --steer-bg:  var(--info-bg, #dbeafe);
@@ -37,6 +45,16 @@ input, select, textarea { font-family: inherit; }
   --heifer-bg: #fbe3ee;
   --both-fg:   #6425b8;
   --both-bg:   #ece1fb;
+
+  /* ----- video format ----- */
+  --format-clean-fg: var(--success);
+  --format-clean-bg: var(--success-bg);
+  --format-legacy-fg: var(--warning);
+  --format-legacy-bg: var(--warning-bg);
+  --format-redo-fg: var(--danger);
+  --format-redo-bg: var(--danger-bg);
+  --format-unknown-fg: var(--text-muted);
+  --format-unknown-bg: var(--bg-muted);
 }
 
 #app { min-height: 100%; display: flex; flex-direction: column; }
@@ -89,7 +107,12 @@ input, select, textarea { font-family: inherit; }
   font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
   background: var(--bg-muted); color: var(--text-secondary);
 }
-.vm-tab.active .vm-tab-count { background: var(--accent-bg); color: var(--accent); }
+/* Count badges stay tinted by what the tab means, active or not — same
+ * language as the status pills used in the table/drawer. */
+.vm-tab[data-tab="ready"] .vm-tab-count { background: var(--accent-bg); color: var(--accent); }
+.vm-tab[data-tab="hold"] .vm-tab-count { background: var(--format-legacy-bg); color: var(--format-legacy-fg); }
+.vm-tab[data-tab="created"] .vm-tab-count { background: var(--format-clean-bg); color: var(--format-clean-fg); }
+.vm-tab.active { border-bottom-width: 2px; }
 .vm-tab-draft-toggle {
   margin-left: auto; align-self: center;
   display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-secondary);
@@ -183,6 +206,23 @@ td:focus, .vm-cell:focus { outline: none; }
 .status-pill.status-hold { color: var(--heifer-fg); background: var(--heifer-bg); }
 .status-pill.status-created { color: var(--success); background: var(--success-bg); }
 .status-pill.status-draft { color: var(--text-muted); background: var(--bg-muted); border: 1px dashed var(--border-strong); }
+
+/* ----- Video Format badges: Clean=green, Legacy Tagged=muted amber, Needs Redo=red, Unknown=gray ----- */
+.format-pill { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; cursor: default; }
+.format-pill.format-clean { color: var(--format-clean-fg); background: var(--format-clean-bg); }
+.format-pill.format-legacy { color: var(--format-legacy-fg); background: var(--format-legacy-bg); }
+.format-pill.format-redo { color: var(--format-redo-fg); background: var(--format-redo-bg); font-weight: 800; }
+.format-pill.format-unknown { color: var(--format-unknown-fg); background: var(--format-unknown-bg); }
+
+/* ----- baked-in tag chips (drawer) ----- */
+.tag-chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.tag-chip {
+  font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 999px;
+  background: var(--bg-muted); border: 1px solid var(--border-subtle); color: var(--text-secondary);
+}
+.tag-chip:hover { border-color: var(--border-strong); }
+.tag-chip.active { background: var(--format-legacy-bg); border-color: var(--format-legacy-fg); color: var(--format-legacy-fg); }
+.tag-chip.tag-chip-add { color: var(--accent); border-style: dashed; background: transparent; }
 
 .clip-strip { display: inline-flex; align-items: center; gap: 4px; }
 .clip-thumb {

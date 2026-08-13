@@ -36,5 +36,7 @@ export function formatDuration(sec) {
 export function sexShort(label) {
   if (!label) return '—';
   if (label === 'Steers & Heifers') return 'S & H';
+  if (label === 'Steers') return 'STR';
+  if (label === 'Heifers') return 'HFR';
   return label;
 }

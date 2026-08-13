@@ -250,6 +250,12 @@ function renderFiltersPanel() {
       <span class="switch-label">Has auction usage</span>
       <select id="f-usage" style="width:auto"><option value="">Any</option><option value="yes">Used</option><option value="no">Never used</option></select>
     </div>
+    <div class="vm-filters-panel-row">
+      <label>Video Format</label>
+      <select id="f-format"><option value="">All</option>
+        ${ReferenceDataRepository.getVideoFormats().map(f => `<option value="${f.code}">${f.label}</option>`).join('')}
+      </select>
+    </div>
     <div class="vm-filters-panel-footer">
       <button class="btn btn-ghost btn-block" id="f-clear" type="button">Clear all</button>
       <button class="btn btn-primary btn-block" id="f-apply" type="button">Apply</button>
@@ -278,6 +284,7 @@ function renderFiltersPanel() {
     const yt = panel.querySelector('#f-has-youtube').value; if (yt) filters.hasYoutube = yt === 'yes';
     const review = panel.querySelector('#f-needs-review').checked; if (review) filters.needsReview = true;
     const usage = panel.querySelector('#f-usage').value; if (usage) filters.hasUsage = usage === 'yes';
+    const format = panel.querySelector('#f-format').value; if (format) filters.videoFormat = format;
 
     state.filters = filters;
     updateFilterBadge();
@@ -306,6 +313,7 @@ const FILTER_LABELS = {
   hasYoutube: v => v ? 'Has YouTube' : 'No YouTube',
   needsReview: () => 'Needs review',
   hasUsage: v => v ? 'Used in auctions' : 'Never used',
+  videoFormat: code => `Format: ${ReferenceDataRepository.videoFormatMeta(code)?.label || code}`,
 };
 
 function renderActiveFilterChips() {

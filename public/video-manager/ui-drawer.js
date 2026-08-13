@@ -127,12 +127,55 @@ function detailsHtml(rec, ctx) {
     </div>
 
     <div class="vm-drawer-section">
+      <div class="vm-drawer-section-title">Video Format</div>
+      <div class="field-row">
+        <div>
+          <label>Video Format</label>
+          <select id="d-videoformat">
+            ${ctx.ref.getVideoFormats().map(f => `<option value="${f.code}" ${f.code === rec.videoFormat ? 'selected' : ''}>${f.label}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label>Overlay Mode</label>
+          <select id="d-overlaymode">
+            ${ctx.ref.getOverlayModes().map(m => `<option value="${m.code}" ${m.code === rec.overlayMode ? 'selected' : ''}>${m.label}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="field-hint" style="margin-bottom:10px;">${escapeHtml(ctx.ref.videoFormatMeta(rec.videoFormat)?.desc || '')} Overlay Mode is informational for now — it does not control OBS yet.</div>
+
+      <label>Baked-In Tags</label>
+      <div class="tag-chip-row" id="d-tags-row">
+        ${ctx.ref.getProgramTags().map(t => `
+          <button type="button" class="tag-chip ${rec.bakedInTags.includes(t.name) ? 'active' : ''}" data-tag="${escapeHtml(t.name)}">${escapeHtml(t.name)}</button>
+        `).join('')}
+        <button type="button" class="tag-chip tag-chip-add" id="d-add-tag">+ Add Tag</button>
+      </div>
+      <div class="field-hint">${rec.bakedInTags.length ? `Baked in: ${rec.bakedInTags.map(escapeHtml).join(', ')}` : 'Clean videos are safe for dynamic OBS overlays.'}</div>
+
+      ${rec.videoFormat !== 'needs-redo' ? `<button class="btn btn-sm" id="d-mark-redo" style="margin-top:12px;border-color:var(--danger);color:var(--danger);">Mark Needs Redo</button>` : ''}
+    </div>
+
+    <div class="vm-drawer-section">
       <div class="vm-drawer-section-title">YouTube</div>
       ${rec.youtubeUrl ? `
         <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.youtubeUrl)}" disabled /><button class="btn btn-sm" data-copy="url">Copy Video Link</button></div>
         <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.embedUrl)}" disabled /><button class="btn btn-sm" data-copy="embed">Copy Embed Link</button></div>
         <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.embedCode)}" disabled /><button class="btn btn-sm" data-copy="code">Copy Embed Code</button></div>
-        <button class="btn btn-sm btn-ghost" data-open-yt>Open YouTube</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm btn-ghost" data-open-yt>Open YouTube</button>
+          <button class="btn btn-sm" id="d-change-yt" style="border-color:var(--info, #1e40af);color:var(--info, #1e40af);">Change YouTube Video</button>
+        </div>
+        <div id="d-change-yt-panel"></div>
+        ${rec.previousYouTubeVideos.length ? `
+          <div class="vm-drawer-section-title" style="margin-top:16px;">Previous YouTube Versions</div>
+          ${rec.previousYouTubeVideos.map(p => `
+            <div class="vm-history-item">
+              <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.url)}</a><br>
+              Replaced ${formatDate(p.replacedAt)} by ${escapeHtml(p.replacedBy)}${p.reason ? ` — ${escapeHtml(p.reason)}` : ''}
+            </div>
+          `).join('')}
+        ` : ''}
       ` : `
         <div class="vm-link-row"><input type="text" id="d-yt-input" placeholder="Paste YouTube link…" /><button class="btn btn-sm btn-primary" id="d-yt-save">Save</button></div>
       `}
@@ -201,13 +244,83 @@ function wireDetails(body, rec, ctx) {
   const ytSave = body.querySelector('#d-yt-save');
   if (ytSave) ytSave.addEventListener('click', async () => {
     const val = body.querySelector('#d-yt-input').value.trim();
-    const m = val.match(/(?:youtu\.be\/|v=|embed\/)([a-zA-Z0-9_-]{5,})/);
-    const ytId = m ? m[1] : (/^[a-zA-Z0-9_-]{5,}$/.test(val) ? val : null);
+    const ytId = parseYoutubeLink(val);
     if (!ytId) { showToast('Could not read a YouTube link from that'); return; }
     await ctx.repo.setYoutube(rec.id, { youtubeUrl: val.startsWith('http') ? val : `https://youtu.be/${ytId}`, youtubeId: ytId }, 'Staff');
     ctx.refresh();
     paint(ctx);
   });
+
+  const changeYtBtn = body.querySelector('#d-change-yt');
+  if (changeYtBtn) changeYtBtn.addEventListener('click', () => {
+    const panel = body.querySelector('#d-change-yt-panel');
+    panel.innerHTML = `
+      <div class="vm-link-row" style="margin-top:8px;">
+        <input type="text" id="d-change-yt-input" placeholder="New YouTube link…" />
+      </div>
+      <div class="field"><input type="text" id="d-change-yt-reason" placeholder="Reason (optional) — e.g. rebuilt clean" /></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-sm btn-primary" id="d-change-yt-save">Save New Version</button>
+        <button class="btn btn-sm btn-ghost" id="d-change-yt-cancel">Cancel</button>
+      </div>
+    `;
+    panel.querySelector('#d-change-yt-cancel').addEventListener('click', () => panel.innerHTML = '');
+    panel.querySelector('#d-change-yt-save').addEventListener('click', async () => {
+      const val = panel.querySelector('#d-change-yt-input').value.trim();
+      const reason = panel.querySelector('#d-change-yt-reason').value.trim();
+      const ytId = parseYoutubeLink(val);
+      if (!ytId) { showToast('Could not read a YouTube link from that'); return; }
+      await ctx.repo.setYoutube(rec.id, { youtubeUrl: val.startsWith('http') ? val : `https://youtu.be/${ytId}`, youtubeId: ytId }, 'Staff', reason);
+      showToast('New YouTube version saved — previous version kept in history');
+      ctx.refresh();
+      paint(ctx);
+    });
+  });
+
+  body.querySelector('#d-videoformat').addEventListener('change', async e => {
+    await ctx.repo.setVideoFormat(rec.id, e.target.value, 'Staff');
+    ctx.refresh();
+    paint(ctx);
+  });
+  body.querySelector('#d-overlaymode').addEventListener('change', async e => {
+    await ctx.repo.setOverlayMode(rec.id, e.target.value, 'Staff');
+    ctx.refresh();
+  });
+
+  body.querySelectorAll('#d-tags-row [data-tag]').forEach(btn => btn.addEventListener('click', async () => {
+    const tag = btn.dataset.tag;
+    const tags = new Set(rec.bakedInTags);
+    tags.has(tag) ? tags.delete(tag) : tags.add(tag);
+    await ctx.repo.setBakedInTags(rec.id, [...tags], 'Staff');
+    ctx.refresh();
+    paint(ctx);
+  }));
+  const addTagBtn = body.querySelector('#d-add-tag');
+  if (addTagBtn) addTagBtn.addEventListener('click', async () => {
+    const name = prompt('New tag name (e.g. GAP4):');
+    if (!name || !name.trim()) return;
+    try {
+      const tag = ctx.ref.addProgramTag(name.trim());
+      await ctx.repo.setBakedInTags(rec.id, [...rec.bakedInTags, tag.name], 'Staff');
+      ctx.refresh();
+      paint(ctx);
+    } catch (err) {
+      showToast(err.message);
+    }
+  });
+
+  const markRedoBtn = body.querySelector('#d-mark-redo');
+  if (markRedoBtn) markRedoBtn.addEventListener('click', async () => {
+    await ctx.repo.markNeedsRedo(rec.id, 'Staff');
+    showToast('Marked Needs Redo');
+    ctx.refresh();
+    paint(ctx);
+  });
+}
+
+function parseYoutubeLink(val) {
+  const m = val.match(/(?:youtu\.be\/|v=|embed\/)([a-zA-Z0-9_-]{5,})/);
+  return m ? m[1] : (/^[a-zA-Z0-9_-]{5,}$/.test(val) ? val : null);
 }
 
 /* =============================================================
@@ -297,6 +410,7 @@ function usageHtml(rec) {
         <div class="vm-usage-group">
           <div class="vm-usage-date">${formatDate(u.auctionDate)} — ${escapeHtml(u.auctionName)}</div>
           <div class="vm-usage-lots">${u.lots.map(l => `<span class="vm-usage-lot">${escapeHtml(l)}</span>`).join('')}</div>
+          ${u.youtubeVersionId && u.youtubeVersionId !== rec.youtubeId ? `<div class="field-hint" style="margin-top:4px;">Used an earlier YouTube version (${escapeHtml(u.youtubeVersionId)})</div>` : ''}
         </div>
       `).join('')}
     </div>
