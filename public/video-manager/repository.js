@@ -75,7 +75,7 @@ export const ReferenceDataRepository = {
     if (CONSIGNORS.some(c => c.code === String(code))) {
       throw new Error(`Consignor code ${code} is already in use`);
     }
-    const rec = { code: String(code), name, flaggedNew: true };
+    const rec = { code: String(code), name, flaggedNew: true, active: true };
     CONSIGNORS.push(rec);
     emitter.emit({ type: 'reference-changed' });
     return rec;
@@ -91,6 +91,14 @@ export const ReferenceDataRepository = {
     return rec;
   },
 
+  setConsignorActive(code, active) {
+    const rec = CONSIGNORS.find(c => c.code === String(code));
+    if (!rec) throw new Error('Consignor not found');
+    rec.active = active;
+    emitter.emit({ type: 'reference-changed' });
+    return rec;
+  },
+
   clearConsignorFlag(code) {
     const rec = CONSIGNORS.find(c => c.code === String(code));
     if (!rec) throw new Error('Consignor not found');
@@ -101,16 +109,48 @@ export const ReferenceDataRepository = {
 
   addSireType(code, label) {
     if (SIRE_TYPES.some(s => s.code === String(code))) throw new Error('Sire code already exists');
-    const rec = { code: String(code), label };
+    const rec = { code: String(code), label, active: true };
     SIRE_TYPES.push(rec);
+    emitter.emit({ type: 'reference-changed' });
+    return rec;
+  },
+
+  renameSireType(code, label) {
+    const rec = SIRE_TYPES.find(s => s.code === String(code));
+    if (!rec) throw new Error('Sire type not found');
+    rec.label = label;
+    emitter.emit({ type: 'reference-changed' });
+    return rec;
+  },
+
+  setSireActive(code, active) {
+    const rec = SIRE_TYPES.find(s => s.code === String(code));
+    if (!rec) throw new Error('Sire type not found');
+    rec.active = active;
     emitter.emit({ type: 'reference-changed' });
     return rec;
   },
 
   addDamType(code, label) {
     if (DAM_TYPES.some(s => s.code === String(code))) throw new Error('Dam code already exists');
-    const rec = { code: String(code), label };
+    const rec = { code: String(code), label, active: true };
     DAM_TYPES.push(rec);
+    emitter.emit({ type: 'reference-changed' });
+    return rec;
+  },
+
+  renameDamType(code, label) {
+    const rec = DAM_TYPES.find(s => s.code === String(code));
+    if (!rec) throw new Error('Dam type not found');
+    rec.label = label;
+    emitter.emit({ type: 'reference-changed' });
+    return rec;
+  },
+
+  setDamActive(code, active) {
+    const rec = DAM_TYPES.find(s => s.code === String(code));
+    if (!rec) throw new Error('Dam type not found');
+    rec.active = active;
     emitter.emit({ type: 'reference-changed' });
     return rec;
   },

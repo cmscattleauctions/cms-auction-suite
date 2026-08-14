@@ -8,7 +8,7 @@
  * which is confusing, so this view keeps that in one place.
  * ============================================================= */
 
-import { escapeHtml, formatDate, formatBytes, sexShort } from './format.js';
+import { escapeHtml, formatDateShort, formatBytes, sexShort } from './format.js';
 import { formatMonthYear } from './video-id.js';
 import { showToast, copyToClipboard } from './toast.js';
 import { handleIdEntryLoop } from './ui-modals.js';
@@ -61,7 +61,7 @@ function rowHtml(r, ctx) {
       <td>${escapeHtml(formatMonthYear(r.monthYear))}</td>
       <td>${clipsCell(r, ctx)}</td>
       <td>${r.status === 'created' ? editableCell(r, 'videoMaker', escapeHtml(r.videoMaker)) : `<span class="is-empty" title="Assigned once this video is moved to Created">—</span>`}</td>
-      <td>${formatDate(r.dateAdded)}</td>
+      <td>${formatDateShort(r.dateAdded)}</td>
       <td class="vm-notes-cell" title="${r.notes ? escapeHtml(r.notes) : ''}">${editableCell(r, 'notes', r.notes ? escapeHtml(r.notes) : '', !r.notes)}</td>
       <td>${videoLinkCell(r)}</td>
       <td>${embedLinkCell(r)}</td>

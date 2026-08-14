@@ -10,7 +10,7 @@ import { VideoRepository, ReferenceDataRepository, UsageRepository, Notification
 import { renderTable } from './ui-table.js';
 import { renderGrid } from './ui-grid.js';
 import { openDrawer, closeDrawer } from './ui-drawer.js';
-import { openUploadModal, openCsvImportModal, openNotificationsModal, openManageConsignorsModal } from './ui-modals.js';
+import { openUploadModal, openCsvImportModal, openNotificationsModal, openVideoIdManagerModal } from './ui-modals.js';
 
 const state = {
   statusTab: 'ready',
@@ -175,7 +175,7 @@ function wireToolbar() {
     }
   });
 
-  document.getElementById('vm-btn-consignors').addEventListener('click', () => openManageConsignorsModal(ctx));
+  document.getElementById('vm-btn-idmanager').addEventListener('click', () => openVideoIdManagerModal(ctx));
   document.getElementById('vm-btn-upload').addEventListener('click', () => openUploadModal(ctx));
   document.getElementById('vm-btn-import-csv').addEventListener('click', () => openCsvImportModal(ctx));
   document.getElementById('vm-btn-notifications').addEventListener('click', () => openNotificationsModal(ctx));
