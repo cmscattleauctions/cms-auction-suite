@@ -213,15 +213,24 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 /* condensed option-lot subrows — experimental, toggled per-auction via
    Settings > Output Options > Condensed Option Lots (S.issue.optionLotLayout).
    Only ever used for li>0 rows of a grouped block; the group's first lot
-   always renders as a normal full .lotrow. See condensedOptionRowHTML(). */
+   always renders as a normal full .lotrow. See condensedOptionRowHTML().
+   border-left continues the same deep-blue option bracket the full row
+   above already draws (.lotrow.gtop .cell.lot), flush at the row's own
+   left edge so it lines up exactly and — being a real border on each row
+   rather than one absolutely-positioned line spanning multiple rows —
+   always ends cleanly at the group's actual last row, never overshooting
+   into the next lot. cond-last (set from JS, not :last-child, since the
+   group is rarely the literal last row on the page) caps the bracket and
+   gets the same heavy divider used between any two different lots. */
 .lotrow-condensed{position:relative;display:flex;align-items:center;flex-shrink:0;
-  min-height:27px;padding:3px 10px 3px 40px;gap:12px;
+  min-height:27px;padding:3px 14px 3px 26px;
+  border-left:2.4px solid var(--deepblue);
   border-bottom:1px solid var(--line);font-size:calc(11px * var(--ts,1));background:#fff}
-.lotrow-condensed::before{content:'';position:absolute;left:20px;top:0;bottom:0;border-left:2px solid #b7bfd6}
-.lotrow-condensed:last-child::before{bottom:50%}
-.lotrow-condensed::after{content:'';position:absolute;left:20px;top:50%;width:12px;border-top:2px solid #b7bfd6}
-.lotrow-condensed .cond-body{flex:1;display:flex;align-items:baseline;gap:16px;min-width:0;flex-wrap:wrap}
-.lotrow-condensed .cond-lot{font-family:'Oswald';font-weight:700;font-size:1.15em;color:var(--deepblue);flex-shrink:0;min-width:2.6em}
+.lotrow-condensed::after{content:'';position:absolute;left:0;top:50%;width:14px;border-top:2.4px solid var(--deepblue)}
+.lotrow-condensed.cond-last{border-bottom:6px solid var(--lot-divider,#d3d3d3)}
+.lotrow-condensed.cond-last::before{content:'';position:absolute;left:0;bottom:0;width:14px;border-bottom:2.4px solid var(--deepblue)}
+.lotrow-condensed .cond-body{flex:1;display:flex;align-items:baseline;justify-content:space-between;gap:14px;min-width:0;flex-wrap:wrap}
+.lotrow-condensed .cond-lot{font-family:'Oswald';font-weight:700;font-size:1.15em;color:var(--deepblue);flex-shrink:0}
 .lotrow-condensed .cond-field{color:#2a3354;white-space:nowrap}
 .lotrow-condensed .cond-diff{color:#2a3354;font-size:.95em;white-space:nowrap}
 .lotrow-condensed .cond-diff b{font-weight:700;color:#0c1430}
@@ -1170,7 +1179,7 @@ function condensedFieldDiffs(lot,first){
   if(notesV&&notesV!==notesF)diffs.push({label:'Notes',value:flat(notesV)});
   return diffs;
 }
-function condensedOptionRowHTML(lot,first,li,bi,page){
+function condensedOptionRowHTML(lot,first,li,bi,page,isLast){
   const headV=esc(lotEdit(lot,'head')??lot.head);
   const loadN=parseInt(lot.loadCount)||0;
   const loadV=lot.loadCount?`${esc(lot.loadCount)} load${loadN===1?'':'s'}`:'';
@@ -1178,7 +1187,7 @@ function condensedOptionRowHTML(lot,first,li,bi,page){
   const deliveryV=esc(lotEdit(lot,'delivery')??lot.delivery);
   const priceV=lotEdit(lot,'price')??(lot.price?esc(lot.price):'');
   const diffs=condensedFieldDiffs(lot,first);
-  return `<div class="lotrow-condensed" data-id="${lot.id}" data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}">
+  return `<div class="lotrow-condensed${isLast?' cond-last':''}" data-id="${lot.id}" data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}">
       <div class="lot-select"><input type="checkbox" class="lot-cb" data-id="${lot.id}" title="Select lot"></div>
       <div class="lot-split"><button class="split-btn" data-li="${li}" title="Split the option group here — this lot and the ones below it move to the top of the next page">✂</button></div>
       <div class="cond-body">
@@ -1532,7 +1541,7 @@ function sheetHTML(page,pageNum,totalPages){
     const condensedGroup=S.issue.optionLotLayout==='condensed'&&b.grouped;
     b.lots.forEach((lot,li)=>{
       if(condensedGroup&&li>0){
-        h+=condensedOptionRowHTML(lot,b.lots[0],li,bi,page);
+        h+=condensedOptionRowHTML(lot,b.lots[0],li,bi,page,li===b.lots.length-1);
         alt++;
         return;
       }
