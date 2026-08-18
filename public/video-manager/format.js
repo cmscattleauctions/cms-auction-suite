@@ -41,8 +41,23 @@ export function formatDuration(sec) {
 
 export function sexShort(label) {
   if (!label) return '—';
-  if (label === 'Steers & Heifers') return 'S & H';
+  if (label === 'Steers & Heifers') return 'S&H';
   if (label === 'Steers') return 'STR';
   if (label === 'Heifers') return 'HFR';
   return label;
+}
+
+/** "0826" -> "Aug 26" (compact, for the one-line cattle summary / dense table). */
+export function formatMonthYearShort(mmyy) {
+  if (!mmyy || mmyy.length !== 4) return mmyy || '—';
+  const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const mm = Number(mmyy.slice(0, 2));
+  const yy = mmyy.slice(2);
+  const label = months[mm] || mmyy.slice(0, 2);
+  return `${label} ${yy}`;
+}
+
+/** One-line cattle summary: "HFR · Angus × Jersey · 450 lb · Aug 26" */
+export function cattleSummaryLine({ sexLabel, sireLabel, damLabel, weight, monthYear }) {
+  return `${sexShort(sexLabel)} · ${sireLabel} × ${damLabel} · ${weight} lb · ${formatMonthYearShort(monthYear)}`;
 }
