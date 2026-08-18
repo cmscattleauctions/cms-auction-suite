@@ -210,6 +210,23 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 /* manual cell highlight — color set by --change-hl (editable in Colors panel) */
 .lotrow .cell.cell-hl{background:var(--change-hl,#fff7cc)!important}
 
+/* condensed option-lot subrows — experimental, toggled per-auction via
+   Settings > Output Options > Condensed Option Lots (S.issue.optionLotLayout).
+   Only ever used for li>0 rows of a grouped block; the group's first lot
+   always renders as a normal full .lotrow. See condensedOptionRowHTML(). */
+.lotrow-condensed{position:relative;display:flex;align-items:center;flex-shrink:0;
+  min-height:27px;padding:3px 10px 3px 40px;gap:12px;
+  border-bottom:1px solid var(--line);font-size:calc(11px * var(--ts,1));background:#fff}
+.lotrow-condensed::before{content:'';position:absolute;left:20px;top:0;bottom:0;border-left:2px solid #b7bfd6}
+.lotrow-condensed:last-child::before{bottom:50%}
+.lotrow-condensed::after{content:'';position:absolute;left:20px;top:50%;width:12px;border-top:2px solid #b7bfd6}
+.lotrow-condensed .cond-body{flex:1;display:flex;align-items:baseline;gap:16px;min-width:0;flex-wrap:wrap}
+.lotrow-condensed .cond-lot{font-family:'Oswald';font-weight:700;font-size:1.15em;color:var(--deepblue);flex-shrink:0;min-width:2.6em}
+.lotrow-condensed .cond-field{color:#2a3354;white-space:nowrap}
+.lotrow-condensed .cond-diff{color:#2a3354;font-size:.95em;white-space:nowrap}
+.lotrow-condensed .cond-diff b{font-weight:700;color:#0c1430}
+.lotrow-condensed .cond-price{font-family:'Oswald';font-weight:700;font-size:1.1em;color:var(--deepblue);flex-shrink:0;margin-left:auto;padding-left:12px}
+
 /* footer */
 .s-foot{height:34px;border-top:2px solid var(--blue);display:flex;align-items:center;
   gap:14px;font-size:11px;color:#3a4568;margin-top:auto}
@@ -703,6 +720,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
         <div class="field"><label>Header Text Alignment</label><select id="i-header-align"><option value="left">Left Align</option><option value="center">Center Align</option></select>
           <div class="hint">Controls the CMS/title/date text block in the printable header.</div></div>
         <div class="check-field"><input type="checkbox" id="i-show-calendar"><div><label for="i-show-calendar">Show Next Auction Badge</label><div class="hint">Turn this off to remove the top-right next auction badge and give the header more room.</div></div></div>
+        <div class="check-field"><input type="checkbox" id="i-condensed-options"><div><label for="i-condensed-options">Condensed Option Lots</label><div class="hint">Experimental. Renders additional options in an option group as short indented subrows instead of full rows. Applies only to this auction — off by default, and existing auctions keep their current layout unless you turn this on for them.</div></div></div>
       </div>
       <div class="card advanced-only">
         <h3>Bold Rules</h3>
@@ -920,7 +938,7 @@ const S = {
   global:{house:'CMS Livestock Auction',phone:'(806) 355-7505',
     email:'info@cmslivestock.com',web:'www.CattleMarketingServices.com',
     addr:'6900 I40 West, Ste 135, Amarillo, TX 79106'},
-  issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:'',showCalendar:true,headerAlign:'center'},
+  issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:'',showCalendar:true,headerAlign:'center',optionLotLayout:'legacy'},
   sections:[], zoom:.70, rowStep:14, textScale:1, calendarTextScale:1, toolsHidden:false, builderMode:'basic',
   colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff',changeHL:'#fff7cc'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows','Holstein Cows | unless: Jersey, Jers','Holstein Cow | unless: Jersey, Jers'],
@@ -1060,7 +1078,7 @@ function syncSettingsUI(){
   $('#i-date').value=S.issue.date; $('#i-time').value=S.issue.time;
   $('#i-name').value=S.issue.name; $('#i-ndate').value=S.issue.ndate;
   $('#i-nname').value=S.issue.nname; $('#i-ntag').value=S.issue.ntag;
-  $('#i-show-calendar').checked=S.issue.showCalendar!==false; $('#i-header-align').value=S.issue.headerAlign||'center'; $('#builder-mode').value=S.builderMode||'basic'; $('#v-settings').classList.toggle('basic-builder',(S.builderMode||'basic')==='basic');
+  $('#i-show-calendar').checked=S.issue.showCalendar!==false; $('#i-header-align').value=S.issue.headerAlign||'center'; $('#i-condensed-options').checked=(S.issue.optionLotLayout==='condensed'); $('#builder-mode').value=S.builderMode||'basic'; $('#v-settings').classList.toggle('basic-builder',(S.builderMode||'basic')==='basic');
   $('#c-blue').value=S.colors.blue; $('#c-section-end').value=S.colors.sectionEnd;
   $('#c-section-text').value=S.colors.sectionText; $('#c-table-head').value=S.colors.tableHead;
   $('#c-calendar').value=S.colors.calendar; $('#c-divider').value=S.colors.divider||'#d3d3d3'; $('#c-supp-accent').value=S.colors.suppAccent;
@@ -1071,7 +1089,8 @@ function readSettingsUI(){
     email:$('#g-email').value,web:$('#g-web').value,addr:$('#g-addr').value};
   S.issue={date:$('#i-date').value,time:$('#i-time').value,name:$('#i-name').value,
     ndate:$('#i-ndate').value,nname:$('#i-nname').value,ntag:$('#i-ntag').value,
-    showCalendar:$('#i-show-calendar').checked,headerAlign:$('#i-header-align').value||'left'};
+    showCalendar:$('#i-show-calendar').checked,headerAlign:$('#i-header-align').value||'left',
+    optionLotLayout:$('#i-condensed-options').checked?'condensed':'legacy'};
   S.builderMode=$('#builder-mode').value||'basic';
   $('#v-settings').classList.toggle('basic-builder',S.builderMode==='basic');
   S.colors={blue:$('#c-blue').value,sectionEnd:$('#c-section-end').value,
@@ -1132,6 +1151,46 @@ function notesHTML(lot){
 function sellerHTML(lot){
   if(lotEdit(lot,'seller')!=null) return lotEdit(lot,'seller');
   return `<span class="seller-name">${esc(lot.consignor)}</span>`+(lot.location?`<i>${esc(lot.location)}</i>`:'');
+}
+
+/* ===== condensed option-lot rendering (experimental, toggle: S.issue.optionLotLayout) =====
+ * Rendering only — never touches S.lots/group/CSV data. Legacy renderExistingOptionGroup
+ * path (the col-based .lotrow loop in sheetHTML) is untouched; this is purely an
+ * additional branch for li>0 rows of a grouped block when the per-auction toggle is on. */
+function condensedFieldDiffs(lot,first){
+  const diffs=[];
+  const sexV=flat(lotEdit(lot,'sex')??lot.sex), sexF=flat(lotEdit(first,'sex')??first.sex);
+  if(sexV&&sexV!==sexF)diffs.push({label:'Sex',value:sexV});
+  const shrinkV=esc(lotEdit(lot,'shrink')??lot.shrink), shrinkF=esc(lotEdit(first,'shrink')??first.shrink);
+  if(shrinkV&&shrinkV!==shrinkF)diffs.push({label:'Shrink',value:shrinkV});
+  const slideV=flat(lotEdit(lot,'slide')??lot.slide), slideF=flat(lotEdit(first,'slide')??first.slide);
+  if(slideV&&slideV!==slideF)diffs.push({label:'Slide',value:slideV});
+  if(lot.consignor&&lot.consignor!==first.consignor)diffs.push({label:'Seller',value:esc(lot.consignor)});
+  const notesV=[lot.desc1,lot.desc2].filter(Boolean).join(' '), notesF=[first.desc1,first.desc2].filter(Boolean).join(' ');
+  if(notesV&&notesV!==notesF)diffs.push({label:'Notes',value:flat(notesV)});
+  return diffs;
+}
+function condensedOptionRowHTML(lot,first,li,bi,page){
+  const headV=esc(lotEdit(lot,'head')??lot.head);
+  const loadN=parseInt(lot.loadCount)||0;
+  const loadV=lot.loadCount?`${esc(lot.loadCount)} load${loadN===1?'':'s'}`:'';
+  const basewtV=lotEdit(lot,'basewt')??(lot.basewt?esc(lot.basewt)+'#':'');
+  const deliveryV=esc(lotEdit(lot,'delivery')??lot.delivery);
+  const priceV=lotEdit(lot,'price')??(lot.price?esc(lot.price):'');
+  const diffs=condensedFieldDiffs(lot,first);
+  return `<div class="lotrow-condensed" data-id="${lot.id}" data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}">
+      <div class="lot-select"><input type="checkbox" class="lot-cb" data-id="${lot.id}" title="Select lot"></div>
+      <div class="lot-split"><button class="split-btn" data-li="${li}" title="Split the option group here — this lot and the ones below it move to the top of the next page">✂</button></div>
+      <div class="cond-body">
+        <span class="cond-lot">${esc(displayLotNumber(lot))}</span>
+        ${headV?`<span class="cond-field">${headV} hd</span>`:''}
+        ${loadV?`<span class="cond-field">${loadV}</span>`:''}
+        ${basewtV?`<span class="cond-field">${basewtV}</span>`:''}
+        ${deliveryV?`<span class="cond-field">${deliveryV}</span>`:''}
+        ${diffs.map(d=>`<span class="cond-diff"><b>${esc(d.label)}:</b> ${d.value}</span>`).join('')}
+      </div>
+      <div class="cond-price">${priceV}</div>
+    </div>`;
 }
 
 /* ===== build sections & pagination ===== */
@@ -1470,7 +1529,13 @@ function sheetHTML(page,pageNum,totalPages){
   // rows
   let alt=0;
   page.blocks.forEach((b,bi)=>{
+    const condensedGroup=S.issue.optionLotLayout==='condensed'&&b.grouped;
     b.lots.forEach((lot,li)=>{
+      if(condensedGroup&&li>0){
+        h+=condensedOptionRowHTML(lot,b.lots[0],li,bi,page);
+        alt++;
+        return;
+      }
       const gpos=b.grouped?(li===0?'gtop':(li===b.lots.length-1?'gbot':'gmid')):'';
       const isFirst=li===0;
       const selOn=S.selected&&S.selected.has(lot.id);
@@ -2232,6 +2297,7 @@ function applyProject(payload){
   S.results=!!payload.results;
   if(payload.global)Object.assign(S.global,payload.global);
   if(payload.issue)Object.assign(S.issue,payload.issue);
+  S.issue.optionLotLayout=payload.issue?.optionLotLayout==='condensed'?'condensed':'legacy';
   if(payload.colors)Object.assign(S.colors,payload.colors);
   if(Array.isArray(payload.boldRules))S.boldRules=payload.boldRules.slice();
   if(payload.rowStep)S.rowStep=payload.rowStep;
