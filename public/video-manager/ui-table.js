@@ -18,6 +18,8 @@ import { handleIdEntryLoop } from './ui-modals.js';
 
 let addRowOpen = false;
 
+const COPY_ICON = `<svg viewBox="0 0 14 14" fill="none"><rect x="5" y="5" width="7" height="7" rx="1.2" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 9.5v-6A1 1 0 0 1 3.5 2.5h6" stroke="currentColor" stroke-width="1.3"/></svg>`;
+
 export function renderTable(container, records, ctx) {
   const isCreated = ctx.state.statusTab === 'created';
   const headCells = isCreated
@@ -35,10 +37,26 @@ export function renderTable(container, records, ctx) {
   `;
 
   const tbody = container.querySelector('#vm-table-body');
-  tbody.innerHTML = records.map(r => (isCreated ? createdRowHtml(r, ctx) : readyRowHtml(r, ctx))).join('') + addRowHtml(colspan);
+  const rowHtml = r => (isCreated ? createdRowHtml(r, ctx) : readyRowHtml(r, ctx));
+  tbody.innerHTML = (ctx.state.groupByConsignor ? groupedRowsHtml(records, rowHtml, colspan) : records.map(rowHtml).join('')) + addRowHtml(colspan);
 
   wireRows(tbody, ctx);
   wireAddRow(tbody, ctx);
+}
+
+/** Group by consignor (alphabetical), a plain header row above each cluster — display only, doesn't touch the record order/data itself. */
+function groupedRowsHtml(records, rowHtml, colspan) {
+  const groups = new Map();
+  records.forEach(r => {
+    if (!groups.has(r.consignorName)) groups.set(r.consignorName, []);
+    groups.get(r.consignorName).push(r);
+  });
+  const names = [...groups.keys()].sort((a, b) => a.localeCompare(b));
+  return names.map(name => {
+    const rows = groups.get(name);
+    return `<tr class="vm-group-header"><td colspan="${colspan}">${escapeHtml(name)} <span class="vm-group-count">${rows.length}</span></td></tr>`
+      + rows.map(rowHtml).join('');
+  }).join('');
 }
 
 /* =============================================================
@@ -107,8 +125,8 @@ function publishedCell(r) {
   return `
     <span class="yt-actions">
       <button class="btn btn-icon" data-open-yt="${r.id}" title="Open YouTube Video"><svg viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 1 5 5" stroke="currentColor" stroke-width="1.3"/><path d="M9 3h3v3M12 2 7.5 6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
-      <button class="btn btn-icon" data-copy-link="${r.id}" title="Copy YouTube Link"><svg viewBox="0 0 14 14" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 9.5V2.5A1 1 0 0 1 3.5 1.5h7" stroke="currentColor" stroke-width="1.3"/></svg></button>
-      <button class="btn btn-icon" data-copy-embed="${r.id}" title="Copy Embed Code"><svg viewBox="0 0 14 14" fill="none"><path d="M5 4 2 7l3 3M9 4l3 3-3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn btn-icon" data-copy-link="${r.id}" title="Copy YouTube Link">${COPY_ICON}</button>
+      <button class="btn btn-icon" data-copy-embed="${r.id}" title="Copy Embed Code">${COPY_ICON}</button>
     </span>`;
 }
 

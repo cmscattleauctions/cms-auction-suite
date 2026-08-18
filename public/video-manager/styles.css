@@ -208,13 +208,18 @@ table.vm-table { width: 100%; min-width: 100%; border-collapse: collapse; font-s
   border-bottom: 1px solid var(--sidebar-bg); font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
   text-transform: uppercase; color: rgba(255,255,255,0.85); white-space: nowrap;
 }
-.vm-table tbody tr { border-bottom: 1px solid var(--border-subtle); height: 32px; cursor: pointer; }
+.vm-table tbody tr { border-bottom: 1px solid var(--border-subtle); height: 34px; cursor: pointer; }
 .vm-table tbody tr:hover { background: var(--bg-surface-hover); }
-.vm-table td { padding: 4px 9px; vertical-align: middle; white-space: nowrap; }
+.vm-table td { padding: 5px 10px; vertical-align: middle; white-space: nowrap; }
 .vm-table th:nth-child(1), .vm-table td:nth-child(1) { width: 150px; }
 .vm-table th:nth-child(3), .vm-table td:nth-child(3) { min-width: 230px; }
 .vm-table tbody tr.vm-addrow-row { cursor: default; }
 .vm-table tbody tr.vm-addrow-row:hover { background: none; }
+
+.vm-group-header td { padding: 6px 10px; background: var(--bg-muted); font-size: 11px; font-weight: 700; color: var(--text-secondary); }
+.vm-group-header { cursor: default !important; height: auto !important; }
+.vm-group-header:hover { background: none !important; }
+.vm-group-count { font-weight: 500; color: var(--text-muted); }
 
 .vm-cell {
   display: block; min-height: 22px; padding: 3px 5px; border-radius: 4px; border: 1px solid transparent;
