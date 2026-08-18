@@ -61,7 +61,8 @@ function cattleCell(r, ctx) {
   const sexLabel = ctx.ref.sexLabel(r.sexCode) || `Code ${r.sexCode}`;
   const sireLabel = ctx.ref.sireLabel(r.sireCode) || `Code ${r.sireCode}`;
   const damLabel = ctx.ref.damLabel(r.damCode) || `Code ${r.damCode}`;
-  return `<span class="vm-cattle-cell">${escapeHtml(cattleSummaryLine({ sexLabel, sireLabel, damLabel, weight: r.weight, monthYear: r.monthYear }))}</span>`;
+  const line = cattleSummaryLine({ sexLabel, sireLabel, damLabel, weight: r.weight, monthYear: r.monthYear });
+  return `<span class="vm-cattle-cell" title="${escapeHtml(line)}">${escapeHtml(line)}</span>`;
 }
 
 function clipsCell(r) {
@@ -76,10 +77,11 @@ function clipsCell(r) {
 }
 
 function statusIssueCell(r) {
-  if (r.isDraft) return `<span class="vm-status-text is-bad">Upload incomplete</span>`;
+  if (r.isDraft) return `<span class="vm-status-text is-bad">Upload Incomplete</span>`;
   if (r.needsReview) return `<span class="vm-status-text is-warn">Needs Review</span>`;
   if (r.status === 'hold') return `<span class="vm-status-text">On Hold</span>`;
-  return `<span class="vm-status-text is-ready">Ready</span>`;
+  if (!r.clips.length) return `<span class="vm-status-text is-warn">Waiting for Clips</span>`;
+  return `<span class="vm-status-text is-ready">Ready to Build</span>`;
 }
 
 function sourceCell(r, ctx) {
@@ -104,9 +106,9 @@ function publishedCell(r) {
   }
   return `
     <span class="yt-actions">
-      <button class="btn btn-icon" data-open-yt="${r.id}" title="Open YouTube"><svg viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 1 5 5" stroke="currentColor" stroke-width="1.3"/><path d="M9 3h3v3M12 2 7.5 6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
-      <button class="btn btn-icon" data-copy-link="${r.id}" title="Copy video link"><svg viewBox="0 0 14 14" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 9.5V2.5A1 1 0 0 1 3.5 1.5h7" stroke="currentColor" stroke-width="1.3"/></svg></button>
-      <button class="btn btn-icon" data-copy-embed="${r.id}" title="Copy embed link"><svg viewBox="0 0 14 14" fill="none"><path d="M5 4 2 7l3 3M9 4l3 3-3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn btn-icon" data-open-yt="${r.id}" title="Open YouTube Video"><svg viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 1 5 5" stroke="currentColor" stroke-width="1.3"/><path d="M9 3h3v3M12 2 7.5 6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+      <button class="btn btn-icon" data-copy-link="${r.id}" title="Copy YouTube Link"><svg viewBox="0 0 14 14" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 9.5V2.5A1 1 0 0 1 3.5 1.5h7" stroke="currentColor" stroke-width="1.3"/></svg></button>
+      <button class="btn btn-icon" data-copy-embed="${r.id}" title="Copy Embed Code"><svg viewBox="0 0 14 14" fill="none"><path d="M5 4 2 7l3 3M9 4l3 3-3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </span>`;
 }
 
@@ -244,7 +246,7 @@ function wireRows(tbody, ctx) {
     const copyEmbedBtn = e.target.closest('[data-copy-embed]');
     if (copyEmbedBtn) {
       const rec = await ctx.repo.getVideoById(copyEmbedBtn.dataset.copyEmbed);
-      await copyToClipboard(rec.embedUrl);
+      await copyToClipboard(rec.embedCode);
       showToast('Copied');
       return;
     }

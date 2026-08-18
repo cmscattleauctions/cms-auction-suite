@@ -7,7 +7,7 @@
 import { escapeHtml, formatDate, formatBytes, formatDuration, cattleSummaryLine } from './format.js';
 import { showToast, copyToClipboard } from './toast.js';
 import { resolveVideoIdEntry, CODE_KIND_LABELS, CODE_KIND_SHORT_LABELS } from './id-workflow.js';
-import { buildBaseId, formatMonthYear, parseVideoId } from './video-id.js';
+import { buildBaseId, formatMonthYear, parseVideoId, monthYearToInputValue, inputValueToMonthYear } from './video-id.js';
 
 /* ----- generic modal shell ----- */
 function mountModal(innerHtml, { wide = false } = {}) {
@@ -163,6 +163,8 @@ const ID_MANAGER_TABS = [
   ['consignors', 'Consignors'], ['sex', 'Sex'], ['sire', 'Sire Types'], ['dam', 'Dam Types'],
 ];
 
+const IDMGR_LOCK_ICON = `<span class="vm-idmgr-lock" title="Codes already used in Video IDs remain permanent."><svg viewBox="0 0 16 16" fill="none"><rect x="3.5" y="7" width="9" height="6.5" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" stroke-width="1.3"/></svg></span>`;
+
 export function openVideoIdManagerModal(ctx) {
   let tab = 'consignors';
   const example = { consignorCode: '21', sexCode: '2', sireCode: '2', damCode: '2', weight: '450', monthYear: '0826' };
@@ -271,7 +273,7 @@ function renderConsignorsTab(container, ctx) {
         <tbody>
           ${rows.map(c => `
             <tr data-code="${escapeHtml(c.code)}">
-              <td class="vm-idmgr-code">${escapeHtml(c.code)}</td>
+              <td class="vm-idmgr-code">${escapeHtml(c.code)}${IDMGR_LOCK_ICON}</td>
               <td>${editingCode === c.code
                 ? `<input type="text" class="idmgr-name-input" value="${escapeHtml(c.name)}" style="max-width:240px;" />`
                 : escapeHtml(c.name)}</td>
@@ -338,7 +340,7 @@ function renderSexTab(container, ctx) {
     <table class="vm-idmgr-table">
       <thead><tr><th>Code</th><th>Name</th><th>Status</th></tr></thead>
       <tbody>
-        ${rows.map(s => `<tr><td class="vm-idmgr-code">${escapeHtml(s.code)}</td><td>${escapeHtml(s.label)}</td><td>${statusText(s)}</td></tr>`).join('')}
+        ${rows.map(s => `<tr><td class="vm-idmgr-code">${escapeHtml(s.code)}${IDMGR_LOCK_ICON}</td><td>${escapeHtml(s.label)}</td><td>${statusText(s)}</td></tr>`).join('')}
       </tbody>
     </table>
   `;
@@ -357,7 +359,7 @@ function renderCodeTab(container, ctx, cfg) {
         <tbody>
           ${rows.map(r => `
             <tr data-code="${escapeHtml(r.code)}">
-              <td class="vm-idmgr-code">${escapeHtml(r.code)}</td>
+              <td class="vm-idmgr-code">${escapeHtml(r.code)}${IDMGR_LOCK_ICON}</td>
               <td>${editingCode === r.code
                 ? `<input type="text" class="idmgr-code-name-input" value="${escapeHtml(r.label)}" style="max-width:240px;" />`
                 : escapeHtml(r.label)}</td>
@@ -466,7 +468,7 @@ export function openUploadModal(ctx) {
           <div><label>Sire</label><select id="um-b-sire"><option value="">Select…</option>${sires.map(s => `<option value="${s.code}">${s.label}</option>`).join('')}</select></div>
           <div><label>Dam</label><select id="um-b-dam"><option value="">Select…</option>${dams.map(s => `<option value="${s.code}">${s.label}</option>`).join('')}</select></div>
         </div>
-        <div class="field"><label>Month / Year</label><input type="text" id="um-b-monthyear" placeholder="0826 (Aug 2026)" maxlength="4" /></div>
+        <div class="field"><label>Month / Year</label><input type="month" id="um-b-monthyear" /></div>
         <div class="vm-generated-id-box is-placeholder" id="um-b-preview">
           <div><div class="label">Generated Video ID</div><div class="id">Fill in all fields</div></div>
         </div>
@@ -549,7 +551,7 @@ export function openUploadModal(ctx) {
     const sireCode = modal.querySelector('#um-b-sire').value;
     const damCode = modal.querySelector('#um-b-dam').value;
     const weight = modal.querySelector('#um-b-weight').value;
-    const monthYear = modal.querySelector('#um-b-monthyear').value;
+    const monthYear = inputValueToMonthYear(modal.querySelector('#um-b-monthyear').value);
     const box = modal.querySelector('#um-b-preview');
     if (consignorCode && sexCode && sireCode && damCode && weight && monthYear.length === 4) {
       builtId = buildBaseId({ consignorCode, sexCode, sireCode, damCode, weight, monthYear });

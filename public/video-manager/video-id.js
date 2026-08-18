@@ -115,6 +115,19 @@ export function formatMonthYear(mmyy) {
   return `${label} 20${yy}`;
 }
 
+/** "0826" -> "2026-08" for an <input type="month"> control. */
+export function monthYearToInputValue(mmyy) {
+  if (!mmyy || mmyy.length !== 4) return '';
+  return `20${mmyy.slice(2)}-${mmyy.slice(0, 2)}`;
+}
+
+/** "2026-08" (from <input type="month">) -> "0826". */
+export function inputValueToMonthYear(value) {
+  const m = String(value || '').match(/^(\d{4})-(\d{2})$/);
+  if (!m) return '';
+  return `${m[2]}${m[1].slice(2)}`;
+}
+
 /** Generate a short immutable internal record id, e.g. "vid_8k7x29a1". */
 export function generateInternalId() {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';

@@ -16,7 +16,7 @@
  * ============================================================= */
 
 import { escapeHtml, formatDate, formatDateTime, formatDuration, sexShort } from './format.js';
-import { formatMonthYear, buildBaseId } from './video-id.js';
+import { formatMonthYear, buildBaseId, monthYearToInputValue, inputValueToMonthYear } from './video-id.js';
 import { showToast, copyToClipboard } from './toast.js';
 
 let activeId = null;
@@ -43,6 +43,8 @@ async function paint(ctx) {
   const rec = await ctx.repo.getVideoById(activeId);
   const root = document.getElementById('vm-drawer-root');
   if (!rec) { root.innerHTML = ''; return; }
+  const prevBody = root.querySelector('#vm-drawer-body');
+  const prevScrollTop = prevBody ? prevBody.scrollTop : 0;
 
   const sexLabel = ctx.ref.sexLabel(rec.sexCode) || `Code ${rec.sexCode}`;
   const sireLabel = ctx.ref.sireLabel(rec.sireCode) || `Code ${rec.sireCode}`;
@@ -78,6 +80,9 @@ async function paint(ctx) {
       ${footerHtml(rec)}
     </aside>
   `;
+
+  const body = root.querySelector('#vm-drawer-body');
+  if (body) body.scrollTop = prevScrollTop;
 
   root.querySelector('#vm-drawer-close').addEventListener('click', closeDrawer);
   root.querySelector('#vm-drawer-backdrop').addEventListener('click', closeDrawer);
@@ -136,7 +141,7 @@ function cattleSectionHtml(rec, ctx, sexLabel, sireLabel, damLabel) {
         <div class="vm-id-warning">
           <svg viewBox="0 0 20 20" fill="none"><path d="M10 2 1 17h18L10 2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 8v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="10" cy="14.5" r="0.9" fill="currentColor"/></svg>
           <div>
-            Video ID still reflects the original coding. Video IDs are not automatically reassigned.
+            Video ID reflects the original coding and will not change automatically.
             <button class="btn-text" id="cattle-update-id" type="button">Update Video ID to match →</button>
           </div>
         </div>
@@ -155,7 +160,7 @@ function cattleRowHtml(rec, ctx, field, sexLabel, sireLabel, damLabel) {
       <div class="vm-fieldrow" data-cattle-field="${field.key}">
         <span class="k">${field.label}</span>
         <span class="v">${escapeHtml(cattleDisplay(rec, field.key, sexLabel, sireLabel, damLabel))}</span>
-        <span class="edit-hint">Edit</span>
+        <span class="edit-hint" title="Edit"><svg viewBox="0 0 16 16" fill="none"><path d="M11 2.5 13.5 5 5.5 13 2 14l1-3.5L11 2.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></span>
       </div>`;
   }
   return `
@@ -178,7 +183,7 @@ function cattleControlHtml(rec, ctx, field) {
     return `<input type="number" id="cattle-input-${field.key}" value="${rec.weight}" />`;
   }
   if (field.kind === 'monthyear') {
-    return `<input type="text" id="cattle-input-${field.key}" value="${escapeHtml(rec.monthYear)}" maxlength="4" placeholder="MMYY" />`;
+    return `<input type="month" id="cattle-input-${field.key}" value="${escapeHtml(monthYearToInputValue(rec.monthYear))}" />`;
   }
   // consignor: searchable combo
   return `
@@ -192,9 +197,20 @@ function wireCattleSection(root, rec, ctx) {
   root.querySelectorAll('[data-cattle-field]').forEach(row => {
     row.addEventListener('click', () => { editingCattleField = row.dataset.cattleField; paint(ctx); });
   });
-  root.querySelectorAll('[data-cattle-cancel]').forEach(btn => {
-    btn.addEventListener('click', () => { editingCattleField = null; paint(ctx); });
-  });
+  const cancelEdit = () => { editingCattleField = null; paint(ctx); };
+  root.querySelectorAll('[data-cattle-cancel]').forEach(btn => btn.addEventListener('click', cancelEdit));
+
+  const editingRow = root.querySelector('[data-cattle-editing]');
+  if (editingRow) {
+    editingRow.querySelectorAll('input, select').forEach(el => {
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); root.querySelector('[data-cattle-save]')?.click(); }
+        if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+      });
+    });
+    const firstControl = editingRow.querySelector('input, select');
+    if (firstControl) { firstControl.focus(); if (firstControl.select) firstControl.select(); }
+  }
 
   const combo = root.querySelector('#cattle-consignor-combo');
   if (combo) {
@@ -229,12 +245,17 @@ function wireCattleSection(root, rec, ctx) {
       const match = ctx.ref.getConsignors().find(c => c.code === selectedCode);
       if (!match || match.name !== consignorInput.value.trim()) { showToast('Pick a consignor from the list'); return; }
       value = selectedCode;
+    } else if (key === 'monthYear') {
+      value = inputValueToMonthYear(root.querySelector(`#cattle-input-${key}`).value);
+      if (!value) { showToast('Pick a month'); return; }
     } else {
       value = root.querySelector(`#cattle-input-${key}`).value.trim();
       if (!value) { showToast('This field can’t be empty'); return; }
     }
+    const actions = btn.closest('.vm-fieldedit-actions');
+    if (actions) actions.innerHTML = `<span class="vm-fieldedit-saving">Saving…</span>`;
     await ctx.repo.updateCattleFields(rec.id, { [key]: value }, 'Staff');
-    showToast('Updated');
+    showToast('Saved');
     editingCattleField = null;
     ctx.refresh();
     paint(ctx);
@@ -285,7 +306,7 @@ function clipsSectionHtml(rec) {
             <div class="vm-clip-row">
               <svg class="vm-clip-icon" viewBox="0 0 24 24" fill="none"><path d="M4 6h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6"/><path d="M17 10.5 22 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
               <div class="vm-clip-info">
-                <div class="vm-clip-name">${escapeHtml(c.filename)}</div>
+                <div class="vm-clip-name" data-preview-clip="${c.id}" title="Preview">${escapeHtml(c.filename)}</div>
                 <div class="vm-clip-details">${formatDuration(c.durationSec)} · ${escapeHtml(c.uploader)} · ${formatDate(c.uploadedAt)}</div>
               </div>
               <button class="vm-clip-play" data-preview-clip="${c.id}" type="button" title="Preview"><svg viewBox="0 0 12 12" fill="currentColor"><path d="M3 2l7 4-7 4V2z"/></svg></button>
@@ -359,8 +380,8 @@ function publishingSectionHtml(rec) {
     <div class="vm-drawer-section">
       <div class="vm-drawer-section-title">Publishing</div>
       ${rec.youtubeUrl ? `
-        <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.youtubeUrl)}" disabled /><button class="btn btn-sm" data-copy="url" type="button">Copy</button><button class="btn btn-sm btn-ghost" data-open-yt type="button">Open</button></div>
-        <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.embedUrl)}" disabled /><button class="btn btn-sm" data-copy="embed" type="button">Copy Embed</button></div>
+        <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.youtubeUrl)}" disabled /><button class="btn btn-sm" data-copy="url" type="button" title="Copy YouTube Link">Copy Link</button><button class="btn btn-sm btn-ghost" data-open-yt type="button" title="Open YouTube Video">Open</button></div>
+        <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.embedCode)}" disabled /><button class="btn btn-sm" data-copy="code" type="button" title="Copy Embed Code">Copy Code</button></div>
         <button class="btn btn-sm" id="d-change-yt" type="button" style="margin-bottom:8px;">Change YouTube Video</button>
         <div id="d-change-yt-panel"></div>
         ${rec.previousYouTubeVideos.length ? `
@@ -387,7 +408,7 @@ function publishingSectionHtml(rec) {
 
 function wirePublishingSection(root, rec, ctx) {
   root.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
-    const map = { url: rec.youtubeUrl, embed: rec.embedUrl };
+    const map = { url: rec.youtubeUrl, code: rec.embedCode };
     await copyToClipboard(map[btn.dataset.copy]);
     showToast('Copied');
   }));
@@ -463,9 +484,11 @@ function parseYoutubeLink(val) {
  * ============================================================= */
 function sourceStatusSectionHtml(rec, ctx) {
   const meta = ctx.ref.videoFormatMeta(rec.videoFormat);
+  const showTags = rec.videoFormat !== 'clean';
   return `
     <div class="vm-drawer-section">
       <div class="vm-drawer-section-title">Source Status</div>
+      <div class="vm-drawer-section-hint">Is this underlying source video reusable?</div>
       <div class="vm-source-select-row">
         <select id="d-videoformat">
           ${ctx.ref.getVideoFormats().map(f => `<option value="${f.code}" ${f.code === rec.videoFormat ? 'selected' : ''}>${f.label}</option>`).join('')}
@@ -474,22 +497,23 @@ function sourceStatusSectionHtml(rec, ctx) {
       </div>
       <p class="field-hint" id="d-videoformat-desc">${escapeHtml(meta ? meta.desc : '')}</p>
 
-      <div class="field-row" style="margin-top:12px;">
-        <div>
-          <label>Overlay Mode</label>
-          <select id="d-overlaymode">
-            ${ctx.ref.getOverlayModes().map(m => `<option value="${m.code}" ${m.code === rec.overlayMode ? 'selected' : ''}>${m.label}</option>`).join('')}
-          </select>
+      ${showTags ? `
+        <label style="display:block;margin:12px 0 6px;">Baked-In Tags</label>
+        <div class="tag-chip-row" id="d-tags-row">
+          ${ctx.ref.getProgramTags().map(t => `
+            <button type="button" class="tag-chip ${rec.bakedInTags.includes(t.name) ? 'active' : ''}" data-tag="${escapeHtml(t.name)}">${escapeHtml(t.name)}</button>
+          `).join('')}
+          <button type="button" class="tag-chip tag-chip-add" id="d-add-tag">+ Add Tag</button>
         </div>
-        <div></div>
-      </div>
-      <label style="display:block;margin:10px 0 6px;">Baked-In Tags</label>
-      <div class="tag-chip-row" id="d-tags-row">
-        ${ctx.ref.getProgramTags().map(t => `
-          <button type="button" class="tag-chip ${rec.bakedInTags.includes(t.name) ? 'active' : ''}" data-tag="${escapeHtml(t.name)}">${escapeHtml(t.name)}</button>
-        `).join('')}
-        <button type="button" class="tag-chip tag-chip-add" id="d-add-tag">+ Add Tag</button>
-      </div>
+      ` : ''}
+    </div>
+
+    <div class="vm-drawer-section">
+      <div class="vm-drawer-section-title">Playback</div>
+      <div class="vm-drawer-section-hint">How should overlays be handled during playback/OBS?</div>
+      <select id="d-overlaymode" style="max-width:200px;">
+        ${ctx.ref.getOverlayModes().map(m => `<option value="${m.code}" ${m.code === rec.overlayMode ? 'selected' : ''}>${m.label}</option>`).join('')}
+      </select>
     </div>`;
 }
 
