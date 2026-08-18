@@ -18,6 +18,7 @@ const state = {
   search: '',
   filters: {},
   draftsOnly: false,
+  groupByConsignor: false,
 };
 
 const STATUS_TABS = [
@@ -163,6 +164,11 @@ function wireToolbar() {
     if (!btn) return;
     state.view = btn.dataset.view;
     document.querySelectorAll('.vm-view-btn').forEach(b => b.classList.toggle('active', b === btn));
+    refresh();
+  });
+
+  document.getElementById('vm-group-consignor').addEventListener('change', e => {
+    state.groupByConsignor = e.target.checked;
     refresh();
   });
 
