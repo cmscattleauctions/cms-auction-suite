@@ -20,12 +20,23 @@
         </div>
       </div>
       <div class="vm-topbar-actions">
-        <button class="btn btn-ghost" type="button" id="vm-btn-idmanager">Video ID Manager</button>
-        <button class="btn btn-ghost" type="button" id="vm-btn-notifications">Notifications</button>
-        <button class="btn btn-ghost" type="button" id="vm-btn-import-csv">Import Usage CSV</button>
+        <div class="vm-dropdown" id="vm-tools-dropdown">
+          <button class="btn btn-ghost vm-dropdown-btn" type="button" id="vm-btn-tools" aria-haspopup="true" aria-expanded="false">
+            Tools <svg viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="vm-dropdown-menu" id="vm-tools-menu" hidden>
+            <button class="vm-dropdown-item" type="button" id="vm-btn-idmanager">Video ID Manager</button>
+            <button class="vm-dropdown-item" type="button" id="vm-btn-import-csv">Import Usage CSV</button>
+            <button class="vm-dropdown-item" type="button" id="vm-btn-notifications">Notifications</button>
+          </div>
+        </div>
         <button class="btn btn-primary" type="button" id="vm-btn-upload">+ Upload Video</button>
       </div>
     </header>
+
+    <div class="vm-summary-row">
+      <div class="vm-summary-line" id="vm-summary-line"></div>
+    </div>
 
     <nav class="vm-tabs" id="vm-tabs" aria-label="Status"></nav>
 
@@ -33,7 +44,7 @@
       <div class="vm-search">
         <svg class="vm-search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.6"/><path d="M18 18l-4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
         <input type="text" id="vm-search-input" autocomplete="off"
-          placeholder="Search Video ID, consignor, lot, auction, video maker, sex, breed, weight, date, YouTube link…" />
+          placeholder="Search Video ID, consignor, lot, cattle, YouTube…" />
       </div>
 
       <div class="vm-filters-wrap">

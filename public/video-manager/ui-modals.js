@@ -4,10 +4,10 @@
  * quick-add unrecognized code, CSV usage import, notifications.
  * ============================================================= */
 
-import { escapeHtml, formatDate, formatBytes } from './format.js';
-import { showToast } from './toast.js';
+import { escapeHtml, formatDate, formatBytes, formatDuration, cattleSummaryLine } from './format.js';
+import { showToast, copyToClipboard } from './toast.js';
 import { resolveVideoIdEntry, CODE_KIND_LABELS, CODE_KIND_SHORT_LABELS } from './id-workflow.js';
-import { buildBaseId, formatMonthYear } from './video-id.js';
+import { buildBaseId, formatMonthYear, parseVideoId } from './video-id.js';
 
 /* ----- generic modal shell ----- */
 function mountModal(innerHtml, { wide = false } = {}) {
@@ -160,13 +160,29 @@ export function openNewConsignorModal(ctx) {
  * separate, code-free UI — see /video-upload).
  * ============================================================= */
 const ID_MANAGER_TABS = [
-  ['consignors', 'Consignors'], ['sex', 'Sex'], ['sire', 'Sire Types'], ['dam', 'Dam Types'], ['how', 'How IDs Work'],
+  ['consignors', 'Consignors'], ['sex', 'Sex'], ['sire', 'Sire Types'], ['dam', 'Dam Types'],
 ];
 
 export function openVideoIdManagerModal(ctx) {
   let tab = 'consignors';
+  const example = { consignorCode: '21', sexCode: '2', sireCode: '2', damCode: '2', weight: '450', monthYear: '0826' };
+  const exampleId = buildBaseId(example);
+
   const { modal } = mountModal(`
-    <div class="vm-modal-header"><h2>Video ID Manager</h2><button class="vm-modal-close" data-modal-close>&times;</button></div>
+    <div class="vm-modal-header">
+      <div>
+        <h2>Video ID Manager</h2>
+        <p class="field-hint">Controls the codes used to construct CMS Video IDs. Existing codes remain permanently associated with historical videos.</p>
+      </div>
+      <button class="vm-modal-close" data-modal-close>&times;</button>
+    </div>
+    <div class="vm-modal-body" style="padding-bottom:0;">
+      <div class="vm-idmgr-explainer">
+        <div class="cap">Example Video ID</div>
+        <div class="fmt">21<span class="sep">.</span>2<span class="sep">.</span>2<span class="sep">.</span>2<span class="sep">.</span>450<span class="sep">.</span>0826</div>
+        <div class="cap">Consignor · Sex · Sire · Dam · Weight · Month/Year</div>
+      </div>
+    </div>
     <div class="vm-idmgr-tabs" id="idmgr-tabs">
       ${ID_MANAGER_TABS.map(([id, label]) => `<button type="button" class="vm-idmgr-tab ${id === tab ? 'active' : ''}" data-idmgr-tab="${id}">${label}</button>`).join('')}
     </div>
@@ -198,16 +214,38 @@ export function openVideoIdManagerModal(ctx) {
       rename: (code, label) => ctx.ref.renameDamType(code, label),
       setActive: (code, active) => ctx.ref.setDamActive(code, active),
     });
-    else if (tab === 'how') renderHowIdsWorkTab(body, ctx);
   }
   paintTab();
+}
+
+/* ----- shared overflow-menu helper: click "⋯", pick an action ----- */
+function wireOverflowMenus(container) {
+  container.querySelectorAll('.vm-overflow').forEach(wrap => {
+    const btn = wrap.querySelector('.vm-overflow-btn');
+    const menu = wrap.querySelector('.vm-overflow-menu');
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const willOpen = menu.hidden;
+      container.querySelectorAll('.vm-overflow-menu').forEach(m => m.hidden = true);
+      menu.hidden = !willOpen;
+    });
+  });
+  document.addEventListener('click', () => {
+    container.querySelectorAll('.vm-overflow-menu').forEach(m => m.hidden = true);
+  }, { once: true });
+}
+
+function statusText(rec) {
+  if (rec.flaggedNew) return `<span class="vm-idmgr-status needs-review">Needs Review</span>`;
+  if (rec.active === false) return `<span class="vm-idmgr-status inactive">Inactive</span>`;
+  return `<span class="vm-idmgr-status active">Active</span>`;
 }
 
 function renderConsignorsTab(container, ctx) {
   let query = '';
   let sortBy = 'name';
+  let editingCode = null;
   container.innerHTML = `
-    <p class="muted" style="margin-bottom:12px;">The code behind the Consignor segment of every Video ID. Renaming updates every video already on file for that consignor — codes themselves can't be reassigned once in use.</p>
     <div style="display:flex;gap:10px;margin-bottom:12px;">
       <input type="text" id="idmgr-c-search" placeholder="Search consignors…" style="flex:1;" />
       <select id="idmgr-c-sort" style="width:auto;">
@@ -227,31 +265,53 @@ function renderConsignorsTab(container, ctx) {
       const q = query.trim().toLowerCase();
       rows = rows.filter(c => c.name.toLowerCase().includes(q) || c.code.includes(q));
     }
-    list.innerHTML = rows.map(c => `
-      <div class="vm-notify-row" data-code="${escapeHtml(c.code)}">
-        <div style="flex:1;display:flex;align-items:center;gap:8px;">
-          <span class="vm-idmgr-code">${escapeHtml(c.code)}</span>
-          <input type="text" class="idmgr-name-input" value="${escapeHtml(c.name)}" style="flex:1;max-width:260px;" />
-          ${c.flaggedNew ? '<span class="status-pill status-hold">NEEDS REVIEW</span>' : ''}
-          ${c.active === false ? '<span class="status-pill" style="background:var(--bg-muted);color:var(--text-muted);">INACTIVE</span>' : ''}
-        </div>
-        <div style="display:flex;gap:6px;">
-          ${c.flaggedNew ? `<button class="btn btn-sm btn-ghost" data-review="${escapeHtml(c.code)}" type="button">Mark reviewed</button>` : ''}
-          <button class="btn btn-sm btn-ghost" data-toggle-active="${escapeHtml(c.code)}" type="button">${c.active === false ? 'Activate' : 'Deactivate'}</button>
-          <button class="btn btn-sm" data-save="${escapeHtml(c.code)}" type="button">Save</button>
-        </div>
-      </div>
-    `).join('') || '<p class="muted">No consignors match.</p>';
+    list.innerHTML = `
+      <table class="vm-idmgr-table">
+        <thead><tr><th>Code</th><th>Consignor</th><th>Videos</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          ${rows.map(c => `
+            <tr data-code="${escapeHtml(c.code)}">
+              <td class="vm-idmgr-code">${escapeHtml(c.code)}</td>
+              <td>${editingCode === c.code
+                ? `<input type="text" class="idmgr-name-input" value="${escapeHtml(c.name)}" style="max-width:240px;" />`
+                : escapeHtml(c.name)}</td>
+              <td>${ctx.ref.countVideosForConsignor(c.code)}</td>
+              <td>${statusText(c)}</td>
+              <td>
+                ${editingCode === c.code ? `
+                  <div style="display:flex;gap:6px;">
+                    <button class="btn btn-xs btn-primary" data-save="${escapeHtml(c.code)}" type="button">Save</button>
+                    <button class="btn btn-xs btn-ghost" data-cancel-edit type="button">Cancel</button>
+                  </div>
+                ` : `
+                  ${c.flaggedNew ? `<button class="btn btn-xs" data-review="${escapeHtml(c.code)}" type="button">Review</button>` : `<button class="btn btn-xs" data-edit="${escapeHtml(c.code)}" type="button">Edit</button>`}
+                  <span class="vm-overflow">
+                    <button class="vm-overflow-btn" type="button">⋯</button>
+                    <div class="vm-overflow-menu" hidden>
+                      ${c.flaggedNew ? `<button data-edit="${escapeHtml(c.code)}" type="button">Rename</button>` : ''}
+                      <button data-toggle-active="${escapeHtml(c.code)}" type="button">${c.active === false ? 'Activate' : 'Mark inactive'}</button>
+                    </div>
+                  </span>
+                `}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      ${!rows.length ? '<p class="muted" style="margin-top:10px;">No consignors match.</p>' : ''}
+    `;
 
+    list.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => { editingCode = btn.dataset.edit; paint(); }));
+    list.querySelectorAll('[data-cancel-edit]').forEach(btn => btn.addEventListener('click', () => { editingCode = null; paint(); }));
     list.querySelectorAll('[data-save]').forEach(btn => btn.addEventListener('click', () => {
       const code = btn.dataset.save;
-      const input = list.querySelector(`.vm-notify-row[data-code="${CSS.escape(code)}"] .idmgr-name-input`);
+      const input = list.querySelector(`tr[data-code="${CSS.escape(code)}"] .idmgr-name-input`);
       const name = input.value.trim();
       if (!name) { showToast('Name cannot be empty'); return; }
-      try { ctx.ref.renameConsignor(code, name); showToast(`Updated ${name}`); ctx.refresh(); } catch (err) { showToast(err.message); }
+      try { ctx.ref.renameConsignor(code, name); showToast(`Updated ${name}`); ctx.refresh(); editingCode = null; paint(); } catch (err) { showToast(err.message); }
     }));
     list.querySelectorAll('[data-review]').forEach(btn => btn.addEventListener('click', () => {
-      ctx.ref.clearConsignorFlag(btn.dataset.review); paint();
+      ctx.ref.clearConsignorFlag(btn.dataset.review); ctx.refresh(); paint();
     }));
     list.querySelectorAll('[data-toggle-active]').forEach(btn => btn.addEventListener('click', () => {
       const code = btn.dataset.toggleActive;
@@ -260,6 +320,7 @@ function renderConsignorsTab(container, ctx) {
       ctx.refresh();
       paint();
     }));
+    wireOverflowMenus(list);
   }
   paint();
 
@@ -274,56 +335,67 @@ function renderConsignorsTab(container, ctx) {
 function renderSexTab(container, ctx) {
   const rows = ctx.ref.getSexTypes();
   container.innerHTML = `
-    <p class="muted" style="margin-bottom:12px;">Fixed reference values used to build the Sex segment of a Video ID.</p>
     <table class="vm-idmgr-table">
-      <thead><tr><th>Code</th><th>Name</th><th>Active</th></tr></thead>
+      <thead><tr><th>Code</th><th>Name</th><th>Status</th></tr></thead>
       <tbody>
-        ${rows.map(s => `<tr><td class="vm-idmgr-code">${escapeHtml(s.code)}</td><td>${escapeHtml(s.label)}</td><td>${s.active === false ? 'Inactive' : 'Active'}</td></tr>`).join('')}
+        ${rows.map(s => `<tr><td class="vm-idmgr-code">${escapeHtml(s.code)}</td><td>${escapeHtml(s.label)}</td><td>${statusText(s)}</td></tr>`).join('')}
       </tbody>
     </table>
   `;
 }
 
 function renderCodeTab(container, ctx, cfg) {
-  container.innerHTML = `
-    <p class="muted" style="margin-bottom:12px;">Existing codes are permanent once assigned — correct a spelling or mark a value inactive rather than reassigning its meaning.</p>
-    <div id="idmgr-code-list"></div>
-    <div class="field-row" style="margin-top:14px;align-items:flex-end;">
-      <div><label>New Code</label><input type="text" id="idmgr-code-new-code" placeholder="e.g. 11" /></div>
-      <div><label>Name</label><input type="text" id="idmgr-code-new-name" placeholder="e.g. Red Angus" /></div>
-    </div>
-    <button class="btn btn-ghost" id="idmgr-code-add" type="button" style="margin-top:8px;">+ Add ${cfg.title}</button>
-  `;
+  let editingCode = null;
+  container.innerHTML = `<div id="idmgr-code-list"></div>`;
   const list = container.querySelector('#idmgr-code-list');
 
   function paint() {
     const rows = [...cfg.get()].sort((a, b) => Number(a.code) - Number(b.code));
     list.innerHTML = `
       <table class="vm-idmgr-table">
-        <thead><tr><th>Code</th><th>Name</th><th>Active</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Code</th><th>Name</th><th>Status</th><th></th></tr></thead>
         <tbody>
           ${rows.map(r => `
             <tr data-code="${escapeHtml(r.code)}">
               <td class="vm-idmgr-code">${escapeHtml(r.code)}</td>
-              <td><input type="text" class="idmgr-code-name-input" value="${escapeHtml(r.label)}" /></td>
-              <td>${r.active === false ? 'Inactive' : 'Active'}</td>
+              <td>${editingCode === r.code
+                ? `<input type="text" class="idmgr-code-name-input" value="${escapeHtml(r.label)}" style="max-width:240px;" />`
+                : escapeHtml(r.label)}</td>
+              <td>${statusText(r)}</td>
               <td>
-                <div style="display:flex;gap:6px;">
-                  <button class="btn btn-sm" data-save="${escapeHtml(r.code)}" type="button">Save</button>
-                  <button class="btn btn-sm btn-ghost" data-toggle="${escapeHtml(r.code)}" type="button">${r.active === false ? 'Activate' : 'Deactivate'}</button>
-                </div>
+                ${editingCode === r.code ? `
+                  <div style="display:flex;gap:6px;">
+                    <button class="btn btn-xs btn-primary" data-save="${escapeHtml(r.code)}" type="button">Save</button>
+                    <button class="btn btn-xs btn-ghost" data-cancel-edit type="button">Cancel</button>
+                  </div>
+                ` : `
+                  <button class="btn btn-xs" data-edit="${escapeHtml(r.code)}" type="button">Edit</button>
+                  <span class="vm-overflow">
+                    <button class="vm-overflow-btn" type="button">⋯</button>
+                    <div class="vm-overflow-menu" hidden>
+                      <button data-toggle="${escapeHtml(r.code)}" type="button">${r.active === false ? 'Activate' : 'Mark inactive'}</button>
+                    </div>
+                  </span>
+                `}
               </td>
             </tr>
           `).join('')}
         </tbody>
       </table>
+      <div class="field-row" style="margin-top:14px;align-items:flex-end;">
+        <div><label>New Code</label><input type="text" id="idmgr-code-new-code" placeholder="e.g. 11" /></div>
+        <div><label>Name</label><input type="text" id="idmgr-code-new-name" placeholder="e.g. Red Angus" /></div>
+      </div>
+      <button class="btn btn-ghost" id="idmgr-code-add" type="button" style="margin-top:8px;">+ Add ${cfg.title}</button>
     `;
+    list.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => { editingCode = btn.dataset.edit; paint(); }));
+    list.querySelectorAll('[data-cancel-edit]').forEach(btn => btn.addEventListener('click', () => { editingCode = null; paint(); }));
     list.querySelectorAll('[data-save]').forEach(btn => btn.addEventListener('click', () => {
       const code = btn.dataset.save;
       const input = list.querySelector(`tr[data-code="${CSS.escape(code)}"] .idmgr-code-name-input`);
       const label = input.value.trim();
       if (!label) { showToast('Name cannot be empty'); return; }
-      try { cfg.rename(code, label); showToast(`Updated code ${code}`); ctx.refresh(); } catch (err) { showToast(err.message); }
+      try { cfg.rename(code, label); showToast(`Updated code ${code}`); ctx.refresh(); editingCode = null; paint(); } catch (err) { showToast(err.message); }
     }));
     list.querySelectorAll('[data-toggle]').forEach(btn => btn.addEventListener('click', () => {
       const code = btn.dataset.toggle;
@@ -332,77 +404,54 @@ function renderCodeTab(container, ctx, cfg) {
       ctx.refresh();
       paint();
     }));
+    wireOverflowMenus(list);
+    list.querySelector('#idmgr-code-add').addEventListener('click', () => {
+      const codeInput = list.querySelector('#idmgr-code-new-code');
+      const nameInput = list.querySelector('#idmgr-code-new-name');
+      const code = codeInput.value.trim();
+      const name = nameInput.value.trim();
+      if (!code || !name) { showToast('Enter both a code and a name'); return; }
+      try {
+        cfg.add(code, name);
+        showToast(`Added ${cfg.title.toLowerCase()} ${code}`);
+        paint();
+      } catch (err) { showToast(err.message); }
+    });
   }
   paint();
-
-  container.querySelector('#idmgr-code-add').addEventListener('click', () => {
-    const codeInput = container.querySelector('#idmgr-code-new-code');
-    const nameInput = container.querySelector('#idmgr-code-new-name');
-    const code = codeInput.value.trim();
-    const name = nameInput.value.trim();
-    if (!code || !name) { showToast('Enter both a code and a name'); return; }
-    try {
-      cfg.add(code, name);
-      showToast(`Added ${cfg.title.toLowerCase()} ${code}`);
-      codeInput.value = ''; nameInput.value = '';
-      paint();
-    } catch (err) { showToast(err.message); }
-  });
-}
-
-function renderHowIdsWorkTab(container, ctx) {
-  const example = { consignorCode: '21', sexCode: '2', sireCode: '2', damCode: '2', weight: '450', monthYear: '0826' };
-  const id = buildBaseId(example);
-  const consignorLabel = ctx.ref.findConsignor(example.consignorCode)?.name || 'TL Harvesting, Inc.';
-  const sexLabel = ctx.ref.sexLabel(example.sexCode) || 'Heifers';
-  const sireLabel = ctx.ref.sireLabel(example.sireCode) || 'Angus';
-  const damLabel = ctx.ref.damLabel(example.damCode) || 'Jersey';
-  container.innerHTML = `
-    <div class="vm-drawer-section-title">Video ID Format</div>
-    <p style="font-family:var(--font-mono);font-size:15px;font-weight:700;margin:6px 0 16px;">Consignor.Sex.Sire.Dam.Weight.MMYY</p>
-    <p class="muted" style="margin-bottom:6px;">Example:</p>
-    <p style="font-family:var(--font-mono);font-size:20px;font-weight:700;margin-bottom:16px;color:var(--accent);">${escapeHtml(id)}</p>
-    <table class="vm-idmgr-table" style="margin-bottom:20px;">
-      <tbody>
-        <tr><td class="vm-idmgr-code">${example.consignorCode}</td><td>→</td><td>${escapeHtml(consignorLabel)}</td></tr>
-        <tr><td class="vm-idmgr-code">${example.sexCode}</td><td>→</td><td>${escapeHtml(sexLabel)}</td></tr>
-        <tr><td class="vm-idmgr-code">${example.sireCode}</td><td>→</td><td>${escapeHtml(sireLabel)} (Sire)</td></tr>
-        <tr><td class="vm-idmgr-code">${example.damCode}</td><td>→</td><td>${escapeHtml(damLabel)} (Dam)</td></tr>
-        <tr><td class="vm-idmgr-code">${example.weight}</td><td>→</td><td>${example.weight} lbs</td></tr>
-        <tr><td class="vm-idmgr-code">${example.monthYear}</td><td>→</td><td>${escapeHtml(formatMonthYear(example.monthYear))}</td></tr>
-      </tbody>
-    </table>
-    <div class="vm-drawer-section-title">Suffixes for duplicate classifications</div>
-    <p class="muted" style="margin-top:8px;">If <strong style="font-family:var(--font-mono);color:var(--text-primary)">${escapeHtml(id)}</strong> already exists, a genuinely separate video with the exact same classification becomes:</p>
-    <p style="font-family:var(--font-mono);font-weight:700;margin:10px 0;">${escapeHtml(id)}-2</p>
-    <p class="muted">then <strong style="font-family:var(--font-mono);color:var(--text-primary)">-3</strong>, <strong style="font-family:var(--font-mono);color:var(--text-primary)">-4</strong>, and so on. The suffix is assigned automatically — staff never type it by hand.</p>
-  `;
 }
 
 /* =============================================================
- * Full Upload Screen
+ * Upload Cattle Videos
+ * -------------------------------------------------------------
+ * Video ID field first: search or type an existing ID (inline
+ * preview + explicit add-clips-vs-create-separate choice, since
+ * duplicates are allowed on purpose) or expand the builder if you
+ * don't have one yet. Listing Image is intentionally not part of
+ * this flow anymore — the field stays in the data model (see
+ * mock-data.js/repository.js) so nothing historical breaks, it's
+ * just not offered here.
  * ============================================================= */
 export function openUploadModal(ctx) {
   const sexes = ctx.ref.getSexTypes(), sires = ctx.ref.getSireTypes(), dams = ctx.ref.getDamTypes();
   const consignors = ctx.ref.getConsignors();
-  let mode = 'enter'; // 'enter' | 'build'
-  const pickedFiles = []; // { file, progress, status }
-  let listingImageDataUrl = null;
+  let buildOpen = false;
+  let builtId = null;
+  let matchedExisting = null;
+  let idChoice = null; // 'add-to-existing' | 'create-separate'
+  const pickedFiles = []; // { file, progress, status, durationSec }
 
   const { modal, close } = mountModal(`
-    <div class="vm-modal-header"><h2>Upload Video</h2><button class="vm-modal-close" data-modal-close>&times;</button></div>
+    <div class="vm-modal-header"><h2>Upload Cattle Videos</h2><button class="vm-modal-close" data-modal-close>&times;</button></div>
     <div class="vm-modal-body">
-      <div class="vm-idbuild-toggle">
-        <button class="btn active" data-mode="enter" type="button">Enter Video ID</button>
-        <button class="btn" data-mode="build" type="button">Build Video ID</button>
+      <div class="field">
+        <label>Video ID</label>
+        <input type="text" id="um-id-input" placeholder="Search or enter an existing Video ID…" autocomplete="off" />
       </div>
+      <div id="um-id-result"></div>
+      <button class="vm-build-toggle-link" id="um-build-toggle" type="button">Don't have a Video ID? Build one →</button>
 
-      <div id="um-enter-panel">
-        <div class="field"><label>Video ID</label><input type="text" id="um-id-input" placeholder="21.2.2.2.450.0826" /></div>
-        <div id="um-id-feedback"></div>
-      </div>
-
-      <div id="um-build-panel" style="display:none">
+      <div id="um-build-panel" style="display:none;margin-top:16px;">
         <div class="field">
           <label>Consignor <button type="button" class="btn btn-sm btn-ghost" id="um-new-consignor" style="margin-left:6px">+ Add New</button></label>
           <select id="um-b-consignor"><option value="">Select consignor…</option>
@@ -418,21 +467,18 @@ export function openUploadModal(ctx) {
           <div><label>Dam</label><select id="um-b-dam"><option value="">Select…</option>${dams.map(s => `<option value="${s.code}">${s.label}</option>`).join('')}</select></div>
         </div>
         <div class="field"><label>Month / Year</label><input type="text" id="um-b-monthyear" placeholder="0826 (Aug 2026)" maxlength="4" /></div>
-        <div class="field-hint" id="um-b-preview" style="margin-bottom:14px;"></div>
+        <div class="vm-generated-id-box is-placeholder" id="um-b-preview">
+          <div><div class="label">Generated Video ID</div><div class="id">Fill in all fields</div></div>
+        </div>
         <div id="um-build-feedback"></div>
       </div>
 
       <div class="field" style="margin-top:18px;">
         <label>Cattle Videos</label>
-        <div class="vm-dropzone" id="um-dropzone"><strong>Click to choose files</strong><br>or drag video files here</div>
+        <div class="vm-dropzone" id="um-dropzone"><strong>Drop cattle clips here</strong><br>or choose files</div>
         <input type="file" id="um-file-input" accept="video/*" multiple style="display:none" />
         <div id="um-file-list"></div>
-      </div>
-
-      <div class="field">
-        <label>Optional Listing Image</label>
-        <input type="file" id="um-image-input" accept="image/*" />
-        <div id="um-image-preview" class="field-hint"></div>
+        <div id="um-file-summary" class="vm-upload-summary"></div>
       </div>
 
       <div class="field"><label>Notes</label><textarea id="um-notes" rows="3" placeholder="Optional notes…"></textarea></div>
@@ -443,14 +489,49 @@ export function openUploadModal(ctx) {
     </div>
   `, { wide: true });
 
-  /* mode toggle */
-  modal.querySelectorAll('[data-mode]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      mode = btn.dataset.mode;
-      modal.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b === btn));
-      modal.querySelector('#um-enter-panel').style.display = mode === 'enter' ? '' : 'none';
-      modal.querySelector('#um-build-panel').style.display = mode === 'build' ? '' : 'none';
-    });
+  /* ----- Video ID field: live existing-record detection ----- */
+  const idInput = modal.querySelector('#um-id-input');
+  const idResult = modal.querySelector('#um-id-result');
+  let debounceTimer;
+  idInput.addEventListener('input', () => {
+    matchedExisting = null; idChoice = null;
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(checkIdInput, 200);
+  });
+
+  async function checkIdInput() {
+    const raw = idInput.value.trim();
+    const parsed = parseVideoId(raw);
+    if (!raw || !parsed.valid) { idResult.innerHTML = ''; return; }
+    const existing = await ctx.repo.findByFinalId(parsed.finalId);
+    if (!existing) { matchedExisting = null; idResult.innerHTML = ''; return; }
+    matchedExisting = existing;
+    const sexLabel = ctx.ref.sexLabel(existing.sexCode) || existing.sexCode;
+    const sireLabel = ctx.ref.sireLabel(existing.sireCode) || existing.sireCode;
+    const damLabel = ctx.ref.damLabel(existing.damCode) || existing.damCode;
+    const statusWord = existing.status === 'created' ? 'Created' : existing.status === 'hold' ? 'On Hold' : 'Ready to Make';
+    idResult.innerHTML = `
+      <div class="vm-id-search-result">
+        <div class="vid">${escapeHtml(existing.videoId)}</div>
+        <div class="line">${escapeHtml(existing.consignorName)}</div>
+        <div class="line">${escapeHtml(cattleSummaryLine({ sexLabel, sireLabel, damLabel, weight: existing.weight, monthYear: existing.monthYear }))}</div>
+        <div class="exists-note">This Video ID already has ${existing.clips.length} clip${existing.clips.length === 1 ? '' : 's'} and a ${statusWord} video.</div>
+        <div class="vm-id-search-choices">
+          <button class="btn btn-sm ${idChoice === 'add-to-existing' ? 'btn-primary' : ''}" id="um-choice-add" type="button">Add clips to existing record</button>
+          <button class="btn btn-sm ${idChoice === 'create-separate' ? 'btn-primary' : ''}" id="um-choice-separate" type="button">Create another record using this Video ID</button>
+        </div>
+      </div>`;
+    idResult.querySelector('#um-choice-add').addEventListener('click', () => { idChoice = 'add-to-existing'; checkIdInput(); });
+    idResult.querySelector('#um-choice-separate').addEventListener('click', () => { idChoice = 'create-separate'; checkIdInput(); });
+  }
+
+  /* ----- Build Video ID (collapsed by default) ----- */
+  const buildPanel = modal.querySelector('#um-build-panel');
+  const buildToggle = modal.querySelector('#um-build-toggle');
+  buildToggle.addEventListener('click', () => {
+    buildOpen = !buildOpen;
+    buildPanel.style.display = buildOpen ? '' : 'none';
+    buildToggle.textContent = buildOpen ? '← Hide builder' : "Don't have a Video ID? Build one →";
   });
 
   modal.querySelector('#um-new-consignor').addEventListener('click', async () => {
@@ -469,31 +550,54 @@ export function openUploadModal(ctx) {
     const damCode = modal.querySelector('#um-b-dam').value;
     const weight = modal.querySelector('#um-b-weight').value;
     const monthYear = modal.querySelector('#um-b-monthyear').value;
-    const preview = modal.querySelector('#um-b-preview');
+    const box = modal.querySelector('#um-b-preview');
     if (consignorCode && sexCode && sireCode && damCode && weight && monthYear.length === 4) {
-      const id = buildBaseId({ consignorCode, sexCode, sireCode, damCode, weight, monthYear });
-      preview.innerHTML = `Generated ID: <strong style="color:var(--text)">${id}</strong>`;
+      builtId = buildBaseId({ consignorCode, sexCode, sireCode, damCode, weight, monthYear });
+      box.classList.remove('is-placeholder');
+      box.innerHTML = `<div><div class="label">Generated Video ID</div><div class="id">${escapeHtml(builtId)}</div></div><button class="btn btn-sm btn-ghost" id="um-b-copy" type="button">Copy</button>`;
+      box.querySelector('#um-b-copy').addEventListener('click', async () => { await copyToClipboard(builtId); showToast('Copied'); });
     } else {
-      preview.textContent = 'Fill in all fields to generate the Video ID.';
+      builtId = null;
+      box.classList.add('is-placeholder');
+      box.innerHTML = `<div><div class="label">Generated Video ID</div><div class="id">Fill in all fields</div></div>`;
     }
   }
-  modal.querySelector('#um-build-panel').addEventListener('change', updateBuildPreview);
-  modal.querySelector('#um-build-panel').addEventListener('input', updateBuildPreview);
+  buildPanel.addEventListener('change', updateBuildPreview);
+  buildPanel.addEventListener('input', updateBuildPreview);
 
-  /* file picking + mock resumable-upload simulation */
+  /* ----- file picking + mock resumable-upload simulation ----- */
   const dropzone = modal.querySelector('#um-dropzone');
   const fileInput = modal.querySelector('#um-file-input');
   dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', e => e.preventDefault());
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    [...(e.dataTransfer?.files || [])].forEach(file => addFileRow(file));
+  });
   fileInput.addEventListener('change', () => {
     [...fileInput.files].forEach(file => addFileRow(file));
     fileInput.value = '';
   });
 
   function addFileRow(file) {
-    const entry = { file, progress: 0, status: 'uploading' };
+    const entry = { file, progress: 0, status: 'uploading', durationSec: null };
     pickedFiles.push(entry);
     renderFileList();
     simulateUpload(entry);
+    readDuration(file).then(d => { entry.durationSec = d; renderFileList(); });
+  }
+
+  function readDuration(file) {
+    return new Promise(resolve => {
+      try {
+        const url = URL.createObjectURL(file);
+        const v = document.createElement('video');
+        v.preload = 'metadata';
+        v.onloadedmetadata = () => { resolve(Math.round(v.duration) || null); URL.revokeObjectURL(url); };
+        v.onerror = () => { resolve(null); URL.revokeObjectURL(url); };
+        v.src = url;
+      } catch { resolve(null); }
+    });
   }
 
   function simulateUpload(entry) {
@@ -515,14 +619,17 @@ export function openUploadModal(ctx) {
     list.innerHTML = pickedFiles.map((entry, i) => `
       <div class="vm-upload-file-row">
         <div style="flex:1">
-          <div class="name">${escapeHtml(entry.file.name)} · ${formatBytes(entry.file.size)}</div>
+          <div class="name">${escapeHtml(entry.file.name)} · ${entry.durationSec != null ? formatDuration(entry.durationSec) : formatBytes(entry.file.size)}</div>
           <div class="vm-progress-bar"><div class="vm-progress-fill ${entry.status === 'failed' ? 'failed' : entry.status === 'complete' ? 'complete' : ''}" style="width:${entry.progress}%"></div></div>
           <div class="vm-upload-status">${entry.status === 'uploading' ? `Uploading… ${Math.round(entry.progress)}%` : entry.status === 'complete' ? 'Complete' : 'Failed — connection dropped'}</div>
         </div>
-        ${entry.status === 'failed' ? `<button class="btn btn-sm" data-retry="${i}">Retry</button>` : ''}
-        <button class="btn btn-sm btn-ghost" data-remove-file="${i}">Remove</button>
+        ${entry.status === 'failed' ? `<button class="btn btn-sm" data-retry="${i}" type="button">Retry</button>` : ''}
+        <button class="btn btn-icon btn-ghost" data-remove-file="${i}" type="button" title="Remove">×</button>
       </div>
     `).join('');
+    const summary = modal.querySelector('#um-file-summary');
+    const totalDur = pickedFiles.reduce((s, e) => s + (e.durationSec || 0), 0);
+    summary.textContent = pickedFiles.length ? `${pickedFiles.length} clip${pickedFiles.length === 1 ? '' : 's'}${totalDur ? ` · ${formatDuration(totalDur)} total` : ''}` : '';
     list.querySelectorAll('[data-retry]').forEach(b => b.addEventListener('click', () => {
       const entry = pickedFiles[Number(b.dataset.retry)];
       entry.status = 'uploading'; entry.progress = 0;
@@ -534,83 +641,67 @@ export function openUploadModal(ctx) {
     }));
   }
 
-  modal.querySelector('#um-image-input').addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      listingImageDataUrl = reader.result;
-      modal.querySelector('#um-image-preview').innerHTML = `<img src="${reader.result}" style="max-width:120px;border-radius:6px;margin-top:6px;display:block" />`;
-    };
-    reader.readAsDataURL(file);
-  });
-
-  /* submit */
+  /* ----- submit ----- */
   modal.querySelector('#um-submit').addEventListener('click', async () => {
-    let rawId;
-    if (mode === 'enter') {
-      rawId = modal.querySelector('#um-id-input').value.trim();
-      if (!rawId) { showToast('Enter a Video ID or switch to Build Video ID'); return; }
-    } else {
-      const consignorCode = modal.querySelector('#um-b-consignor').value;
-      const sexCode = modal.querySelector('#um-b-sex').value;
-      const sireCode = modal.querySelector('#um-b-sire').value;
-      const damCode = modal.querySelector('#um-b-dam').value;
-      const weight = modal.querySelector('#um-b-weight').value;
-      const monthYear = modal.querySelector('#um-b-monthyear').value;
-      if (!consignorCode || !sexCode || !sireCode || !damCode || !weight || monthYear.length !== 4) {
-        showToast('Fill in all fields to build the Video ID'); return;
-      }
-      rawId = buildBaseId({ consignorCode, sexCode, sireCode, damCode, weight, monthYear });
-    }
-
-    const feedbackEl = modal.querySelector(mode === 'enter' ? '#um-id-feedback' : '#um-build-feedback');
-    const outcome = await handleIdEntryLoop(rawId, ctx, feedbackEl);
-    if (!outcome) return; // user cancelled somewhere in the loop
-
-    if (outcome.type === 'open') {
-      close();
-      ctx.openDrawer(outcome.existing.id);
-      return;
-    }
-
     const clips = pickedFiles.filter(e => e.status === 'complete').map(e => ({
       id: 'clip_' + Math.random().toString(36).slice(2, 10),
       filename: e.file.name,
       swatch: Math.floor(Math.random() * 8),
-      durationSec: null,
+      durationSec: e.durationSec,
       sizeBytes: e.file.size,
       uploader: 'Staff',
       uploadedAt: new Date().toISOString(),
       isOriginal: true,
       fileHandle: e.file,
     }));
+    const notes = modal.querySelector('#um-notes').value.trim();
 
-    let fields = outcome.fields;
-    let suffix = fields.suffix || null;
-    if (outcome.type === 'create-separate') {
-      suffix = await ctx.repo.nextSuffixFor(outcome.baseId);
+    // Case 1: the typed/searched ID matched an existing record and a choice was made inline.
+    if (matchedExisting) {
+      if (!idChoice) { showToast('Choose whether to add clips or create a separate record'); return; }
+      if (idChoice === 'add-to-existing') {
+        await ctx.repo.addClips(matchedExisting.id, clips, 'Staff');
+        showToast(`${clips.length} clip(s) added to ${matchedExisting.videoId}`);
+        close(); ctx.refresh();
+        return;
+      }
+      const suffix = await ctx.repo.nextSuffixFor(matchedExisting.baseVideoId);
+      const fields = {
+        consignorCode: matchedExisting.consignorCode, sexCode: matchedExisting.sexCode,
+        sireCode: matchedExisting.sireCode, damCode: matchedExisting.damCode,
+        weight: matchedExisting.weight, monthYear: matchedExisting.monthYear,
+      };
+      const record = await ctx.repo.createVideo({ ...fields, suffix, status: 'ready', notes, clips }, 'Staff');
+      showToast(`Created ${record.videoId}`);
+      close(); ctx.refresh();
+      return;
     }
 
-    const record = await ctx.repo.createVideo({
-      ...fields, suffix,
-      status: 'ready',
-      notes: modal.querySelector('#um-notes').value.trim(),
-      clips,
-      listingImageUrl: listingImageDataUrl,
-    }, 'Staff');
+    // Case 2: fresh ID (typed or built) — full resolution loop (unrecognized codes + a
+    // collision safety-net, since the Build panel doesn't get the live inline check above).
+    const rawId = builtId || idInput.value.trim();
+    if (!rawId) { showToast('Enter a Video ID or build one'); return; }
+
+    const feedbackEl = buildOpen ? modal.querySelector('#um-build-feedback') : null;
+    const outcome = await handleIdEntryLoop(rawId, ctx, feedbackEl);
+    if (!outcome) return; // user cancelled somewhere in the loop
+
+    if (outcome.type === 'open') { close(); ctx.openDrawer(outcome.existing.id); return; }
 
     if (outcome.type === 'add-to-existing') {
       await ctx.repo.addClips(outcome.existing.id, clips, 'Staff');
       showToast(`${clips.length} clip(s) added to ${outcome.existing.videoId}`);
-    } else {
-      showToast(`Created ${record.videoId}`);
+      close(); ctx.refresh();
+      return;
     }
+
+    let suffix = outcome.fields.suffix || null;
+    if (outcome.type === 'create-separate') suffix = await ctx.repo.nextSuffixFor(outcome.baseId);
+    const record = await ctx.repo.createVideo({ ...outcome.fields, suffix, status: 'ready', notes, clips }, 'Staff');
+    showToast(`Created ${record.videoId}`);
     close();
     ctx.refresh();
   });
-
-  modal.querySelector('.vm-modal-close').addEventListener('click', () => {});
 }
 
 /**

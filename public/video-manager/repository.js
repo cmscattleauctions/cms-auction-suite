@@ -58,6 +58,7 @@ export const ReferenceDataRepository = {
   getSireTypes() { return [...SIRE_TYPES]; },
   getDamTypes()  { return [...DAM_TYPES]; },
   getConsignors() { return [...CONSIGNORS].sort((a, b) => a.name.localeCompare(b.name)); },
+  countVideosForConsignor(code) { return videos.filter(v => v.consignorCode === String(code)).length; },
 
   findConsignor(code) { return consignorFor(code); },
   sexLabel(code)  { return labelFor(SEX_TYPES, code); },
@@ -350,6 +351,9 @@ function matchesFilters(v, filters = {}) {
   if (filters.hasUsage === false && v.usage.length > 0) return false;
   if (filters.isDraft === true && !v.isDraft) return false;
   if (filters.videoFormat && v.videoFormat !== filters.videoFormat) return false;
+  if (filters.monthYear && v.monthYear !== filters.monthYear) return false;
+  if (filters.hasClips === true && v.clips.length === 0) return false;
+  if (filters.hasClips === false && v.clips.length > 0) return false;
   return true;
 }
 
@@ -440,6 +444,39 @@ export const VideoRepository = {
       if (fieldLabels[key]) logActivity(v, actor, 'field', `${fieldLabels[key]} changed: ${v[key]} → ${val}`);
       v[key] = val;
     });
+    touch(v, actor);
+    emitter.emit({ type: 'videos-changed' });
+    return { ...v };
+  },
+
+  /**
+   * Quick cattle-info correction: updates the display/classification
+   * fields (consignor, sex, sire, dam, weight, month/year) WITHOUT
+   * touching videoId/baseVideoId/suffix. Deliberately separate from
+   * setVideoIdFields() below — correcting "what this video actually
+   * shows" and "what the Video ID says" are two different actions,
+   * and an existing Video ID must never change silently just because
+   * a typo in the weight got fixed. The drawer shows a warning + an
+   * explicit opt-in path to setVideoIdFields() when the two diverge.
+   */
+  async updateCattleFields(id, fields, actor = 'Staff') {
+    const v = videos.find(v => v.id === id);
+    if (!v) throw new Error('Video not found');
+
+    const fieldLabels = { consignorCode: 'Consignor', sexCode: 'Sex', sireCode: 'Sire', damCode: 'Dam', weight: 'Weight', monthYear: 'Month/Year' };
+    const patch = { ...fields };
+    if (patch.weight != null) patch.weight = Number(patch.weight);
+    if (patch.consignorCode && patch.consignorCode !== v.consignorCode) {
+      const consignor = ReferenceDataRepository.findConsignor(patch.consignorCode);
+      patch.consignorName = consignor ? consignor.name : patch.consignorCode;
+    }
+
+    Object.entries(fields).forEach(([key, val]) => {
+      const compareVal = key === 'weight' ? Number(val) : val;
+      if (compareVal === v[key]) return;
+      if (fieldLabels[key]) logActivity(v, actor, 'field', `${fieldLabels[key]} changed: ${v[key]} → ${compareVal}`);
+    });
+    Object.assign(v, patch);
     touch(v, actor);
     emitter.emit({ type: 'videos-changed' });
     return { ...v };

@@ -1,19 +1,35 @@
 /* =============================================================
  * CMS Video Manager — Right-side detail drawer
- * Details / Clips / Usage / Activity
+ * -------------------------------------------------------------
+ * One continuous scroll (Cattle Information, Source Clips,
+ * Publishing, Source Status, Usage History, Notes, Activity),
+ * not tabs — matches the dense-operations direction. Sticky
+ * footer at the bottom carries the status-move actions, with at
+ * most one primary button.
+ *
+ * IMPORTANT distinction: editing cattle info (consignor/sex/sire/
+ * dam/weight/month) never silently changes the Video ID. Those are
+ * two separate actions — see updateCattleFields() vs setVideoIdFields()
+ * in repository.js. When the two diverge we show a warning and an
+ * explicit opt-in "Update Video ID to match" action instead of
+ * quietly reassigning an ID that may already be in use elsewhere.
  * ============================================================= */
 
-import { escapeHtml, formatDate, formatDateTime, formatBytes, formatDuration, sexShort } from './format.js';
+import { escapeHtml, formatDate, formatDateTime, formatDuration, sexShort } from './format.js';
 import { formatMonthYear, buildBaseId } from './video-id.js';
 import { showToast, copyToClipboard } from './toast.js';
 
 let activeId = null;
-let activeTab = 'details';
+let editingCattleField = null;
+let usageExpanded = false;
+let activityExpanded = false;
 
 export async function openDrawer(id, ctx) {
   closeDrawer();
   activeId = id;
-  activeTab = 'details';
+  editingCattleField = null;
+  usageExpanded = false;
+  activityExpanded = false;
   await paint(ctx);
 }
 
@@ -31,6 +47,8 @@ async function paint(ctx) {
   const sexLabel = ctx.ref.sexLabel(rec.sexCode) || `Code ${rec.sexCode}`;
   const sireLabel = ctx.ref.sireLabel(rec.sireCode) || `Code ${rec.sireCode}`;
   const damLabel = ctx.ref.damLabel(rec.damCode) || `Code ${rec.damCode}`;
+  const formatMeta = ctx.ref.videoFormatMeta(rec.videoFormat);
+  const FORMAT_BADGE_CLASS = { clean: 'format-clean', 'legacy-tagged': 'format-legacy', 'needs-redo': 'format-redo', unknown: 'format-unknown' };
 
   root.innerHTML = `
     <div class="vm-drawer-backdrop" id="vm-drawer-backdrop"></div>
@@ -38,27 +56,26 @@ async function paint(ctx) {
       <div class="vm-drawer-header">
         <div>
           <div class="vm-drawer-title">${escapeHtml(rec.videoId)}</div>
-          <div class="vm-drawer-sub">${escapeHtml(rec.consignorName)} · ${sexShort(sexLabel)} · ${escapeHtml(sireLabel)} × ${escapeHtml(damLabel)} · ${rec.weight} lbs</div>
+          <div class="vm-drawer-sub">${escapeHtml(rec.consignorName)}</div>
+          <div class="vm-drawer-badges">
+            <span class="status-pill status-${rec.isDraft ? 'draft' : rec.status}">${rec.isDraft ? 'Draft' : statusLabel(rec.status)}</span>
+            <span class="format-pill ${FORMAT_BADGE_CLASS[rec.videoFormat] || ''}">${escapeHtml(formatMeta ? formatMeta.short : rec.videoFormat)}</span>
+          </div>
         </div>
         <button class="vm-drawer-close" id="vm-drawer-close">&times;</button>
       </div>
 
-      <div class="vm-drawer-statusbar">
-        <span class="label">Status</span>
-        <span class="status-pill status-${rec.isDraft ? 'draft' : rec.status}">${rec.isDraft ? 'Draft' : statusLabel(rec.status)}</span>
-        <span class="vm-status-actions" style="margin-left:auto;">
-          ${['ready', 'hold', 'created'].filter(s => s !== rec.status).map(s =>
-            `<button class="btn btn-sm" data-move="${s}">Move to ${statusLabel(s)}</button>`).join('')}
-        </span>
+      <div class="vm-drawer-body scroll-thin" id="vm-drawer-body">
+        ${cattleSectionHtml(rec, ctx, sexLabel, sireLabel, damLabel)}
+        ${clipsSectionHtml(rec)}
+        ${publishingSectionHtml(rec)}
+        ${sourceStatusSectionHtml(rec, ctx)}
+        ${usageSectionHtml(rec)}
+        ${notesSectionHtml(rec)}
+        ${activitySectionHtml(rec)}
       </div>
 
-      <div class="vm-drawer-tabs">
-        ${['details', 'clips', 'usage', 'activity'].map(t => `
-          <button class="vm-drawer-tab ${activeTab === t ? 'active' : ''}" data-tab="${t}">${t[0].toUpperCase() + t.slice(1)}${t === 'clips' ? ` (${rec.clips.length})` : t === 'usage' ? ` (${rec.usage.length})` : ''}</button>
-        `).join('')}
-      </div>
-
-      <div class="vm-drawer-body scroll-thin" id="vm-drawer-body"></div>
+      ${footerHtml(rec)}
     </aside>
   `;
 
@@ -70,164 +87,175 @@ async function paint(ctx) {
     ctx.refresh();
     paint(ctx);
   }));
-  root.querySelectorAll('.vm-drawer-tab').forEach(btn => btn.addEventListener('click', () => {
-    activeTab = btn.dataset.tab;
-    paint(ctx);
-  }));
 
-  const body = root.querySelector('#vm-drawer-body');
-  if (activeTab === 'details') body.innerHTML = detailsHtml(rec, ctx), wireDetails(body, rec, ctx);
-  else if (activeTab === 'clips') body.innerHTML = clipsHtml(rec), wireClips(body, rec, ctx);
-  else if (activeTab === 'usage') body.innerHTML = usageHtml(rec);
-  else body.innerHTML = activityHtml(rec);
+  wireCattleSection(root, rec, ctx);
+  wireClipsSection(root, rec, ctx);
+  wirePublishingSection(root, rec, ctx);
+  wireSourceStatusSection(root, rec, ctx);
+  wireUsageSection(root, ctx);
+  wireNotesSection(root, rec, ctx);
+  wireActivitySection(root, ctx);
 }
 
 function statusLabel(s) { return s === 'ready' ? 'Ready to Make' : s === 'hold' ? 'On Hold' : 'Created'; }
 
 /* =============================================================
- * DETAILS tab
+ * CATTLE INFORMATION — click-to-edit rows
  * ============================================================= */
-function detailsHtml(rec, ctx) {
-  const sexes = ctx.ref.getSexTypes(), sires = ctx.ref.getSireTypes(), dams = ctx.ref.getDamTypes();
-  const consignors = ctx.ref.getConsignors();
+const CATTLE_FIELDS = [
+  { key: 'consignorCode', label: 'Consignor', kind: 'consignor' },
+  { key: 'sexCode', label: 'Sex', kind: 'select' },
+  { key: 'sireCode', label: 'Sire', kind: 'select' },
+  { key: 'damCode', label: 'Dam', kind: 'select' },
+  { key: 'weight', label: 'Weight', kind: 'number' },
+  { key: 'monthYear', label: 'Video Month', kind: 'monthyear' },
+];
+
+function cattleDisplay(rec, key, sexLabel, sireLabel, damLabel) {
+  if (key === 'consignorCode') return rec.consignorName;
+  if (key === 'sexCode') return sexShort(sexLabel);
+  if (key === 'sireCode') return sireLabel;
+  if (key === 'damCode') return damLabel;
+  if (key === 'weight') return `${rec.weight} lb`;
+  if (key === 'monthYear') return formatMonthYear(rec.monthYear);
+  return '';
+}
+
+function cattleSectionHtml(rec, ctx, sexLabel, sireLabel, damLabel) {
+  const computedBase = buildBaseId({
+    consignorCode: rec.consignorCode, sexCode: rec.sexCode, sireCode: rec.sireCode,
+    damCode: rec.damCode, weight: rec.weight, monthYear: rec.monthYear,
+  });
+  const idMismatch = computedBase !== rec.baseVideoId;
 
   return `
     <div class="vm-drawer-section">
-      <div class="vm-drawer-section-title">Classification (defines the Video ID)</div>
-      <div class="field-row">
-        <div><label>Consignor</label><select id="d-consignor">${consignors.map(c => `<option value="${c.code}" ${c.code === rec.consignorCode ? 'selected' : ''}>${c.name} (${c.code})</option>`).join('')}</select></div>
-        <div><label>Sex</label><select id="d-sex">${sexes.map(s => `<option value="${s.code}" ${s.code === rec.sexCode ? 'selected' : ''}>${s.label}</option>`).join('')}</select></div>
-      </div>
-      <div class="field-row">
-        <div><label>Sire</label><select id="d-sire">${sires.map(s => `<option value="${s.code}" ${s.code === rec.sireCode ? 'selected' : ''}>${s.label}</option>`).join('')}</select></div>
-        <div><label>Dam</label><select id="d-dam">${dams.map(s => `<option value="${s.code}" ${s.code === rec.damCode ? 'selected' : ''}>${s.label}</option>`).join('')}</select></div>
-      </div>
-      <div class="field-row">
-        <div><label>Weight</label><input type="number" id="d-weight" value="${rec.weight}" /></div>
-        <div><label>Month / Year</label><input type="text" id="d-monthyear" value="${rec.monthYear}" maxlength="4" /></div>
-      </div>
-      <div class="field-hint" id="d-id-preview">Video ID: <strong style="color:var(--text)">${escapeHtml(rec.videoId)}</strong></div>
-      <div id="d-collision-feedback"></div>
-      <button class="btn btn-primary btn-sm" id="d-save-id" style="margin-top:10px;">Save Correction</button>
+      <div class="vm-drawer-section-title">Cattle Information</div>
+      ${CATTLE_FIELDS.map(f => cattleRowHtml(rec, ctx, f, sexLabel, sireLabel, damLabel)).join('')}
+      ${idMismatch ? `
+        <div class="vm-id-warning">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M10 2 1 17h18L10 2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 8v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="10" cy="14.5" r="0.9" fill="currentColor"/></svg>
+          <div>
+            Video ID still reflects the original coding. Video IDs are not automatically reassigned.
+            <button class="btn-text" id="cattle-update-id" type="button">Update Video ID to match →</button>
+          </div>
+        </div>
+        <div id="cattle-id-collision-feedback"></div>
+      ` : ''}
       ${rec.videoIdHistory.length ? `
         <div class="vm-drawer-section-title" style="margin-top:16px;">Previous Video IDs</div>
         ${rec.videoIdHistory.map(h => `<div class="vm-history-item">${escapeHtml(h.id)} — ${formatDate(h.changedAt)} (${escapeHtml(h.reason)})</div>`).join('')}
       ` : ''}
-    </div>
-
-    <div class="vm-drawer-section">
-      <div class="vm-drawer-section-title">Details</div>
-      ${rec.status === 'created' ? `
-        <div class="field"><label>Video Maker</label><input type="text" id="d-videomaker" value="${escapeHtml(rec.videoMaker)}" /></div>
-      ` : `
-        <div class="field"><label>Video Maker</label><input type="text" value="—" disabled /><p class="field-hint">Assigned once this video is moved to Created.</p></div>
-      `}
-      <div class="field-row">
-        <div><label>Created By</label><input type="text" value="${escapeHtml(rec.createdBy)}" disabled /></div>
-        <div><label>Date Added</label><input type="text" value="${formatDate(rec.dateAdded)}" disabled /></div>
-      </div>
-      <div class="field"><label>Last Updated</label><input type="text" value="${formatDateTime(rec.lastUpdated)}" disabled /></div>
-      <div class="field"><label>Notes</label><textarea id="d-notes" rows="3">${escapeHtml(rec.notes)}</textarea></div>
-      <div class="field">
-        <label>Canva Link</label>
-        <div class="vm-link-row">
-          <input type="text" id="d-canvalink" placeholder="Paste Canva design link…" value="${escapeHtml(rec.canvaLink || '')}" />
-          <button class="btn btn-sm" id="d-canva-copy" ${rec.canvaLink ? '' : 'disabled'}>Copy</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="vm-drawer-section">
-      <div class="vm-drawer-section-title">Video Format</div>
-      <div class="field-row">
-        <div>
-          <label>Video Format</label>
-          <select id="d-videoformat">
-            ${ctx.ref.getVideoFormats().map(f => `<option value="${f.code}" ${f.code === rec.videoFormat ? 'selected' : ''}>${f.label}</option>`).join('')}
-          </select>
-        </div>
-        <div>
-          <label>Overlay Mode</label>
-          <select id="d-overlaymode">
-            ${ctx.ref.getOverlayModes().map(m => `<option value="${m.code}" ${m.code === rec.overlayMode ? 'selected' : ''}>${m.label}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <div class="field-hint" style="margin-bottom:10px;">${escapeHtml(ctx.ref.videoFormatMeta(rec.videoFormat)?.desc || '')} Overlay Mode is informational for now — it does not control OBS yet.</div>
-
-      <label>Baked-In Tags</label>
-      <div class="tag-chip-row" id="d-tags-row">
-        ${ctx.ref.getProgramTags().map(t => `
-          <button type="button" class="tag-chip ${rec.bakedInTags.includes(t.name) ? 'active' : ''}" data-tag="${escapeHtml(t.name)}">${escapeHtml(t.name)}</button>
-        `).join('')}
-        <button type="button" class="tag-chip tag-chip-add" id="d-add-tag">+ Add Tag</button>
-      </div>
-      <div class="field-hint">${rec.bakedInTags.length ? `Baked in: ${rec.bakedInTags.map(escapeHtml).join(', ')}` : 'Clean videos are safe for dynamic OBS overlays.'}</div>
-
-      ${rec.videoFormat !== 'needs-redo' ? `<button class="btn btn-sm" id="d-mark-redo" style="margin-top:12px;border-color:var(--danger);color:var(--danger);">Mark Needs Redo</button>` : ''}
-    </div>
-
-    <div class="vm-drawer-section">
-      <div class="vm-drawer-section-title">YouTube</div>
-      ${rec.youtubeUrl ? `
-        <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.youtubeUrl)}" disabled /><button class="btn btn-sm" data-copy="url">Copy Video Link</button></div>
-        <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.embedUrl)}" disabled /><button class="btn btn-sm" data-copy="embed">Copy Embed Link</button></div>
-        <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.embedCode)}" disabled /><button class="btn btn-sm" data-copy="code">Copy Embed Code</button></div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-sm btn-ghost" data-open-yt>Open YouTube</button>
-          <button class="btn btn-sm" id="d-change-yt" style="border-color:var(--info, #1e40af);color:var(--info, #1e40af);">Change YouTube Video</button>
-        </div>
-        <div id="d-change-yt-panel"></div>
-        ${rec.previousYouTubeVideos.length ? `
-          <div class="vm-drawer-section-title" style="margin-top:16px;">Previous YouTube Versions</div>
-          ${rec.previousYouTubeVideos.map(p => `
-            <div class="vm-history-item">
-              <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.url)}</a><br>
-              Replaced ${formatDate(p.replacedAt)} by ${escapeHtml(p.replacedBy)}${p.reason ? ` — ${escapeHtml(p.reason)}` : ''}
-            </div>
-          `).join('')}
-        ` : ''}
-      ` : `
-        <div class="vm-link-row"><input type="text" id="d-yt-input" placeholder="Paste YouTube link…" /><button class="btn btn-sm btn-primary" id="d-yt-save">Save</button></div>
-      `}
-    </div>
-  `;
+    </div>`;
 }
 
-function wireDetails(body, rec, ctx) {
-  const preview = body.querySelector('#d-id-preview');
-  function recompute() {
-    const fields = {
-      consignorCode: body.querySelector('#d-consignor').value,
-      sexCode: body.querySelector('#d-sex').value,
-      sireCode: body.querySelector('#d-sire').value,
-      damCode: body.querySelector('#d-dam').value,
-      weight: body.querySelector('#d-weight').value,
-      monthYear: body.querySelector('#d-monthyear').value,
-    };
-    preview.innerHTML = `Video ID: <strong style="color:var(--text)">${escapeHtml(buildBaseId(fields))}</strong>`;
-    return fields;
+function cattleRowHtml(rec, ctx, field, sexLabel, sireLabel, damLabel) {
+  if (editingCattleField !== field.key) {
+    return `
+      <div class="vm-fieldrow" data-cattle-field="${field.key}">
+        <span class="k">${field.label}</span>
+        <span class="v">${escapeHtml(cattleDisplay(rec, field.key, sexLabel, sireLabel, damLabel))}</span>
+        <span class="edit-hint">Edit</span>
+      </div>`;
   }
-  body.querySelectorAll('#d-consignor,#d-sex,#d-sire,#d-dam,#d-weight,#d-monthyear').forEach(el => {
-    el.addEventListener('input', recompute);
-    el.addEventListener('change', recompute);
+  return `
+    <div class="vm-fieldedit" data-cattle-editing="${field.key}">
+      <span class="k">${field.label}</span>
+      ${cattleControlHtml(rec, ctx, field)}
+      <div class="vm-fieldedit-actions">
+        <button class="btn btn-xs btn-primary" data-cattle-save="${field.key}" type="button">Save</button>
+        <button class="btn btn-xs btn-ghost" data-cattle-cancel type="button">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function cattleControlHtml(rec, ctx, field) {
+  if (field.kind === 'select') {
+    const options = field.key === 'sexCode' ? ctx.ref.getSexTypes() : field.key === 'sireCode' ? ctx.ref.getSireTypes() : ctx.ref.getDamTypes();
+    return `<select id="cattle-input-${field.key}">${options.map(o => `<option value="${o.code}" ${o.code === rec[field.key] ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select>`;
+  }
+  if (field.kind === 'number') {
+    return `<input type="number" id="cattle-input-${field.key}" value="${rec.weight}" />`;
+  }
+  if (field.kind === 'monthyear') {
+    return `<input type="text" id="cattle-input-${field.key}" value="${escapeHtml(rec.monthYear)}" maxlength="4" placeholder="MMYY" />`;
+  }
+  // consignor: searchable combo
+  return `
+    <div class="vm-combo" id="cattle-consignor-combo" data-selected-code="${escapeHtml(rec.consignorCode)}">
+      <input type="text" id="cattle-input-consignorCode" value="${escapeHtml(rec.consignorName)}" autocomplete="off" />
+      <div class="vm-combo-list" id="cattle-consignor-list" hidden></div>
+    </div>`;
+}
+
+function wireCattleSection(root, rec, ctx) {
+  root.querySelectorAll('[data-cattle-field]').forEach(row => {
+    row.addEventListener('click', () => { editingCattleField = row.dataset.cattleField; paint(ctx); });
+  });
+  root.querySelectorAll('[data-cattle-cancel]').forEach(btn => {
+    btn.addEventListener('click', () => { editingCattleField = null; paint(ctx); });
   });
 
-  body.querySelector('#d-save-id').addEventListener('click', async () => {
-    const fields = recompute();
+  const combo = root.querySelector('#cattle-consignor-combo');
+  if (combo) {
+    const input = combo.querySelector('#cattle-input-consignorCode');
+    const list = combo.querySelector('#cattle-consignor-list');
+    const consignors = ctx.ref.getConsignors();
+    function renderOptions(query) {
+      const q = query.trim().toLowerCase();
+      const matches = q ? consignors.filter(c => c.name.toLowerCase().includes(q) || c.code.includes(q)) : consignors;
+      list.innerHTML = matches.length
+        ? matches.slice(0, 30).map(c => `<button type="button" class="vm-combo-option" data-code="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${escapeHtml(c.code)})</button>`).join('')
+        : `<div class="vm-combo-empty">No match</div>`;
+      list.hidden = false;
+      list.querySelectorAll('[data-code]').forEach(opt => opt.addEventListener('click', () => {
+        const rec2 = consignors.find(c => c.code === opt.dataset.code);
+        input.value = rec2.name;
+        combo.dataset.selectedCode = rec2.code;
+        list.hidden = true;
+      }));
+    }
+    input.addEventListener('focus', () => renderOptions(input.value));
+    input.addEventListener('input', () => renderOptions(input.value));
+    input.addEventListener('blur', () => setTimeout(() => { list.hidden = true; }, 150));
+  }
+
+  root.querySelectorAll('[data-cattle-save]').forEach(btn => btn.addEventListener('click', async () => {
+    const key = btn.dataset.cattleSave;
+    let value;
+    if (key === 'consignorCode') {
+      const consignorInput = root.querySelector('#cattle-input-consignorCode');
+      const selectedCode = combo ? combo.dataset.selectedCode : null;
+      const match = ctx.ref.getConsignors().find(c => c.code === selectedCode);
+      if (!match || match.name !== consignorInput.value.trim()) { showToast('Pick a consignor from the list'); return; }
+      value = selectedCode;
+    } else {
+      value = root.querySelector(`#cattle-input-${key}`).value.trim();
+      if (!value) { showToast('This field can’t be empty'); return; }
+    }
+    await ctx.repo.updateCattleFields(rec.id, { [key]: value }, 'Staff');
+    showToast('Updated');
+    editingCattleField = null;
+    ctx.refresh();
+    paint(ctx);
+  }));
+
+  const updateIdBtn = root.querySelector('#cattle-update-id');
+  if (updateIdBtn) updateIdBtn.addEventListener('click', async () => {
+    const fields = { consignorCode: rec.consignorCode, sexCode: rec.sexCode, sireCode: rec.sireCode, damCode: rec.damCode, weight: rec.weight, monthYear: rec.monthYear };
     const { collision } = await ctx.repo.setVideoIdFields(rec.id, fields, 'Staff');
-    const feedback = body.querySelector('#d-collision-feedback');
+    const feedback = root.querySelector('#cattle-id-collision-feedback');
     if (collision) {
       feedback.innerHTML = `
         <div class="vm-unrecognized-inline" style="align-items:flex-start;flex-direction:column;">
           <div>Video ID already exists: <strong>${escapeHtml(collision.videoId)}</strong> (${escapeHtml(collision.consignorName)})</div>
           <div style="display:flex;gap:8px;margin-top:8px;">
-            <button class="btn btn-sm" id="d-open-collision">Open Existing</button>
-            <button class="btn btn-sm btn-primary" id="d-suffix-collision">Create Separate (assign suffix)</button>
+            <button class="btn btn-sm" id="cattle-open-collision" type="button">Open Existing</button>
+            <button class="btn btn-sm btn-primary" id="cattle-suffix-collision" type="button">Create Separate (assign suffix)</button>
           </div>
         </div>`;
-      feedback.querySelector('#d-open-collision').addEventListener('click', () => { closeDrawer(); openDrawer(collision.id, ctx); });
-      feedback.querySelector('#d-suffix-collision').addEventListener('click', async () => {
+      feedback.querySelector('#cattle-open-collision').addEventListener('click', () => { closeDrawer(); openDrawer(collision.id, ctx); });
+      feedback.querySelector('#cattle-suffix-collision').addEventListener('click', async () => {
         const suffix = await ctx.repo.nextSuffixFor(buildBaseId(fields));
         await ctx.repo.setVideoIdFields(rec.id, fields, 'Staff', { forceSuffix: suffix });
         showToast('Video ID updated with suffix');
@@ -240,145 +268,44 @@ function wireDetails(body, rec, ctx) {
     ctx.refresh();
     paint(ctx);
   });
-
-  const videoMakerInput = body.querySelector('#d-videomaker');
-  if (videoMakerInput) videoMakerInput.addEventListener('blur', e => ctx.repo.updateVideo(rec.id, { videoMaker: e.target.value.trim() }, 'Staff'));
-  body.querySelector('#d-notes').addEventListener('blur', e => ctx.repo.updateVideo(rec.id, { notes: e.target.value.trim() }, 'Staff'));
-  body.querySelector('#d-canvalink').addEventListener('blur', e => {
-    const val = e.target.value.trim();
-    ctx.repo.updateVideo(rec.id, { canvaLink: val || null }, 'Staff');
-    const copyBtn = body.querySelector('#d-canva-copy');
-    copyBtn.disabled = !val;
-  });
-  const canvaCopyBtn = body.querySelector('#d-canva-copy');
-  if (canvaCopyBtn) canvaCopyBtn.addEventListener('click', async () => {
-    await copyToClipboard(body.querySelector('#d-canvalink').value.trim());
-    showToast('Copied');
-  });
-
-  body.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
-    const map = { url: rec.youtubeUrl, embed: rec.embedUrl, code: rec.embedCode };
-    await copyToClipboard(map[btn.dataset.copy]);
-    showToast('Copied');
-  }));
-  const openYt = body.querySelector('[data-open-yt]');
-  if (openYt) openYt.addEventListener('click', () => window.open(rec.youtubeUrl, '_blank', 'noopener'));
-
-  const ytSave = body.querySelector('#d-yt-save');
-  if (ytSave) ytSave.addEventListener('click', async () => {
-    const val = body.querySelector('#d-yt-input').value.trim();
-    const ytId = parseYoutubeLink(val);
-    if (!ytId) { showToast('Could not read a YouTube link from that'); return; }
-    await ctx.repo.setYoutube(rec.id, { youtubeUrl: val.startsWith('http') ? val : `https://youtu.be/${ytId}`, youtubeId: ytId }, 'Staff');
-    ctx.refresh();
-    paint(ctx);
-  });
-
-  const changeYtBtn = body.querySelector('#d-change-yt');
-  if (changeYtBtn) changeYtBtn.addEventListener('click', () => {
-    const panel = body.querySelector('#d-change-yt-panel');
-    panel.innerHTML = `
-      <div class="vm-link-row" style="margin-top:8px;">
-        <input type="text" id="d-change-yt-input" placeholder="New YouTube link…" />
-      </div>
-      <div class="field"><input type="text" id="d-change-yt-reason" placeholder="Reason (optional) — e.g. rebuilt clean" /></div>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-sm btn-primary" id="d-change-yt-save">Save New Version</button>
-        <button class="btn btn-sm btn-ghost" id="d-change-yt-cancel">Cancel</button>
-      </div>
-    `;
-    panel.querySelector('#d-change-yt-cancel').addEventListener('click', () => panel.innerHTML = '');
-    panel.querySelector('#d-change-yt-save').addEventListener('click', async () => {
-      const val = panel.querySelector('#d-change-yt-input').value.trim();
-      const reason = panel.querySelector('#d-change-yt-reason').value.trim();
-      const ytId = parseYoutubeLink(val);
-      if (!ytId) { showToast('Could not read a YouTube link from that'); return; }
-      await ctx.repo.setYoutube(rec.id, { youtubeUrl: val.startsWith('http') ? val : `https://youtu.be/${ytId}`, youtubeId: ytId }, 'Staff', reason);
-      showToast('New YouTube version saved — previous version kept in history');
-      ctx.refresh();
-      paint(ctx);
-    });
-  });
-
-  body.querySelector('#d-videoformat').addEventListener('change', async e => {
-    await ctx.repo.setVideoFormat(rec.id, e.target.value, 'Staff');
-    ctx.refresh();
-    paint(ctx);
-  });
-  body.querySelector('#d-overlaymode').addEventListener('change', async e => {
-    await ctx.repo.setOverlayMode(rec.id, e.target.value, 'Staff');
-    ctx.refresh();
-  });
-
-  body.querySelectorAll('#d-tags-row [data-tag]').forEach(btn => btn.addEventListener('click', async () => {
-    const tag = btn.dataset.tag;
-    const tags = new Set(rec.bakedInTags);
-    tags.has(tag) ? tags.delete(tag) : tags.add(tag);
-    await ctx.repo.setBakedInTags(rec.id, [...tags], 'Staff');
-    ctx.refresh();
-    paint(ctx);
-  }));
-  const addTagBtn = body.querySelector('#d-add-tag');
-  if (addTagBtn) addTagBtn.addEventListener('click', async () => {
-    const name = prompt('New tag name (e.g. GAP4):');
-    if (!name || !name.trim()) return;
-    try {
-      const tag = ctx.ref.addProgramTag(name.trim());
-      await ctx.repo.setBakedInTags(rec.id, [...rec.bakedInTags, tag.name], 'Staff');
-      ctx.refresh();
-      paint(ctx);
-    } catch (err) {
-      showToast(err.message);
-    }
-  });
-
-  const markRedoBtn = body.querySelector('#d-mark-redo');
-  if (markRedoBtn) markRedoBtn.addEventListener('click', async () => {
-    await ctx.repo.markNeedsRedo(rec.id, 'Staff');
-    showToast('Marked Needs Redo');
-    ctx.refresh();
-    paint(ctx);
-  });
-}
-
-function parseYoutubeLink(val) {
-  const m = val.match(/(?:youtu\.be\/|v=|embed\/)([a-zA-Z0-9_-]{5,})/);
-  return m ? m[1] : (/^[a-zA-Z0-9_-]{5,}$/.test(val) ? val : null);
 }
 
 /* =============================================================
- * CLIPS tab
+ * SOURCE CLIPS
  * ============================================================= */
-function clipsHtml(rec) {
-  if (!rec.clips.length) {
-    return `<div class="vm-drawer-section"><p class="muted">No clips uploaded yet.</p><button class="btn btn-primary btn-sm" id="c-add-clips" style="margin-top:10px;">Add Clips</button></div>`;
-  }
+function clipsSectionHtml(rec) {
   return `
     <div class="vm-drawer-section">
-      <button class="btn btn-primary btn-block" id="c-download-all">Download All ${rec.clips.length} Clip${rec.clips.length === 1 ? '' : 's'}</button>
-    </div>
-    <div class="vm-drawer-section">
-      <div class="vm-clip-list">
-        ${rec.clips.map(c => `
-          <div class="vm-clip-row">
-            <span class="clip-thumb clip-swatch-${c.swatch}"><svg viewBox="0 0 12 12" fill="currentColor"><path d="M3 2l7 4-7 4V2z"/></svg></span>
-            <div class="vm-clip-info">
-              <div class="vm-clip-name">${escapeHtml(c.filename)}</div>
-              <div class="vm-clip-details">${formatDuration(c.durationSec)} · ${formatBytes(c.sizeBytes)} · ${escapeHtml(c.uploader)} · ${formatDateTime(c.uploadedAt)}</div>
-            </div>
-            <button class="btn btn-sm" data-download-clip="${c.id}">Download</button>
-          </div>
-        `).join('')}
+      <div class="vm-drawer-section-title">Source Clips
+        <span>${rec.clips.length}</span>
       </div>
-    </div>
-    <div class="vm-drawer-section">
-      <button class="btn btn-sm" id="c-add-clips">+ Add More Clips</button>
-    </div>
-  `;
+      ${rec.clips.length ? `
+        <div class="vm-clip-list">
+          ${rec.clips.map(c => `
+            <div class="vm-clip-row">
+              <svg class="vm-clip-icon" viewBox="0 0 24 24" fill="none"><path d="M4 6h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6"/><path d="M17 10.5 22 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              <div class="vm-clip-info">
+                <div class="vm-clip-name">${escapeHtml(c.filename)}</div>
+                <div class="vm-clip-details">${formatDuration(c.durationSec)} · ${escapeHtml(c.uploader)} · ${formatDate(c.uploadedAt)}</div>
+              </div>
+              <button class="vm-clip-play" data-preview-clip="${c.id}" type="button" title="Preview"><svg viewBox="0 0 12 12" fill="currentColor"><path d="M3 2l7 4-7 4V2z"/></svg></button>
+              <button class="btn btn-xs" data-download-clip="${c.id}" type="button">Download</button>
+            </div>
+          `).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="btn btn-sm" id="c-download-all" type="button">Download All</button>
+          <button class="btn btn-sm btn-ghost" id="c-add-clips" type="button">+ Add Clips</button>
+        </div>
+      ` : `
+        <p class="muted">No clips uploaded yet.</p>
+        <button class="btn btn-primary btn-sm" id="c-add-clips" type="button" style="margin-top:8px;">Add Clips</button>
+      `}
+    </div>`;
 }
 
-function wireClips(body, rec, ctx) {
-  const addBtn = body.querySelector('#c-add-clips');
+function wireClipsSection(root, rec, ctx) {
+  const addBtn = root.querySelector('#c-add-clips');
   if (addBtn) addBtn.addEventListener('click', () => {
     const input = document.createElement('input');
     input.type = 'file'; input.accept = 'video/*'; input.multiple = true;
@@ -398,12 +325,17 @@ function wireClips(body, rec, ctx) {
     input.click();
   });
 
-  const downloadAll = body.querySelector('#c-download-all');
-  if (downloadAll) downloadAll.addEventListener('click', () => downloadClips(rec.clips));
+  const downloadAllBtn = root.querySelector('#c-download-all');
+  if (downloadAllBtn) downloadAllBtn.addEventListener('click', () => downloadClips(rec.clips));
 
-  body.querySelectorAll('[data-download-clip]').forEach(btn => btn.addEventListener('click', () => {
+  root.querySelectorAll('[data-download-clip]').forEach(btn => btn.addEventListener('click', () => {
     const clip = rec.clips.find(c => c.id === btn.dataset.downloadClip);
     downloadClips(clip ? [clip] : []);
+  }));
+  root.querySelectorAll('[data-preview-clip]').forEach(btn => btn.addEventListener('click', () => {
+    const clip = rec.clips.find(c => c.id === btn.dataset.previewClip);
+    if (!clip || !clip.fileHandle) { showToast('Mock data — original files aren’t wired to real storage in this prototype yet'); return; }
+    window.open(URL.createObjectURL(clip.fileHandle), '_blank', 'noopener');
   }));
 }
 
@@ -420,35 +352,255 @@ function downloadClips(clips) {
 }
 
 /* =============================================================
- * USAGE tab
+ * PUBLISHING
  * ============================================================= */
-function usageHtml(rec) {
-  if (!rec.usage.length) return `<div class="vm-drawer-section"><p class="muted">Not used in any auctions yet.</p></div>`;
-  const totalLots = rec.usage.reduce((n, u) => n + u.lots.length, 0);
-  const sorted = [...rec.usage].sort((a, b) => b.auctionDate.localeCompare(a.auctionDate));
+function publishingSectionHtml(rec) {
   return `
     <div class="vm-drawer-section">
-      <div class="vm-drawer-section-title">Used in Auctions — ${totalLots} use${totalLots === 1 ? '' : 's'}</div>
-      ${sorted.map(u => `
-        <div class="vm-usage-group">
-          <div class="vm-usage-date">${formatDate(u.auctionDate)} — ${escapeHtml(u.auctionName)}</div>
-          <div class="vm-usage-lots">${u.lots.map(l => `<span class="vm-usage-lot">${escapeHtml(l)}</span>`).join('')}</div>
-          ${u.youtubeVersionId && u.youtubeVersionId !== rec.youtubeId ? `<div class="field-hint" style="margin-top:4px;">Used an earlier YouTube version (${escapeHtml(u.youtubeVersionId)})</div>` : ''}
+      <div class="vm-drawer-section-title">Publishing</div>
+      ${rec.youtubeUrl ? `
+        <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.youtubeUrl)}" disabled /><button class="btn btn-sm" data-copy="url" type="button">Copy</button><button class="btn btn-sm btn-ghost" data-open-yt type="button">Open</button></div>
+        <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.embedUrl)}" disabled /><button class="btn btn-sm" data-copy="embed" type="button">Copy Embed</button></div>
+        <button class="btn btn-sm" id="d-change-yt" type="button" style="margin-bottom:8px;">Change YouTube Video</button>
+        <div id="d-change-yt-panel"></div>
+        ${rec.previousYouTubeVideos.length ? `
+          <div class="vm-drawer-section-title" style="margin-top:14px;">Previous Versions</div>
+          ${rec.previousYouTubeVideos.map(p => `
+            <div class="vm-history-item">
+              <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.url)}</a><br>
+              Replaced ${formatDate(p.replacedAt)} by ${escapeHtml(p.replacedBy)}${p.reason ? ` — ${escapeHtml(p.reason)}` : ''}
+            </div>
+          `).join('')}
+        ` : ''}
+      ` : `
+        <div class="vm-link-row"><input type="text" id="d-yt-input" placeholder="Paste YouTube link…" /><button class="btn btn-sm btn-primary" id="d-yt-save" type="button">Save</button></div>
+      `}
+      ${rec.status === 'created' ? `
+        <div class="vm-fieldrow" data-cattle-field="__none" style="cursor:default;">
+          <span class="k">Video Maker</span>
+          <span class="v" id="d-videomaker-display">${escapeHtml(rec.videoMaker)}</span>
         </div>
-      `).join('')}
-    </div>
-  `;
+        <input type="text" id="d-videomaker" value="${escapeHtml(rec.videoMaker)}" style="display:none;" />
+      ` : ''}
+    </div>`;
+}
+
+function wirePublishingSection(root, rec, ctx) {
+  root.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
+    const map = { url: rec.youtubeUrl, embed: rec.embedUrl };
+    await copyToClipboard(map[btn.dataset.copy]);
+    showToast('Copied');
+  }));
+  const openYt = root.querySelector('[data-open-yt]');
+  if (openYt) openYt.addEventListener('click', () => window.open(rec.youtubeUrl, '_blank', 'noopener'));
+
+  const ytSave = root.querySelector('#d-yt-save');
+  if (ytSave) ytSave.addEventListener('click', async () => {
+    const val = root.querySelector('#d-yt-input').value.trim();
+    const ytId = parseYoutubeLink(val);
+    if (!ytId) { showToast('Could not read a YouTube link from that'); return; }
+    await ctx.repo.setYoutube(rec.id, { youtubeUrl: val.startsWith('http') ? val : `https://youtu.be/${ytId}`, youtubeId: ytId }, 'Staff');
+    ctx.refresh();
+    paint(ctx);
+  });
+
+  const changeYtBtn = root.querySelector('#d-change-yt');
+  if (changeYtBtn) changeYtBtn.addEventListener('click', () => {
+    const panel = root.querySelector('#d-change-yt-panel');
+    panel.innerHTML = `
+      <div class="vm-link-row" style="margin-top:4px;">
+        <input type="text" id="d-change-yt-input" placeholder="New YouTube link…" />
+      </div>
+      <div class="field"><input type="text" id="d-change-yt-reason" placeholder="Reason (optional) — e.g. rebuilt clean" /></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-sm btn-primary" id="d-change-yt-save" type="button">Save New Version</button>
+        <button class="btn btn-sm btn-ghost" id="d-change-yt-cancel" type="button">Cancel</button>
+      </div>
+    `;
+    panel.querySelector('#d-change-yt-cancel').addEventListener('click', () => panel.innerHTML = '');
+    panel.querySelector('#d-change-yt-save').addEventListener('click', async () => {
+      const val = panel.querySelector('#d-change-yt-input').value.trim();
+      const reason = panel.querySelector('#d-change-yt-reason').value.trim();
+      const ytId = parseYoutubeLink(val);
+      if (!ytId) { showToast('Could not read a YouTube link from that'); return; }
+      await ctx.repo.setYoutube(rec.id, { youtubeUrl: val.startsWith('http') ? val : `https://youtu.be/${ytId}`, youtubeId: ytId }, 'Staff', reason);
+      showToast('New YouTube version saved — previous version kept in history');
+      ctx.refresh();
+      paint(ctx);
+    });
+  });
+
+  const vmDisplay = root.querySelector('#d-videomaker-display');
+  if (vmDisplay) {
+    const row = vmDisplay.closest('.vm-fieldrow');
+    const hiddenInput = root.querySelector('#d-videomaker');
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', () => {
+      row.innerHTML = `<span class="k">Video Maker</span>`;
+      const input = document.createElement('input');
+      input.type = 'text'; input.value = rec.videoMaker; input.style.flex = '1';
+      row.appendChild(input);
+      input.focus(); input.select();
+      const commit = async () => {
+        const val = input.value.trim();
+        if (val && val !== rec.videoMaker) await ctx.repo.updateVideo(rec.id, { videoMaker: val }, 'Staff');
+        ctx.refresh();
+        paint(ctx);
+      };
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+    });
+  }
+}
+
+function parseYoutubeLink(val) {
+  const m = val.match(/(?:youtu\.be\/|v=|embed\/)([a-zA-Z0-9_-]{5,})/);
+  return m ? m[1] : (/^[a-zA-Z0-9_-]{5,}$/.test(val) ? val : null);
 }
 
 /* =============================================================
- * ACTIVITY tab
+ * SOURCE STATUS — compact selector + short explanation
  * ============================================================= */
-function activityHtml(rec) {
-  if (!rec.activity.length) return `<div class="vm-drawer-section"><p class="muted">No activity yet.</p></div>`;
-  const sorted = [...rec.activity].sort((a, b) => b.ts.localeCompare(a.ts));
+function sourceStatusSectionHtml(rec, ctx) {
+  const meta = ctx.ref.videoFormatMeta(rec.videoFormat);
   return `
     <div class="vm-drawer-section">
-      ${sorted.map(a => `
+      <div class="vm-drawer-section-title">Source Status</div>
+      <div class="vm-source-select-row">
+        <select id="d-videoformat">
+          ${ctx.ref.getVideoFormats().map(f => `<option value="${f.code}" ${f.code === rec.videoFormat ? 'selected' : ''}>${f.label}</option>`).join('')}
+        </select>
+        ${rec.videoFormat !== 'needs-redo' ? `<button class="btn btn-sm btn-ghost" id="d-mark-redo" type="button">Mark Needs Redo</button>` : ''}
+      </div>
+      <p class="field-hint" id="d-videoformat-desc">${escapeHtml(meta ? meta.desc : '')}</p>
+
+      <div class="field-row" style="margin-top:12px;">
+        <div>
+          <label>Overlay Mode</label>
+          <select id="d-overlaymode">
+            ${ctx.ref.getOverlayModes().map(m => `<option value="${m.code}" ${m.code === rec.overlayMode ? 'selected' : ''}>${m.label}</option>`).join('')}
+          </select>
+        </div>
+        <div></div>
+      </div>
+      <label style="display:block;margin:10px 0 6px;">Baked-In Tags</label>
+      <div class="tag-chip-row" id="d-tags-row">
+        ${ctx.ref.getProgramTags().map(t => `
+          <button type="button" class="tag-chip ${rec.bakedInTags.includes(t.name) ? 'active' : ''}" data-tag="${escapeHtml(t.name)}">${escapeHtml(t.name)}</button>
+        `).join('')}
+        <button type="button" class="tag-chip tag-chip-add" id="d-add-tag">+ Add Tag</button>
+      </div>
+    </div>`;
+}
+
+function wireSourceStatusSection(root, rec, ctx) {
+  root.querySelector('#d-videoformat').addEventListener('change', async e => {
+    await ctx.repo.setVideoFormat(rec.id, e.target.value, 'Staff');
+    ctx.refresh();
+    paint(ctx);
+  });
+  root.querySelector('#d-overlaymode').addEventListener('change', async e => {
+    await ctx.repo.setOverlayMode(rec.id, e.target.value, 'Staff');
+    ctx.refresh();
+  });
+  root.querySelectorAll('#d-tags-row [data-tag]').forEach(btn => btn.addEventListener('click', async () => {
+    const tag = btn.dataset.tag;
+    const tags = new Set(rec.bakedInTags);
+    tags.has(tag) ? tags.delete(tag) : tags.add(tag);
+    await ctx.repo.setBakedInTags(rec.id, [...tags], 'Staff');
+    ctx.refresh();
+    paint(ctx);
+  }));
+  const addTagBtn = root.querySelector('#d-add-tag');
+  if (addTagBtn) addTagBtn.addEventListener('click', async () => {
+    const name = prompt('New tag name (e.g. GAP4):');
+    if (!name || !name.trim()) return;
+    try {
+      const tag = ctx.ref.addProgramTag(name.trim());
+      await ctx.repo.setBakedInTags(rec.id, [...rec.bakedInTags, tag.name], 'Staff');
+      ctx.refresh();
+      paint(ctx);
+    } catch (err) {
+      showToast(err.message);
+    }
+  });
+  const markRedoBtn = root.querySelector('#d-mark-redo');
+  if (markRedoBtn) markRedoBtn.addEventListener('click', async () => {
+    await ctx.repo.markNeedsRedo(rec.id, 'Staff');
+    showToast('Marked Needs Redo');
+    ctx.refresh();
+    paint(ctx);
+  });
+}
+
+/* =============================================================
+ * USAGE HISTORY — latest few + View all
+ * ============================================================= */
+function usageSectionHtml(rec) {
+  if (!rec.usage.length) return `<div class="vm-drawer-section"><div class="vm-drawer-section-title">Usage History</div><p class="muted">Not used in any auctions yet.</p></div>`;
+  const sorted = [...rec.usage].sort((a, b) => b.auctionDate.localeCompare(a.auctionDate));
+  const shown = usageExpanded ? sorted : sorted.slice(0, 3);
+  return `
+    <div class="vm-drawer-section">
+      <div class="vm-drawer-section-title">Usage History</div>
+      ${shown.map(u => `
+        <div class="vm-usage-row">
+          <span class="d">${formatDate(u.auctionDate)} — ${escapeHtml(u.auctionName)}</span>
+          <span class="lots">${u.lots.map(escapeHtml).join(', ')}</span>
+        </div>
+      `).join('')}
+      ${sorted.length > 3 ? `<button class="btn-text" id="d-usage-toggle" type="button" style="margin-top:8px;font-size:12px;">${usageExpanded ? 'Show less' : `View all ${sorted.length} uses`}</button>` : ''}
+    </div>`;
+}
+
+function wireUsageSection(root, ctx) {
+  const toggle = root.querySelector('#d-usage-toggle');
+  if (toggle) toggle.addEventListener('click', () => { usageExpanded = !usageExpanded; paint(ctx); });
+}
+
+/* =============================================================
+ * NOTES + Canva Link
+ * ============================================================= */
+function notesSectionHtml(rec) {
+  return `
+    <div class="vm-drawer-section">
+      <div class="vm-drawer-section-title">Notes</div>
+      <textarea id="d-notes" rows="3">${escapeHtml(rec.notes)}</textarea>
+      <div class="field" style="margin-top:10px;">
+        <label>Canva Link</label>
+        <div class="vm-link-row">
+          <input type="text" id="d-canvalink" placeholder="Paste Canva design link…" value="${escapeHtml(rec.canvaLink || '')}" />
+          <button class="btn btn-sm" id="d-canva-copy" type="button" ${rec.canvaLink ? '' : 'disabled'}>Copy</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function wireNotesSection(root, rec, ctx) {
+  root.querySelector('#d-notes').addEventListener('blur', e => ctx.repo.updateVideo(rec.id, { notes: e.target.value.trim() }, 'Staff'));
+  root.querySelector('#d-canvalink').addEventListener('blur', e => {
+    const val = e.target.value.trim();
+    ctx.repo.updateVideo(rec.id, { canvaLink: val || null }, 'Staff');
+    root.querySelector('#d-canva-copy').disabled = !val;
+  });
+  const canvaCopyBtn = root.querySelector('#d-canva-copy');
+  if (canvaCopyBtn) canvaCopyBtn.addEventListener('click', async () => {
+    await copyToClipboard(root.querySelector('#d-canvalink').value.trim());
+    showToast('Copied');
+  });
+}
+
+/* =============================================================
+ * ACTIVITY — latest few + View all (kept as a compact log, not a tab)
+ * ============================================================= */
+function activitySectionHtml(rec) {
+  if (!rec.activity.length) return '';
+  const sorted = [...rec.activity].sort((a, b) => b.ts.localeCompare(a.ts));
+  const shown = activityExpanded ? sorted : sorted.slice(0, 3);
+  return `
+    <div class="vm-drawer-section">
+      <div class="vm-drawer-section-title">Activity</div>
+      ${shown.map(a => `
         <div class="vm-activity-item">
           <span class="vm-activity-dot"></span>
           <div>
@@ -457,6 +609,23 @@ function activityHtml(rec) {
           </div>
         </div>
       `).join('')}
-    </div>
-  `;
+      ${sorted.length > 3 ? `<button class="btn-text" id="d-activity-toggle" type="button" style="margin-top:6px;font-size:12px;">${activityExpanded ? 'Show less' : `View all ${sorted.length} events`}</button>` : ''}
+    </div>`;
+}
+
+function wireActivitySection(root, ctx) {
+  const toggle = root.querySelector('#d-activity-toggle');
+  if (toggle) toggle.addEventListener('click', () => { activityExpanded = !activityExpanded; paint(ctx); });
+}
+
+/* =============================================================
+ * FOOTER — status moves, one primary at most
+ * ============================================================= */
+function footerHtml(rec) {
+  const moves = ['ready', 'hold', 'created'].filter(s => s !== rec.status);
+  const primaryTarget = rec.status !== 'created' ? 'created' : null;
+  return `
+    <div class="vm-drawer-footer">
+      ${moves.map(s => `<button class="btn ${s === primaryTarget ? 'btn-primary' : 'btn-ghost'}" data-move="${s}" type="button">Move to ${statusLabel(s)}</button>`).join('')}
+    </div>`;
 }

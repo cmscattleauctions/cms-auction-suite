@@ -57,6 +57,8 @@ async function boot() {
 async function refresh() {
   const counts = await VideoRepository.getCounts();
   paintTabCounts(counts);
+  document.getElementById('vm-summary-line').innerHTML =
+    `<strong>${counts.total}</strong> Videos · <strong>${counts.ready}</strong> Ready · <strong>${counts.hold}</strong> On Hold · <strong>${counts.created}</strong> Created`;
 
   const filters = { ...state.filters };
   if (state.draftsOnly) filters.isDraft = true;
@@ -175,10 +177,25 @@ function wireToolbar() {
     }
   });
 
-  document.getElementById('vm-btn-idmanager').addEventListener('click', () => openVideoIdManagerModal(ctx));
   document.getElementById('vm-btn-upload').addEventListener('click', () => openUploadModal(ctx));
-  document.getElementById('vm-btn-import-csv').addEventListener('click', () => openCsvImportModal(ctx));
-  document.getElementById('vm-btn-notifications').addEventListener('click', () => openNotificationsModal(ctx));
+
+  const toolsBtn = document.getElementById('vm-btn-tools');
+  const toolsMenu = document.getElementById('vm-tools-menu');
+  toolsBtn.addEventListener('click', () => {
+    const willOpen = toolsMenu.hidden;
+    toolsMenu.hidden = !willOpen;
+    toolsBtn.setAttribute('aria-expanded', String(willOpen));
+  });
+  document.addEventListener('click', e => {
+    if (!toolsMenu.hidden && !toolsMenu.contains(e.target) && e.target !== toolsBtn && !toolsBtn.contains(e.target)) {
+      toolsMenu.hidden = true;
+      toolsBtn.setAttribute('aria-expanded', 'false');
+    }
+  });
+  const closeTools = () => { toolsMenu.hidden = true; toolsBtn.setAttribute('aria-expanded', 'false'); };
+  document.getElementById('vm-btn-idmanager').addEventListener('click', () => { closeTools(); openVideoIdManagerModal(ctx); });
+  document.getElementById('vm-btn-import-csv').addEventListener('click', () => { closeTools(); openCsvImportModal(ctx); });
+  document.getElementById('vm-btn-notifications').addEventListener('click', () => { closeTools(); openNotificationsModal(ctx); });
 }
 
 function renderFiltersPanel() {
@@ -218,6 +235,18 @@ function renderFiltersPanel() {
     </div>
     <div class="field-row vm-filters-panel-row">
       <div>
+        <label>Month / Year</label>
+        <input type="text" id="f-monthyear" placeholder="e.g. 0826" maxlength="4" />
+      </div>
+      <div>
+        <label>Video Maker</label>
+        <select id="f-maker"><option value="">Anyone</option>
+          ${makers.map(m => `<option value="${m}">${m}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="field-row vm-filters-panel-row">
+      <div>
         <label>Weight min</label>
         <input type="number" id="f-weight-min" placeholder="e.g. 400" />
       </div>
@@ -225,12 +254,6 @@ function renderFiltersPanel() {
         <label>Weight max</label>
         <input type="number" id="f-weight-max" placeholder="e.g. 900" />
       </div>
-    </div>
-    <div class="vm-filters-panel-row">
-      <label>Video Maker</label>
-      <select id="f-maker"><option value="">Anyone</option>
-        ${makers.map(m => `<option value="${m}">${m}</option>`).join('')}
-      </select>
     </div>
     <div class="field-row vm-filters-panel-row">
       <div>
@@ -241,6 +264,10 @@ function renderFiltersPanel() {
         <label>Date to</label>
         <input type="date" id="f-date-to" />
       </div>
+    </div>
+    <div class="vm-filter-toggle-row">
+      <span class="switch-label">Has clips</span>
+      <select id="f-has-clips" style="width:auto"><option value="">Any</option><option value="yes">Has clips</option><option value="no">No clips</option></select>
     </div>
     <div class="vm-filter-toggle-row">
       <span class="switch-label">Has YouTube video</span>
@@ -255,7 +282,7 @@ function renderFiltersPanel() {
       <select id="f-usage" style="width:auto"><option value="">Any</option><option value="yes">Used</option><option value="no">Never used</option></select>
     </div>
     <div class="vm-filters-panel-row">
-      <label>Video Format</label>
+      <label>Source Status</label>
       <select id="f-format"><option value="">All</option>
         ${ReferenceDataRepository.getVideoFormats().map(f => `<option value="${f.code}">${f.label}</option>`).join('')}
       </select>
@@ -289,6 +316,8 @@ function renderFiltersPanel() {
     const review = panel.querySelector('#f-needs-review').checked; if (review) filters.needsReview = true;
     const usage = panel.querySelector('#f-usage').value; if (usage) filters.hasUsage = usage === 'yes';
     const format = panel.querySelector('#f-format').value; if (format) filters.videoFormat = format;
+    const monthYear = panel.querySelector('#f-monthyear').value.trim(); if (monthYear) filters.monthYear = monthYear;
+    const hasClips = panel.querySelector('#f-has-clips').value; if (hasClips) filters.hasClips = hasClips === 'yes';
 
     state.filters = filters;
     updateFilterBadge();
@@ -327,7 +356,9 @@ const FILTER_LABELS = {
   hasYoutube: v => v ? 'Has YouTube' : 'No YouTube',
   needsReview: () => 'Needs review',
   hasUsage: v => v ? 'Used in auctions' : 'Never used',
-  videoFormat: code => `Format: ${ReferenceDataRepository.videoFormatMeta(code)?.label || code}`,
+  videoFormat: code => `Source: ${ReferenceDataRepository.videoFormatMeta(code)?.label || code}`,
+  monthYear: v => `Month: ${v}`,
+  hasClips: v => v ? 'Has clips' : 'No clips',
 };
 
 function renderActiveFilterChips() {

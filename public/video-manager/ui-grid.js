@@ -1,12 +1,13 @@
 /* =============================================================
  * CMS Video Manager — Grid view
  * -------------------------------------------------------------
- * Visual video library. Preview priority: original cattle clip >
- * listing image > CMS placeholder. Never the YouTube thumbnail
- * (ours are just the CMS logo).
+ * Secondary to Table view — compact cards, not decorative. Preview
+ * priority: original cattle clip > listing image > monochrome
+ * placeholder icon (never the YouTube thumbnail — ours are just
+ * the CMS logo).
  * ============================================================= */
 
-import { escapeHtml, sexShort } from './format.js';
+import { escapeHtml, cattleSummaryLine } from './format.js';
 
 const FORMAT_BADGE_CLASS = {
   clean: 'format-clean', 'legacy-tagged': 'format-legacy', 'needs-redo': 'format-redo', unknown: 'format-unknown',
@@ -26,6 +27,7 @@ function cardHtml(r, ctx) {
   const damLabel = ctx.ref.damLabel(r.damCode) || `Code ${r.damCode}`;
   const originalClips = r.clips.filter(c => c.isOriginal);
   const formatMeta = ctx.ref.videoFormatMeta(r.videoFormat);
+  const cattle = cattleSummaryLine({ sexLabel, sireLabel, damLabel, weight: r.weight, monthYear: r.monthYear });
 
   return `
     <div class="vm-card" data-id="${r.id}">
@@ -33,13 +35,10 @@ function cardHtml(r, ctx) {
       <div class="vm-card-body">
         <div class="vm-card-id">${escapeHtml(r.videoId)}</div>
         <div class="vm-card-consignor">${escapeHtml(r.consignorName)}${r.needsReview ? '<span class="vm-new-badge">NEW</span>' : ''}</div>
-        <div class="vm-card-meta-row">
-          <span class="sex-chip sex-${r.sexCode}">${sexShort(sexLabel)}</span>
-          <span class="format-pill ${FORMAT_BADGE_CLASS[r.videoFormat] || ''}" title="${escapeHtml(formatMeta ? formatMeta.desc : '')}">${escapeHtml(formatMeta ? formatMeta.short : r.videoFormat)}</span>
-          <span class="vm-card-breed">${escapeHtml(sireLabel)} × ${escapeHtml(damLabel)}</span>
-        </div>
+        <div class="vm-card-cattle">${escapeHtml(cattle)}</div>
         <div class="vm-card-foot">
-          <span class="vm-card-clipcount">${originalClips.length} original clip${originalClips.length === 1 ? '' : 's'} · ${r.weight} lbs</span>
+          <span class="vm-card-clipcount">${originalClips.length} clip${originalClips.length === 1 ? '' : 's'}</span>
+          <span class="format-pill ${FORMAT_BADGE_CLASS[r.videoFormat] || ''}" title="${escapeHtml(formatMeta ? formatMeta.desc : '')}">${escapeHtml(formatMeta ? formatMeta.short : r.videoFormat)}</span>
           <span class="status-pill status-${r.isDraft ? 'draft' : r.status}">${r.isDraft ? 'Draft' : r.status === 'ready' ? 'Ready' : r.status === 'hold' ? 'On Hold' : 'Created'}</span>
         </div>
       </div>
@@ -48,11 +47,10 @@ function cardHtml(r, ctx) {
 
 function previewHtml(r, originalClips) {
   if (originalClips.length) {
-    const c = originalClips[0];
     return `
-      <div class="vm-card-preview has-clip clip-swatch-${c.swatch}">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-        <span class="src-tag">Clip Preview</span>
+      <div class="vm-card-preview">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.4"/><path d="M17 10.5 22 8v8l-5-2.5" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        <span class="src-tag">${originalClips.length} clip${originalClips.length === 1 ? '' : 's'}</span>
         ${r.youtubeId ? '<span class="yt-flag">YouTube ✓</span>' : ''}
       </div>`;
   }

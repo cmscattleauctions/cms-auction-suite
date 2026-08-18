@@ -1,85 +1,113 @@
 /* =============================================================
  * CMS Video Manager — Table view
  * -------------------------------------------------------------
- * Fast, Monday/Excel-style operational view. Click a cell, type,
- * Tab/Shift+Tab/Enter to move, Escape to cancel. Video ID is
- * entered once (fast row) or corrected from the drawer — editing
- * it here would re-trigger the full collision workflow mid-row,
- * which is confusing, so this view keeps that in one place.
+ * Dense operational table — target ~32-34px rows so dozens of
+ * records are scannable without scrolling. Ready/On Hold and
+ * Created use different column sets because the workflow differs:
+ * Ready/Hold cares about "is this record usable yet" (Status/
+ * Issue); Created cares about "what's published and where it's
+ * been used" (Source/Usage/Published). Cattle attributes (sex,
+ * sire, dam, weight, month) are collapsed into one summary line —
+ * editing them happens in the drawer, not per-cell here (see
+ * ui-drawer.js's Cattle Information section).
  * ============================================================= */
 
-import { escapeHtml, formatDateShort, formatBytes, sexShort } from './format.js';
-import { formatMonthYear } from './video-id.js';
+import { escapeHtml, formatDateShort, formatDuration, cattleSummaryLine } from './format.js';
 import { showToast, copyToClipboard } from './toast.js';
 import { handleIdEntryLoop } from './ui-modals.js';
-
-const EDITABLE_FIELDS = ['weight', 'videoMaker', 'notes', 'videoLink'];
 
 let addRowOpen = false;
 
 export function renderTable(container, records, ctx) {
+  const isCreated = ctx.state.statusTab === 'created';
+  const headCells = isCreated
+    ? ['Video ID', 'Consignor', 'Cattle', 'Clips', 'Source', 'Usage', 'Published', 'Added', '']
+    : ['Video ID', 'Consignor', 'Cattle', 'Clips', 'Status', 'Added', ''];
+  const colspan = headCells.length;
+
   container.innerHTML = `
     <div class="vm-table-wrap">
       <table class="vm-table">
-        <thead><tr>
-          <th>Video ID</th><th>Consignor</th><th>Sex</th><th>Sire Breed</th><th>Dam Breed</th>
-          <th>Weight</th><th>Month/Year</th><th>Clips</th><th>Video Maker</th><th>Date Added</th>
-          <th>Notes</th><th>Video Link</th><th>Embed Link</th><th>Format</th><th>Actions</th>
-        </tr></thead>
+        <thead><tr>${headCells.map(h => `<th>${h}</th>`).join('')}</tr></thead>
         <tbody id="vm-table-body"></tbody>
       </table>
     </div>
   `;
 
   const tbody = container.querySelector('#vm-table-body');
-  tbody.innerHTML = records.map(r => rowHtml(r, ctx)).join('') + addRowHtml(ctx);
+  tbody.innerHTML = records.map(r => (isCreated ? createdRowHtml(r, ctx) : readyRowHtml(r, ctx))).join('') + addRowHtml(colspan);
 
   wireRows(tbody, ctx);
   wireAddRow(tbody, ctx);
 }
 
 /* =============================================================
- * Row rendering
+ * Shared cell pieces
  * ============================================================= */
-function rowHtml(r, ctx) {
-  const sexLabel = ctx.ref.sexLabel(r.sexCode) || `Code ${r.sexCode}`;
-  const sireLabel = ctx.ref.sireLabel(r.sireCode) || `Code ${r.sireCode}`;
-  const damLabel = ctx.ref.damLabel(r.damCode) || `Code ${r.damCode}`;
-
-  return `
-    <tr data-id="${r.id}">
-      <td>
-        <span class="vm-videoid-cell">${escapeHtml(r.baseVideoId)}${r.suffix ? `<span class="suffix">-${r.suffix}</span>` : ''}</span>
-        ${r.isDraft ? '<div class="status-pill status-draft" style="margin-top:4px;">Draft</div>' : ''}
-        ${r.needsReview ? '<div class="vm-new-badge">NEEDS REVIEW</div>' : ''}
-      </td>
-      <td>${escapeHtml(r.consignorName)}</td>
-      <td><span class="sex-chip sex-${r.sexCode}">${sexShort(sexLabel)}</span></td>
-      <td>${escapeHtml(sireLabel)}</td>
-      <td>${escapeHtml(damLabel)}</td>
-      <td>${editableCell(r, 'weight', `${r.weight} lbs`)}</td>
-      <td>${escapeHtml(formatMonthYear(r.monthYear))}</td>
-      <td>${clipsCell(r, ctx)}</td>
-      <td>${r.status === 'created' ? editableCell(r, 'videoMaker', escapeHtml(r.videoMaker)) : `<span class="is-empty" title="Assigned once this video is moved to Created">—</span>`}</td>
-      <td>${formatDateShort(r.dateAdded)}</td>
-      <td class="vm-notes-cell" title="${r.notes ? escapeHtml(r.notes) : ''}">${editableCell(r, 'notes', r.notes ? escapeHtml(r.notes) : '', !r.notes)}</td>
-      <td>${videoLinkCell(r)}</td>
-      <td>${embedLinkCell(r)}</td>
-      <td>${videoFormatCell(r, ctx)}</td>
-      <td>${actionsCell(r)}</td>
-    </tr>
-  `;
-}
-
 const FORMAT_BADGE_CLASS = {
   clean: 'format-clean', 'legacy-tagged': 'format-legacy', 'needs-redo': 'format-redo', unknown: 'format-unknown',
 };
 
-function videoFormatCell(r, ctx) {
+function videoIdCell(r) {
+  return `
+    <span class="vm-videoid-cell">${escapeHtml(r.baseVideoId)}${r.suffix ? `<span class="suffix">-${r.suffix}</span>` : ''}</span>
+    <span class="vm-row-flags">
+      ${r.isDraft ? '<span class="vm-row-flag draft">Draft</span>' : ''}
+      ${r.needsReview ? '<span class="vm-row-flag review">Review</span>' : ''}
+    </span>`;
+}
+
+function cattleCell(r, ctx) {
+  const sexLabel = ctx.ref.sexLabel(r.sexCode) || `Code ${r.sexCode}`;
+  const sireLabel = ctx.ref.sireLabel(r.sireCode) || `Code ${r.sireCode}`;
+  const damLabel = ctx.ref.damLabel(r.damCode) || `Code ${r.damCode}`;
+  return `<span class="vm-cattle-cell">${escapeHtml(cattleSummaryLine({ sexLabel, sireLabel, damLabel, weight: r.weight, monthYear: r.monthYear }))}</span>`;
+}
+
+function clipsCell(r) {
+  if (!r.clips.length) {
+    return `<span class="vm-clips-none">No clips</span><button class="vm-clips-addlink" data-add-files="${r.id}" type="button">+ Add</button>`;
+  }
+  return `
+    <button class="vm-clips-trigger" data-clips-trigger="${r.id}" type="button" title="View clips">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6"/><path d="M17 10.5 22 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      ${r.clips.length} clip${r.clips.length === 1 ? '' : 's'}
+    </button>`;
+}
+
+function statusIssueCell(r) {
+  if (r.isDraft) return `<span class="vm-status-text is-bad">Upload incomplete</span>`;
+  if (r.needsReview) return `<span class="vm-status-text is-warn">Needs Review</span>`;
+  if (r.status === 'hold') return `<span class="vm-status-text">On Hold</span>`;
+  return `<span class="vm-status-text is-ready">Ready</span>`;
+}
+
+function sourceCell(r, ctx) {
   const meta = ctx.ref.videoFormatMeta(r.videoFormat);
   const short = meta ? meta.short : r.videoFormat;
   const full = meta ? meta.desc : '';
   return `<span class="format-pill ${FORMAT_BADGE_CLASS[r.videoFormat] || ''}" title="${escapeHtml(full)}">${escapeHtml(short)}</span>`;
+}
+
+function usageCell(r) {
+  if (!r.usage.length) return `<span class="vm-status-text">—</span>`;
+  const sorted = [...r.usage].sort((a, b) => b.auctionDate.localeCompare(a.auctionDate));
+  const latest = sorted[0];
+  const lotLabel = latest.lots[0] + (latest.lots.length > 1 ? ` +${latest.lots.length - 1}` : '');
+  const moreUses = r.usage.length > 1 ? ` +${r.usage.length - 1}` : '';
+  return `<span class="vm-status-text">Lot ${escapeHtml(lotLabel)} · ${formatDateShort(latest.auctionDate)}${moreUses}</span>`;
+}
+
+function publishedCell(r) {
+  if (!r.youtubeUrl) {
+    return `<span class="vm-cell" data-editable="true" data-id="${r.id}" data-field="videoLink" tabindex="0"><span class="is-empty">Paste YouTube link…</span></span>`;
+  }
+  return `
+    <span class="yt-actions">
+      <button class="btn btn-icon" data-open-yt="${r.id}" title="Open YouTube"><svg viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 1 5 5" stroke="currentColor" stroke-width="1.3"/><path d="M9 3h3v3M12 2 7.5 6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+      <button class="btn btn-icon" data-copy-link="${r.id}" title="Copy video link"><svg viewBox="0 0 14 14" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 9.5V2.5A1 1 0 0 1 3.5 1.5h7" stroke="currentColor" stroke-width="1.3"/></svg></button>
+      <button class="btn btn-icon" data-copy-embed="${r.id}" title="Copy embed link"><svg viewBox="0 0 14 14" fill="none"><path d="M5 4 2 7l3 3M9 4l3 3-3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </span>`;
 }
 
 function editableCell(r, field, display, isEmpty = false) {
@@ -88,62 +116,51 @@ function editableCell(r, field, display, isEmpty = false) {
   }</span>`;
 }
 
-function clipsCell(r, ctx) {
-  if (!r.clips.length) {
-    return `<span class="clip-none">No clips</span> <button class="clip-download-btn" data-add-files="${r.id}" style="background:var(--surface-2);color:var(--text-dim)">+ Add Files</button>`;
-  }
-  const shown = r.clips.slice(0, 3);
-  const extra = r.clips.length - shown.length;
-  const thumbs = shown.map(c => `<span class="clip-thumb clip-swatch-${c.swatch}"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M2 1l7 4-7 4V1z"/></svg></span>`).join('');
-  return `
-    <span class="clip-strip">
-      ${thumbs}${extra > 0 ? `<span class="clip-more">+${extra}</span>` : ''}
-      <span class="clip-count-label">${r.clips.length} Clip${r.clips.length === 1 ? '' : 's'}</span>
-      <button class="clip-download-btn" data-download-all="${r.id}"><svg viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5l3 3 3-3M2 10h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Download</button>
-      <button class="clip-download-btn" data-add-files="${r.id}" style="background:var(--surface-2);color:var(--text-dim)">+</button>
-    </span>`;
+function actionCell(r) {
+  return `<button class="vm-row-action" data-open-drawer="${r.id}" type="button">Open ›</button>`;
 }
 
-function videoLinkCell(r) {
-  if (!r.youtubeUrl) {
-    return `<span class="vm-cell" data-editable="true" data-id="${r.id}" data-field="videoLink" tabindex="0"><span class="is-empty">Paste YouTube link…</span></span>`;
-  }
+/* =============================================================
+ * Row rendering (two column sets)
+ * ============================================================= */
+function readyRowHtml(r, ctx) {
   return `
-    <span class="yt-actions">
-      <button class="btn btn-icon" data-copy-link="${r.id}" title="Copy video link"><svg viewBox="0 0 14 14" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 9.5V2.5A1 1 0 0 1 3.5 1.5h7" stroke="currentColor" stroke-width="1.3"/></svg></button>
-      <button class="btn btn-icon" data-open-yt="${r.id}" title="Open YouTube"><svg viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 1 5 5" stroke="currentColor" stroke-width="1.3"/><path d="M9 3h3v3M12 2 7.5 6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
-    </span>`;
+    <tr data-id="${r.id}">
+      <td>${videoIdCell(r)}</td>
+      <td>${escapeHtml(r.consignorName)}</td>
+      <td>${cattleCell(r, ctx)}</td>
+      <td>${clipsCell(r)}</td>
+      <td>${statusIssueCell(r)}</td>
+      <td>${formatDateShort(r.dateAdded)}</td>
+      <td>${actionCell(r)}</td>
+    </tr>`;
 }
 
-function embedLinkCell(r) {
-  if (!r.embedUrl) return `<span class="yt-none">—</span>`;
-  return `<button class="btn btn-icon" data-copy-embed="${r.id}" title="Copy embed link"><svg viewBox="0 0 14 14" fill="none"><path d="M5 4 2 7l3 3M9 4l3 3-3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
-}
-
-function actionsCell(r) {
-  const moves = [
-    { s: 'ready', l: 'Ready' }, { s: 'hold', l: 'On Hold' }, { s: 'created', l: 'Created' },
-  ].filter(m => m.s !== r.status);
+function createdRowHtml(r, ctx) {
   return `
-    <span class="row-actions">
-      <select class="btn btn-sm" data-move="${r.id}" style="width:auto;padding:5px 6px;">
-        <option value="">Move…</option>
-        ${moves.map(m => `<option value="${m.s}">${m.l}</option>`).join('')}
-      </select>
-      <button class="btn btn-sm" data-open-drawer="${r.id}">Open</button>
-    </span>`;
+    <tr data-id="${r.id}">
+      <td>${videoIdCell(r)}</td>
+      <td>${escapeHtml(r.consignorName)}</td>
+      <td>${cattleCell(r, ctx)}</td>
+      <td>${clipsCell(r)}</td>
+      <td>${sourceCell(r, ctx)}</td>
+      <td>${usageCell(r)}</td>
+      <td>${publishedCell(r)}</td>
+      <td>${formatDateShort(r.dateAdded)}</td>
+      <td>${actionCell(r)}</td>
+    </tr>`;
 }
 
 /* =============================================================
  * ADD ROW — fast entry
  * ============================================================= */
-function addRowHtml(ctx) {
+function addRowHtml(colspan) {
   if (!addRowOpen) {
-    return `<tr class="vm-addrow-row"><td colspan="15"><button class="vm-addrow-btn" id="vm-open-addrow" type="button">+ Add row</button></td></tr>`;
+    return `<tr class="vm-addrow-row"><td colspan="${colspan}"><button class="vm-addrow-btn" id="vm-open-addrow" type="button">+ Add row</button></td></tr>`;
   }
   return `
     <tr class="vm-addrow-row">
-      <td colspan="15">
+      <td colspan="${colspan}">
         <div style="display:flex;align-items:center;gap:10px;">
           <input type="text" id="vm-addrow-input" class="vm-videoid-input" placeholder="Type Video ID, e.g. 21.2.2.2.450.0826, then press Tab or Enter" autocomplete="off" />
           <button class="btn btn-sm btn-ghost" id="vm-close-addrow" type="button">Cancel</button>
@@ -198,18 +215,23 @@ function wireAddRow(tbody, ctx) {
 }
 
 /* =============================================================
- * Row interaction wiring (delegated)
+ * Row interaction wiring (delegated) — clicking anywhere on a row
+ * not otherwise interactive opens the drawer.
  * ============================================================= */
 function wireRows(tbody, ctx) {
   tbody.addEventListener('click', async e => {
+    const clipsTrigger = e.target.closest('[data-clips-trigger]');
+    if (clipsTrigger) {
+      const rec = await ctx.repo.getVideoById(clipsTrigger.dataset.clipsTrigger);
+      openClipsPopover(clipsTrigger, rec, ctx);
+      return;
+    }
+
     const editable = e.target.closest('.vm-cell[data-editable="true"]');
     if (editable && !editable.classList.contains('editing')) { startEdit(editable, ctx); return; }
 
     const addFilesBtn = e.target.closest('[data-add-files]');
     if (addFilesBtn) { pickFilesForRow(addFilesBtn.dataset.addFiles, ctx); return; }
-
-    const downloadAllBtn = e.target.closest('[data-download-all]');
-    if (downloadAllBtn) { downloadAll(downloadAllBtn.dataset.downloadAll, ctx); return; }
 
     const copyLinkBtn = e.target.closest('[data-copy-link]');
     if (copyLinkBtn) {
@@ -236,29 +258,22 @@ function wireRows(tbody, ctx) {
 
     const openDrawerBtn = e.target.closest('[data-open-drawer]');
     if (openDrawerBtn) { ctx.openDrawer(openDrawerBtn.dataset.openDrawer); return; }
-  });
 
-  tbody.addEventListener('change', async e => {
-    const moveSelect = e.target.closest('[data-move]');
-    if (moveSelect && moveSelect.value) {
-      await ctx.repo.setStatus(moveSelect.dataset.move, moveSelect.value, 'Staff');
-      showToast('Status updated');
-      ctx.refresh();
-    }
+    // Fallback: click anywhere else on a data row opens the drawer.
+    const tr = e.target.closest('tr[data-id]');
+    if (tr) ctx.openDrawer(tr.dataset.id);
   });
 }
 
 function startEdit(span, ctx) {
   const field = span.dataset.field;
   const id = span.dataset.id;
-  const isTextarea = field === 'notes';
-  const raw = span.textContent.trim() === '—' ? '' : span.textContent.trim();
+  const raw = span.textContent.trim() === 'Paste YouTube link…' ? '' : span.textContent.trim();
   span.classList.add('editing');
 
-  const input = document.createElement(isTextarea ? 'textarea' : 'input');
+  const input = document.createElement('input');
   input.className = 'vm-edit-input';
-  input.value = field === 'weight' ? raw.replace(/[^\d.]/g, '') : raw === 'Paste YouTube link…' ? '' : raw;
-  if (field === 'weight') input.type = 'number';
+  input.value = raw;
   input.style.cssText = 'width:100%;background:transparent;border:none;color:inherit;font:inherit;outline:none;';
   span.innerHTML = '';
   span.appendChild(input);
@@ -267,37 +282,21 @@ function startEdit(span, ctx) {
 
   const finish = async (commit) => {
     span.classList.remove('editing');
-    if (!commit) { renderTableSoft(ctx); return; }
+    if (!commit) { ctx.refresh(); return; }
     const value = input.value.trim();
     await applyFieldEdit(id, field, value, ctx);
     ctx.refresh();
   };
 
   input.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !isTextarea) { e.preventDefault(); finish(true); }
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
     if (e.key === 'Escape') { e.preventDefault(); finish(false); }
-    if (e.key === 'Tab') { finish(true); } // allow default focus move after commit
+    if (e.key === 'Tab') { finish(true); }
   });
   input.addEventListener('blur', () => finish(true));
 }
 
-function renderTableSoft(ctx) { ctx.refresh(); }
-
 async function applyFieldEdit(id, field, value, ctx) {
-  if (field === 'weight') {
-    const record = await ctx.repo.getVideoById(id);
-    const weight = Number(value);
-    if (!weight || weight === record.weight) return;
-    const { collision } = await ctx.repo.setVideoIdFields(id, { ...record, weight }, 'Staff');
-    if (collision) {
-      showToast(`That weight would collide with ${collision.videoId} — kept previous weight`);
-      return;
-    }
-    showToast(`Weight updated — Video ID is now ${record.baseVideoId ? '' : ''}${(await ctx.repo.getVideoById(id)).videoId}`);
-    return;
-  }
-  if (field === 'videoMaker') return ctx.repo.updateVideo(id, { videoMaker: value }, 'Staff');
-  if (field === 'notes') return ctx.repo.updateVideo(id, { notes: value }, 'Staff');
   if (field === 'videoLink') {
     if (!value) return;
     const ytId = extractYoutubeId(value);
@@ -311,6 +310,63 @@ function extractYoutubeId(link) {
   if (m) return m[1];
   if (/^[a-zA-Z0-9_-]{5,}$/.test(link.trim())) return link.trim();
   return null;
+}
+
+/* =============================================================
+ * Clips popover — click "N clips" to see the individual files
+ * without leaving the table. Monochrome, no per-clip colored icons.
+ * ============================================================= */
+function closeClipsPopover() {
+  const existing = document.getElementById('vm-active-popover');
+  if (existing) {
+    if (existing._cleanup) existing._cleanup();
+    existing.remove();
+  }
+}
+
+function openClipsPopover(anchorEl, rec, ctx) {
+  closeClipsPopover();
+  const rect = anchorEl.getBoundingClientRect();
+  const pop = document.createElement('div');
+  pop.className = 'vm-popover';
+  pop.id = 'vm-active-popover';
+  const width = 300;
+  pop.style.top = `${Math.min(rect.bottom + 6, window.innerHeight - 200)}px`;
+  pop.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))}px`;
+  pop.innerHTML = `
+    <div class="vm-popover-title">${rec.clips.length} Source Clip${rec.clips.length === 1 ? '' : 's'}</div>
+    ${rec.clips.map(c => `
+      <div class="vm-popover-clip-row">
+        <svg class="vm-popover-clip-icon" viewBox="0 0 24 24" fill="none"><path d="M4 6h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6"/><path d="M17 10.5 22 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <span class="vm-popover-clip-name">${escapeHtml(c.filename)}</span>
+        <span class="vm-popover-clip-dur">${formatDuration(c.durationSec)}</span>
+        <button class="vm-popover-play" data-play-clip="${c.id}" type="button" title="Preview"><svg viewBox="0 0 12 12" fill="currentColor"><path d="M3 2l7 4-7 4V2z"/></svg></button>
+      </div>
+    `).join('')}
+    <div class="vm-popover-footer"><button class="btn btn-sm btn-block" id="pop-download-all" type="button">Download All</button></div>
+  `;
+  document.body.appendChild(pop);
+
+  pop.querySelector('#pop-download-all').addEventListener('click', () => downloadAll(rec.id, ctx));
+  pop.querySelectorAll('[data-play-clip]').forEach(btn => btn.addEventListener('click', () => {
+    const clip = rec.clips.find(c => c.id === btn.dataset.playClip);
+    previewClip(clip);
+  }));
+
+  function outsideHandler(e) { if (!pop.contains(e.target) && e.target !== anchorEl) closeClipsPopover(); }
+  function escHandler(e) { if (e.key === 'Escape') closeClipsPopover(); }
+  setTimeout(() => document.addEventListener('click', outsideHandler), 0);
+  document.addEventListener('keydown', escHandler);
+  pop._cleanup = () => {
+    document.removeEventListener('click', outsideHandler);
+    document.removeEventListener('keydown', escHandler);
+  };
+}
+
+function previewClip(clip) {
+  if (!clip || !clip.fileHandle) { showToast('Mock data — original files aren’t wired to real storage in this prototype yet'); return; }
+  const url = URL.createObjectURL(clip.fileHandle);
+  window.open(url, '_blank', 'noopener');
 }
 
 /* =============================================================
