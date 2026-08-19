@@ -55,6 +55,13 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 
 .view{flex:1;display:none;padding:34px}
+/* The editor view manages its own full-bleed layout (.ed-wrap is sized to
+   exactly fill the viewport below the topbar via calc(100vh - Npx)) — the
+   generic 34px view padding above was adding on top of that math, pushing
+   the actual rendered height past the viewport and forcing the whole page
+   to scroll instead of just .ed-canvas internally. Start/Settings keep the
+   normal padding; only the editor needs none. */
+#v-editor{padding:0}
 .view.on{display:block}
 
 /* ---------- upload ---------- */
@@ -92,20 +99,15 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 
 /* ---------- editor ---------- */
 .ed-wrap{display:flex;gap:0;height:calc(100vh - 56px)}
-/* Page nav rail: PAGE NAV | LOT GUTTER | PAGE. Narrow on purpose — plain page
-   numbers, not thumbnails, so it stays legible and cheap to render at 20+
-   pages. Hidden entirely for a single-page catalog (see .single-page),
-   since a nav rail with one entry has nothing to navigate. */
-.ed-rail{width:56px;background:var(--navy);padding:12px 8px;overflow-y:auto;overflow-x:hidden;flex-shrink:0}
-.ed-rail.single-page{display:none}
-.ed-rail h4{font-size:9px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;
-  margin:0 0 8px;font-family:'Barlow';font-weight:600;text-align:center}
-.thumb{background:transparent;border-radius:6px;margin-bottom:4px;cursor:pointer;
-  border:1.5px solid transparent;color:var(--dim);font-family:'Oswald';font-weight:600;
-  font-size:13px;text-align:center;padding:6px 2px;transition:.12s}
-.thumb:hover{background:rgba(255,255,255,.06);color:var(--txt)}
-.thumb.on{background:var(--blue);border-color:var(--blue);color:#fff}
-.thumb.over{outline:1.5px solid #e0483c;outline-offset:1px}
+.ed-rail{width:178px;background:var(--navy);padding:14px 12px;overflow:auto;flex-shrink:0}
+.ed-rail h4{font-size:11px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;
+  margin:0 0 10px 4px;font-family:'Barlow';font-weight:600}
+.thumb{background:#fff;border-radius:4px;margin-bottom:10px;cursor:pointer;
+  border:2px solid transparent;position:relative;overflow:hidden}
+.thumb.on{border-color:var(--blue)}
+.thumb .tlabel{position:absolute;left:0;right:0;bottom:0;background:rgba(10,26,69,.86);
+  color:#fff;font-size:9px;padding:2px 5px;letter-spacing:.4px}
+.thumb.over{outline:2px solid #e0483c;outline-offset:1px}
 .ed-main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .ed-tools{display:flex;align-items:center;gap:8px;padding:10px 16px;
   background:var(--bg2);border-bottom:1px solid #2a3257;flex-wrap:wrap;
@@ -403,8 +405,8 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .ed-wrap{background:#f5f1ea;}
 .ed-rail{background:#131820;border-right:1px solid rgba(255,255,255,.08);}
 .ed-rail h4{color:#8b919c;}
-.thumb:hover{background:rgba(255,255,255,.08);}
-.thumb.on{background:#b8860b;border-color:#b8860b;color:#fff;}
+.thumb.on{border-color:#d4a017;}
+.thumb .tlabel{background:rgba(19,24,32,.9);color:#f5d491;}
 .ed-tools{background:#fff;border-bottom:1px solid #e6e0d4;}
 .ed-tools .vr{background:#e6e0d4;}
 .ed-tools select{background:#fff;border:1px solid #d4cdbd;color:#1a1d23;}
@@ -737,7 +739,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .lotrow.gbot .cell.lot::after{background:#13235e !important;height:2.4px !important;z-index:20 !important;}
 .sheet .lotrow .cell.head .cc{font-size:calc(1.02em + 2pt) !important;}
 
-@media (max-width: 760px){.view{padding:18px}.settings-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-wrap:wrap}.crumbs{width:100%;overflow:auto}.ed-canvas{padding:18px}}
+@media (max-width: 760px){.view{padding:18px}.settings-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-wrap:wrap}.crumbs{width:100%;overflow:auto}.ed-rail{width:132px}.ed-canvas{padding:18px}}
 
 .sheet .s-thead .cell{line-height:1.05;}
 .sheet .lotrow .cell.po-price .cc{min-height:18px;white-space:nowrap;overflow-wrap:normal;word-break:normal;}
@@ -1947,22 +1949,22 @@ if(document.fonts&&document.fonts.ready){
     if(ed&&ed.classList.contains('on'))renderEditor();
   });
 }
-// Page nav is a narrow rail of plain page numbers, not full-page thumbnails.
-// It used to clone every rendered .sheet (full lot rows and all) into a mini
-// preview on every single render — for a 15-20+ page catalog that's a dozen-
-// plus full-DOM clones rebuilt on every edit, which is exactly the kind of
-// thing that gets slow at that length. Numbers reuse the exact same rail,
-// click-to-scroll, and overflow-flag wiring, just without the per-page render
-// cost — and stay legible at a fraction of the width.
 function renderThumbs(){
   const pages=allPages();
-  const rail=$('.ed-rail');
-  if(rail)rail.classList.toggle('single-page',pages.length<=1);
-  $('#thumbs').innerHTML=pages.map((p,i)=>
-    `<div class="thumb" data-goto="${i}" title="Page ${i+1} — ${escAttr(p.sec.type)}">${i+1}</div>`
-  ).join('')||'<div class="empty-rail">No pages</div>';
+  $('#thumbs').innerHTML=pages.map((p,i)=>{
+    return `<div class="thumb" data-goto="${i}">
+      <div style="transform:scale(.144);transform-origin:top left;width:1056px;height:816px">
+      </div>
+      <div class="tlabel">Pg ${i+1} · ${esc(p.sec.type)}</div></div>`;
+  }).join('')||'<div class="empty-rail">No pages</div>';
+  // mini render
   const pgEls=$$('#zoomwrap .sheet');
   $$('#thumbs .thumb').forEach((t,i)=>{
+    const holder=t.querySelector('div');
+    if(pgEls[i]){const c=pgEls[i].cloneNode(true);
+      c.classList.add('hidectl');c.style.margin='0';c.style.boxShadow='none';
+      holder.appendChild(c);}
+    t.querySelector('div').style.height='117px';
     t.onclick=()=>{
       if(!pgEls[i])return;
       pgEls[i].scrollIntoView({behavior:'smooth',block:'start'});
