@@ -122,7 +122,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .results-upload{display:none;align-items:center;gap:8px;margin-left:auto}
 .results-upload.on{display:flex}
 .ed-tools .col-w-val{min-width:42px;text-align:center}
-.ed-canvas{flex:1;overflow:auto;padding:30px 30px 30px 200px;background:#0c1024;text-align:center}
+.ed-canvas{flex:1;overflow:auto;padding:30px 30px 30px 250px;background:#0c1024;text-align:center}
 /* Catalog Colors used to be a persistent full-width bar above the canvas,
    taking up its own horizontal strip even collapsed. Moved into a modal
    (same #c-blue etc ids, same updateColorsFromEditor wiring) reached from
@@ -255,41 +255,51 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    down through the option instead of two disconnected pieces; it's kept
    thinner than the master's 2.4px bracket so it stays visually light. */
 .lotrow-condensed{position:relative;display:grid;align-items:stretch;flex-shrink:0;
-  min-height:32px;border-bottom:1px solid var(--line);
+  min-height:42px;border-bottom:1px solid var(--line);
   background:rgba(51,102,153,.09);font-size:calc(11px * var(--ts,1))}
-.lotrow-condensed.cond-last{border-bottom:6px solid var(--lot-divider,#d3d3d3);padding-bottom:5px}
+.lotrow-condensed.cond-last{border-bottom:6px solid var(--lot-divider,#d3d3d3);padding-bottom:14px}
 .lotrow-condensed .cond-span{position:relative;display:flex;
   align-items:center;min-width:0;padding:0 10px 0 27px}
 .lotrow-condensed .cond-span::before{content:'';position:absolute;left:0;top:0;bottom:0;
-  border-left:1.5px solid var(--deepblue)}
+  border-left:2.4px solid var(--deepblue)}
 .lotrow-condensed.cond-last .cond-span::before{bottom:50%}
 .lotrow-condensed .cond-span::after{content:'';position:absolute;left:0;top:50%;width:16px;
-  border-top:1.5px solid var(--deepblue)}
-.lotrow-condensed .cond-fields{flex:1;display:flex;align-items:baseline;min-width:0}
-.lotrow-condensed .cond-field{flex:0 0 auto;color:#2a3354;white-space:nowrap;overflow:hidden}
-.lotrow-condensed .cond-field .cc{display:inline-block;min-width:.6em}
+  border-top:2.4px solid var(--deepblue)}
+.lotrow-condensed .cond-fields{flex:1;display:flex;align-items:center;min-width:0}
+/* overflow:hidden + text-overflow:ellipsis on every fixed-width field (not
+   just Consignor, which had it before) — each field's box is a hard stop,
+   so a value that's too long to fit (a long delivery date range, a long
+   consignor name) truncates with "…" inside its own column instead of
+   silently spilling past its edge into whatever text sits next to it. */
+.lotrow-condensed .cond-field{flex:0 0 auto;color:#2a3354;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.lotrow-condensed .cond-field .cc{display:inline-block;min-width:.6em;max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
 /* differs-from-master flag: bolded rather than colored so it still reads correctly
    in black & white print/PDF, matching the Differences list's own bold labels. */
 .lotrow-condensed .cond-field.cond-differs .cc{font-weight:700;color:#0c1430}
 .lotrow-condensed .cond-lot{width:55px;font-family:'Oswald';font-weight:700;
   font-size:1.1em;color:var(--deepblue)}
+.lotrow-condensed .cond-consignor{width:128px}
 .lotrow-condensed .cond-head{width:70px}
 .lotrow-condensed .cond-loads{width:75px}
+.lotrow-condensed .cond-sex{width:55px}
 .lotrow-condensed .cond-wt{width:70px}
-.lotrow-condensed .cond-delivery{width:135px}
-.lotrow-condensed .cond-consignor{width:112px;overflow:hidden;text-overflow:ellipsis}
+.lotrow-condensed .cond-delivery{width:150px}
 .lotrow-condensed .cond-diffs{flex:1 1 auto;min-width:0;color:#2a3354;font-size:.95em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lotrow-condensed .cond-diffs b{font-weight:700;color:#0c1430}
 .lotrow-condensed .cond-diffs .cond-sep{margin:0 7px;color:#b3b9cc}
 .lotrow-condensed .cond-note .cc{font-style:italic}
-.lotrow-condensed .cond-add-note{flex:0 0 auto;margin-left:8px;border:0;background:none;
-  cursor:pointer;font-size:.85em;color:#7c86a8;padding:1px 4px;border-radius:3px;white-space:nowrap}
-.lotrow-condensed .cond-add-note:hover{color:var(--deepblue);background:rgba(51,102,153,.12)}
+.lotrow-condensed .cond-add-note{flex:0 0 auto;margin-left:8px;border:1px solid #c7cee0;
+  background:#fff;cursor:pointer;font-size:.9em;font-weight:600;color:#5a6488;
+  padding:4px 9px;min-height:22px;border-radius:4px;white-space:nowrap}
+.lotrow-condensed .cond-add-note:hover{color:var(--deepblue);border-color:var(--deepblue);
+  background:rgba(51,102,153,.12)}
 .hidectl .cond-add-note{display:none !important}
 .lotrow-condensed .cond-price{display:flex;align-items:center;
   justify-content:center;border-left:1px solid var(--line);font-family:'Oswald';
-  font-weight:700;color:var(--deepblue);font-size:1.05em}
+  font-weight:700;color:var(--deepblue);font-size:1.35em}
 .lotrow-condensed .cond-price .cc{width:100%;text-align:center}
 
 /* footer */
@@ -317,15 +327,15 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    down into the row below and visually overlapped that row's own controls.
    A horizontal strip is at most ~24px tall regardless of how many actions it
    holds, so it always fits inside even the shortest row. Master lots get the
-   full set; continuation rows in an option group (.row-gutter-sub) only get
-   what they actually support today (select + split) — never a second copy of
-   the master's full control set. Less-common actions (jump to adjacent page)
-   live behind the "more" (⋯) toggle instead of being permanent buttons, per
-   row. */
-.row-gutter{position:absolute;left:-142px;top:50%;transform:translateY(-50%);
+   full set, including the previous/next-page jump buttons directly (moving a
+   lot to another page is a heavily-used action — a "more" popover made it two
+   clicks, so it's a permanent visible button here instead). Continuation rows
+   in an option group (.row-gutter-sub) only get what they actually support
+   today (select + split) — never a second copy of the master's full set. */
+.row-gutter{position:absolute;left:-180px;top:50%;transform:translateY(-50%);
   display:none;align-items:center;gap:3px;z-index:10;opacity:.5;transition:opacity .12s}
 .editing .row-gutter{display:flex}
-.editing .lotrow:hover .row-gutter,.row-gutter:hover,.row-gutter.menu-open{opacity:1;z-index:30}
+.editing .lotrow:hover .row-gutter,.row-gutter:hover{opacity:1;z-index:30}
 .row-gutter input[type="checkbox"]{width:16px;height:16px;accent-color:#b8860b;
   cursor:pointer;margin:0;flex-shrink:0}
 .row-gutter button{width:20px;height:20px;flex-shrink:0;background:#0f1730;color:#fff;
@@ -335,16 +345,11 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .row-gutter .drag-grip{cursor:grab;color:#cfd6ef;background:transparent;box-shadow:none}
 .row-gutter .drag-grip:hover{background:#2a3560}
 .row-gutter .drag-grip:active{cursor:grabbing}
+.row-gutter .pgbtn{width:26px;font-size:8.5px;font-weight:700;letter-spacing:.2px;
+  color:#aeb9e2}
+.row-gutter .pgbtn:hover{color:#fff}
 .row-gutter-sub .split-btn{background:#7a5a12}
 .row-gutter-sub .split-btn:hover{background:#b8860b}
-.row-more-wrap{position:relative}
-.row-more-menu{display:none;position:absolute;left:0;top:calc(100% + 3px);
-  background:#0f1730;border-radius:7px;padding:3px;box-shadow:0 4px 16px rgba(0,0,0,.4);
-  flex-direction:column;gap:1px;min-width:168px;z-index:40}
-.row-gutter.menu-open .row-more-menu{display:flex}
-.row-more-menu button{width:auto;height:auto;justify-content:flex-start;padding:6px 9px;
-  font-size:11.5px;font-weight:500;white-space:nowrap;box-shadow:none;color:#cfd6ef}
-.row-more-menu button:hover{background:var(--blue);color:#fff}
 .over-badge{position:absolute;top:6px;right:84px;background:#e0483c;color:#fff;
   font-size:10px;font-weight:700;padding:3px 9px;border-radius:11px;letter-spacing:.5px;
   font-family:'Barlow'}
@@ -544,7 +549,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .tools-check input{width:16px;height:16px;accent-color:#b8860b;cursor:pointer}
 
 /* Compact, clearer editing toolbar */
-.ed-tools{gap:5px !important;padding:5px 10px !important;row-gap:5px !important;flex-wrap:nowrap !important;overflow-x:auto;overflow-y:hidden}
+.ed-tools{gap:5px !important;padding:5px 10px !important;row-gap:5px !important}
 .ed-tools .grp{gap:3px;padding:1px 3px;border-radius:6px;flex-shrink:0}
 .ed-tools .grp .lbl{font-size:9px !important;letter-spacing:.3px}
 .ed-tools .btn.sm{padding:3px 7px;font-size:11px;border-radius:5px;line-height:1.5}
@@ -622,6 +627,18 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
    merged branch has. */
 .sheet:not(.hidectl) .lotrow.sel-on{box-shadow:inset 4px 0 0 #b8860b;background:rgba(184,134,11,.07) !important}
 .sheet:not(.hidectl) .lotrow-condensed.sel-on{box-shadow:inset 4px 0 0 #b8860b;background:rgba(184,134,11,.07) !important}
+
+/* Which row you're actively editing had no indicator at all before this —
+   clicking into a cell to edit it looked identical to any other row.
+   :focus-within lights up automatically whenever the row (or any field
+   inside it) has focus, no JS/state tracking needed — it turns off by
+   itself the moment focus moves elsewhere. Blue rather than the gold used
+   for checkbox selection, so "I'm editing this" and "I checked this for a
+   bulk action" read as two different things when both happen to be true
+   at once. :not(.hidectl) for the same PDF-export-safety reason as .sel-on
+   above, though focus realistically can't survive into a screenshot pass. */
+.sheet:not(.hidectl) .lotrow:focus-within{box-shadow:inset 0 0 0 2px var(--blue) !important}
+.sheet:not(.hidectl) .lotrow-condensed:focus-within{box-shadow:inset 0 0 0 2px var(--blue) !important}
 
 /* Modal */
 .modal-back{position:fixed;inset:0;background:rgba(19,24,32,.55);display:none;align-items:flex-start;justify-content:center;z-index:5000;padding:40px 16px;overflow:auto}
@@ -1403,8 +1420,6 @@ function condSellerVal(lot){const e=lotEdit(lot,'seller');return e!=null?condPla
 function condNotesVal(lot){const e=lotEdit(lot,'notes');return e!=null?condPlain(e):[lot.desc1,lot.desc2].filter(Boolean).join(' ');}
 function condensedFieldDiffs(lot,first){
   const diffs=[];
-  const sexV=flat(lotEdit(lot,'sex')??lot.sex), sexF=flat(lotEdit(first,'sex')??first.sex);
-  if(sexV&&sexV!==sexF)diffs.push({label:'Sex',value:sexV,c:'sex'});
   const shrinkV=esc(lotEdit(lot,'shrink')??lot.shrink), shrinkF=esc(lotEdit(first,'shrink')??first.shrink);
   if(shrinkV&&shrinkV!==shrinkF)diffs.push({label:'Shrink',value:shrinkV,c:'shrink'});
   const slideV=flat(lotEdit(lot,'slide')??lot.slide), slideF=flat(lotEdit(first,'slide')??first.slide);
@@ -1435,6 +1450,7 @@ function condensedOptionRowHTML(lot,first,li,bi,page,isLast,grid,cols){
   const headV=esc(lotEdit(lot,'head')??lot.head??''), headF=esc(lotEdit(first,'head')??first.head??'');
   const loadV=esc(lotEdit(lot,'loadCount')??lot.loadCount??''), loadF=esc(lotEdit(first,'loadCount')??first.loadCount??'');
   const loadN=parseInt(loadV)||0;
+  const sexV=flat(lotEdit(lot,'sex')??lot.sex), sexF=flat(lotEdit(first,'sex')??first.sex);
   const basewtV=esc(lotEdit(lot,'basewt')??lot.basewt??''), basewtF=esc(lotEdit(first,'basewt')??first.basewt??'');
   const deliveryV=esc(lotEdit(lot,'delivery')??lot.delivery??''), deliveryF=esc(lotEdit(first,'delivery')??first.delivery??'');
   const consignorV=esc(condSellerVal(lot)), consignorF=esc(condSellerVal(first));
@@ -1456,11 +1472,12 @@ function condensedOptionRowHTML(lot,first,li,bi,page,isLast,grid,cols){
       <div class="cond-span" style="grid-column:1 / ${spanEnd}">
         <div class="cond-fields">
           ${condField('cond-lot',lot,'lot',esc(displayLotNumber(lot)),undefined,'')}
+          ${condField('cond-consignor',lot,'seller',consignorV,consignorF,'')}
           ${condField('cond-head',lot,'head',headV,headF,headV?' hd':'')}
           ${condField('cond-loads',lot,'loadCount',loadV,loadF,loadV?` load${loadN===1?'':'s'}`:'')}
+          ${condField('cond-sex',lot,'sex',sexV,sexF,'')}
           ${condField('cond-wt',lot,'basewt',basewtV,basewtF,basewtV?'#':'')}
           ${condField('cond-delivery',lot,'delivery',deliveryV,deliveryF,'')}
-          ${condField('cond-consignor',lot,'seller',consignorV,consignorF,'')}
           <span class="cond-diffs">${diffsHtml}</span>
           ${addNoteBtn}
         </div>
@@ -1684,7 +1701,7 @@ function setLotHeight(lot,h){modeState().heights[lot.id]=Math.max(54,Math.round(
 // either one at different times (e.g. it stops being an option's 2nd+ member). -----
 function condensedLotHeight(lot){
   for(const m of modeChain()){const h=modeState(m).condHeights[lot.id]; if(Number.isFinite(h))return h;}
-  return 32;
+  return 42;
 }
 function setCondensedLotHeight(lot,h){modeState().condHeights[lot.id]=Math.max(22,Math.round(h));}
 // Whether `lot` is currently on-screen as a condensed subrow (vs. a normal full .lotrow) —
@@ -1840,13 +1857,8 @@ function sheetHTML(page,pageNum,totalPages){
             <button class="drag-grip" draggable="true" title="Drag to move this lot anywhere in the section">⠿</button>
             <button data-mv="-1" class="step" title="Move up one spot">▲</button>
             <button data-mv="1" class="step" title="Move down one spot">▼</button>
-            <div class="row-more-wrap">
-              <button class="row-more-toggle" title="More row actions">⋯</button>
-              <div class="row-more-menu">
-                <button data-pg="-1" class="pgbtn">Move to previous page</button>
-                <button data-pg="1" class="pgbtn">Move to next page</button>
-              </div>
-            </div>
+            <button data-pg="-1" class="pgbtn" title="Move to the previous page">PG▲</button>
+            <button data-pg="1" class="pgbtn" title="Move to the next page">PG▼</button>
           </div>`;
       }else if(b.grouped){
         h+=`<div class="row-gutter row-gutter-sub">
@@ -2032,23 +2044,11 @@ function wireSheetEvents(){
       renderEditor();
     });
   });
-  // more-actions popover (row gutter): one open at a time, closes on an
-  // outside click or a second click on its own toggle.
-  $$('#zoomwrap .row-more-toggle').forEach(btn=>{
-    btn.addEventListener('click',e=>{
-      e.stopPropagation();
-      const wrap=btn.closest('.row-gutter');
-      const wasOpen=wrap.classList.contains('menu-open');
-      $$('#zoomwrap .row-gutter.menu-open').forEach(g=>g.classList.remove('menu-open'));
-      if(!wasOpen)wrap.classList.add('menu-open');
-    });
-  });
   // move buttons
   $$('#zoomwrap .row-gutter button[data-pg]').forEach(btn=>{
     btn.addEventListener('click',e=>{
       e.stopPropagation();
       const row=e.target.closest('.lotrow');
-      row.querySelector('.row-gutter')?.classList.remove('menu-open');
       moveBlockPage(+row.dataset.si,+row.dataset.pi,+row.dataset.bi,+btn.dataset.pg);
     });
   });
@@ -2261,12 +2261,6 @@ document.addEventListener('focusin',e=>{
     lastFocusCell={id:e.target.dataset.id,c:e.target.dataset.c};
   }
   if(typeof updateContextualToolbar==='function')updateContextualToolbar();
-});
-// Row gutter "more" popover: close it on any click outside the gutter, so at
-// most one is ever open and it never lingers over the catalog.
-document.addEventListener('click',e=>{
-  if(e.target.closest('.row-gutter'))return;
-  $$('#zoomwrap .row-gutter.menu-open').forEach(g=>g.classList.remove('menu-open'));
 });
 function adjustRow(delta){
   if(!lastFocusLot){toast('Click a lot first.');return;}
