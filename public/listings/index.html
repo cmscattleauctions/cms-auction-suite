@@ -214,30 +214,43 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    Settings > Output Options > Condensed Option Lots (S.issue.optionLotLayout).
    Only ever used for li>0 rows of a grouped block; the group's first lot
    always renders as a normal full .lotrow. See condensedOptionRowHTML().
-   The bracket line is a border-left on the row itself, flush at x:0 —
-   the exact same edge the full row's own blue bracket border sits on
-   (.lotrow.gtop .cell.lot) — so it's anchored to a real column line
-   rather than floating at an arbitrary offset, and being a per-row
-   border rather than one absolutely-positioned line spanning multiple
-   rows, it structurally cannot overshoot past the group's actual last
-   row. Subrow content is indented well clear of that line (padding-left)
-   so subrows read as visually subordinate to the group's first row.
-   cond-last (set from JS, not :last-child, since the group is rarely the
-   literal last row on the page) caps the bracket and adds the same heavy
-   divider used between any two different lots elsewhere in the sheet. */
-.lotrow-condensed{position:relative;display:flex;align-items:center;flex-shrink:0;
-  min-height:27px;padding:3px 14px 3px 42px;
-  border-left:2.4px solid var(--deepblue);
-  border-bottom:1px solid var(--line);font-size:calc(11px * var(--ts,1));background:#fff}
-.lotrow-condensed::after{content:'';position:absolute;left:0;top:50%;width:26px;border-top:2.4px solid var(--deepblue)}
+   Uses the SAME grid-template-columns string as the full row (passed in
+   as `grid`) so the Price column's boundary lines up exactly with the
+   real Price column above/below it, without caring what width Price
+   currently is. Everything left of Price is one merged, flexible area
+   (cond-span, grid-column:1/-2) — its internal layout is a small fixed
+   field-width rhythm (Lot/Head/Loads/Wt/Delivery) followed by a flexible
+   Differences area, deliberately NOT tied to the 11-column grid, since
+   forcing subrow values into those column widths is what made earlier
+   attempts look like miniature, misaligned table rows. */
+.lotrow-condensed{position:relative;display:grid;align-items:stretch;flex-shrink:0;
+  min-height:28px;border-bottom:1px solid var(--line);
+  background:rgba(51,102,153,.045);font-size:calc(11px * var(--ts,1))}
 .lotrow-condensed.cond-last{border-bottom:6px solid var(--lot-divider,#d3d3d3)}
-.lotrow-condensed.cond-last::before{content:'';position:absolute;left:0;bottom:0;width:26px;border-bottom:2.4px solid var(--deepblue)}
-.lotrow-condensed .cond-body{flex:1;display:flex;align-items:baseline;justify-content:space-between;gap:14px;min-width:0;flex-wrap:wrap}
-.lotrow-condensed .cond-lot{font-family:'Oswald';font-weight:700;font-size:1.15em;color:var(--deepblue);flex-shrink:0}
-.lotrow-condensed .cond-field{color:#2a3354;white-space:nowrap}
-.lotrow-condensed .cond-diff{color:#2a3354;font-size:.95em;white-space:nowrap}
-.lotrow-condensed .cond-diff b{font-weight:700;color:#0c1430}
-.lotrow-condensed .cond-price{font-family:'Oswald';font-weight:700;font-size:1.1em;color:var(--deepblue);flex-shrink:0;margin-left:auto;padding-left:12px}
+.lotrow-condensed .cond-span{grid-column:1 / -2;position:relative;display:flex;
+  align-items:center;min-width:0;padding:0 10px 0 27px}
+.lotrow-condensed .cond-span::before{content:'';position:absolute;left:11px;top:0;bottom:0;
+  border-left:1.25px solid #aab4d4}
+.lotrow-condensed.cond-last .cond-span::before{bottom:50%}
+.lotrow-condensed .cond-span::after{content:'';position:absolute;left:11px;top:50%;width:11px;
+  border-top:1.25px solid #aab4d4}
+.lotrow-condensed .cond-fields{flex:1;display:flex;align-items:baseline;min-width:0}
+.lotrow-condensed .cond-field{flex:0 0 auto;color:#2a3354;white-space:nowrap;overflow:hidden}
+.lotrow-condensed .cond-field .cc{display:inline-block;min-width:.6em}
+.lotrow-condensed .cond-lot{width:55px;font-family:'Oswald';font-weight:700;
+  font-size:1.1em;color:var(--deepblue)}
+.lotrow-condensed .cond-head{width:70px}
+.lotrow-condensed .cond-loads{width:75px}
+.lotrow-condensed .cond-wt{width:70px}
+.lotrow-condensed .cond-delivery{width:135px}
+.lotrow-condensed .cond-diffs{flex:1 1 auto;min-width:0;color:#2a3354;font-size:.95em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lotrow-condensed .cond-diffs b{font-weight:700;color:#0c1430}
+.lotrow-condensed .cond-diffs .cond-sep{margin:0 7px;color:#b3b9cc}
+.lotrow-condensed .cond-price{grid-column:-2 / -1;display:flex;align-items:center;
+  justify-content:center;border-left:1px solid var(--line);font-family:'Oswald';
+  font-weight:700;color:var(--deepblue);font-size:1.05em}
+.lotrow-condensed .cond-price .cc{width:100%;text-align:center}
 
 /* footer */
 .s-foot{height:34px;border-top:2px solid var(--blue);display:flex;align-items:center;
@@ -1168,40 +1181,57 @@ function sellerHTML(lot){
 /* ===== condensed option-lot rendering (experimental, toggle: S.issue.optionLotLayout) =====
  * Rendering only — never touches S.lots/group/CSV data. Legacy renderExistingOptionGroup
  * path (the col-based .lotrow loop in sheetHTML) is untouched; this is purely an
- * additional branch for li>0 rows of a grouped block when the per-auction toggle is on. */
+ * additional branch for li>0 rows of a grouped block when the per-auction toggle is on.
+ * Diff entries carry a `c` (the same column key legacy full rows use for that field)
+ * whenever the field maps 1:1 to a simple legacy text field, so the value can be made
+ * contenteditable through the exact same generic save wiring (wireSheetEvents' blur
+ * handler keys off [data-id][data-c] regardless of which row template rendered it).
+ * Seller/Notes are left read-only here: their legacy cells store a whole HTML block
+ * (name+location, multi-line notes), and writing a bare diff string into that key on
+ * blur would clobber formatting those fields already carry — editing them still works
+ * normally by switching to legacy view or the Edit Lot modal. */
 function condensedFieldDiffs(lot,first){
   const diffs=[];
   const sexV=flat(lotEdit(lot,'sex')??lot.sex), sexF=flat(lotEdit(first,'sex')??first.sex);
-  if(sexV&&sexV!==sexF)diffs.push({label:'Sex',value:sexV});
+  if(sexV&&sexV!==sexF)diffs.push({label:'Sex',value:sexV,c:'sex'});
   const shrinkV=esc(lotEdit(lot,'shrink')??lot.shrink), shrinkF=esc(lotEdit(first,'shrink')??first.shrink);
-  if(shrinkV&&shrinkV!==shrinkF)diffs.push({label:'Shrink',value:shrinkV});
+  if(shrinkV&&shrinkV!==shrinkF)diffs.push({label:'Shrink',value:shrinkV,c:'shrink'});
   const slideV=flat(lotEdit(lot,'slide')??lot.slide), slideF=flat(lotEdit(first,'slide')??first.slide);
-  if(slideV&&slideV!==slideF)diffs.push({label:'Slide',value:slideV});
+  if(slideV&&slideV!==slideF)diffs.push({label:'Slide',value:slideV,c:'slide'});
   if(lot.consignor&&lot.consignor!==first.consignor)diffs.push({label:'Seller',value:esc(lot.consignor)});
   const notesV=[lot.desc1,lot.desc2].filter(Boolean).join(' '), notesF=[first.desc1,first.desc2].filter(Boolean).join(' ');
   if(notesV&&notesV!==notesF)diffs.push({label:'Notes',value:flat(notesV)});
   return diffs;
 }
-function condensedOptionRowHTML(lot,first,li,bi,page,isLast){
-  const headV=esc(lotEdit(lot,'head')??lot.head);
-  const loadN=parseInt(lot.loadCount)||0;
-  const loadV=lot.loadCount?`${esc(lot.loadCount)} load${loadN===1?'':'s'}`:'';
-  const basewtV=lotEdit(lot,'basewt')??(lot.basewt?esc(lot.basewt)+'#':'');
-  const deliveryV=esc(lotEdit(lot,'delivery')??lot.delivery);
+function condField(cls,lot,c,value,suffix){
+  return `<span class="cond-field ${cls}"><span class="cc" contenteditable data-id="${lot.id}" data-c="${c}">${value}</span>${suffix?`<span class="cond-suffix">${suffix}</span>`:''}</span>`;
+}
+function condensedOptionRowHTML(lot,first,li,bi,page,isLast,grid){
+  const headV=esc(lotEdit(lot,'head')??lot.head??'');
+  const loadV=esc(lotEdit(lot,'loadCount')??lot.loadCount??'');
+  const loadN=parseInt(loadV)||0;
+  const basewtV=esc(lotEdit(lot,'basewt')??lot.basewt??'');
+  const deliveryV=esc(lotEdit(lot,'delivery')??lot.delivery??'');
   const priceV=lotEdit(lot,'price')??(lot.price?esc(lot.price):'');
   const diffs=condensedFieldDiffs(lot,first);
-  return `<div class="lotrow-condensed${isLast?' cond-last':''}" data-id="${lot.id}" data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}">
+  const diffsHtml=diffs.map(d=>{
+    const val=d.c?`<span class="cc" contenteditable data-id="${lot.id}" data-c="${d.c}">${d.value}</span>`:d.value;
+    return `<b>${esc(d.label)}:</b> ${val}`;
+  }).join('<span class="cond-sep">·</span>');
+  return `<div class="lotrow-condensed${isLast?' cond-last':''}" data-id="${lot.id}" data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}" style="grid-template-columns:${grid}">
       <div class="lot-select"><input type="checkbox" class="lot-cb" data-id="${lot.id}" title="Select lot"></div>
       <div class="lot-split"><button class="split-btn" data-li="${li}" title="Split the option group here — this lot and the ones below it move to the top of the next page">✂</button></div>
-      <div class="cond-body">
-        <span class="cond-lot">${esc(displayLotNumber(lot))}</span>
-        ${headV?`<span class="cond-field">${headV} hd</span>`:''}
-        ${loadV?`<span class="cond-field">${loadV}</span>`:''}
-        ${basewtV?`<span class="cond-field">${basewtV}</span>`:''}
-        ${deliveryV?`<span class="cond-field">${deliveryV}</span>`:''}
-        ${diffs.map(d=>`<span class="cond-diff"><b>${esc(d.label)}:</b> ${d.value}</span>`).join('')}
+      <div class="cond-span">
+        <div class="cond-fields">
+          ${condField('cond-lot',lot,'lot',esc(displayLotNumber(lot)),'')}
+          ${condField('cond-head',lot,'head',headV,headV?' hd':'')}
+          ${condField('cond-loads',lot,'loadCount',loadV,loadV?` load${loadN===1?'':'s'}`:'')}
+          ${condField('cond-wt',lot,'basewt',basewtV,basewtV?'#':'')}
+          ${condField('cond-delivery',lot,'delivery',deliveryV,'')}
+          <span class="cond-diffs">${diffsHtml}</span>
+        </div>
       </div>
-      <div class="cond-price">${priceV}</div>
+      <div class="cond-price"><span class="cc" contenteditable data-id="${lot.id}" data-c="price">${priceV}</span></div>
     </div>`;
 }
 
@@ -1544,7 +1574,7 @@ function sheetHTML(page,pageNum,totalPages){
     const condensedGroup=S.issue.optionLotLayout==='condensed'&&b.grouped;
     b.lots.forEach((lot,li)=>{
       if(condensedGroup&&li>0){
-        h+=condensedOptionRowHTML(lot,b.lots[0],li,bi,page,li===b.lots.length-1);
+        h+=condensedOptionRowHTML(lot,b.lots[0],li,bi,page,li===b.lots.length-1,grid);
         alt++;
         return;
       }
