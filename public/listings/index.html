@@ -245,50 +245,46 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    Condensed Option Lots (S.issue.optionLotLayout). The group's master lot always
    renders through legacyLotRowHTML() (see above sheetHTML()) exactly like any other
    full row — untouched, unmodified. Only the group's continuation lots become
-   compact sub-rows, all wrapped together under ONE shared vertical "OPTION" label
-   and bracket (.cond-group-wrap), rather than each row getting its own indent
-   marker. .cond-gutter is absolutely positioned (top:0;bottom:0) inside
-   .cond-group-wrap, whose own height is simply whatever its stacked .cond-subrows
-   need — so the label/bracket automatically span however many sub-rows exist, one
-   or many, with no manual height math anywhere.
-   Two distinct vertical strokes read as one connected group treatment: a thick
-   navy .cond-outer-bar at the very left edge (x=0), same weight/color as the
-   parent lot's own group border, so the group visually continues straight down
-   from the parent through the option area; and a thinner .cond-bracket sitting
-   right next to the OPTION label, close to the actual row content, marking where
-   the option data itself begins. Nothing left of that content column carries any
-   fill color — .lotrow-condensed itself has no background, so that whole gutter
-   area reads as plain white against the tinted content, making the indentation
-   obvious at a glance. The tint instead lives on .cond-span/.cond-price directly.
+   compact sub-rows, all wrapped together under one shared grouping bar
+   (.cond-group-wrap), rather than each row getting its own indent marker.
+   No text label anymore — the grouping is communicated purely by the bar's shape:
+   .cond-elbow is a short horizontal stub at the very top-left, the same navy/weight
+   as the parent lot's own left border, that "catches" where the parent's border
+   ends and turns right into .cond-bar, a vertical bar that then runs the full
+   height of the group (sized to whatever .cond-subrows actually needs — dynamic,
+   no manual height math). Together they read as one continuous branch off the
+   parent rather than a straight line or a separate bracket.
+   Everything left of the option content (the whole .cond-elbow/.cond-bar gutter)
+   stays plain white — .lotrow-condensed itself has no background/border of its
+   own; the tint AND the subtle inter-row separator both live on .cond-span/
+   .cond-price directly, which only start at the content's own left edge, so
+   nothing (fill or line) ever bleeds into that white indentation area.
    Each sub-row keeps the same grid-template-columns the header/master row use SOLELY
    so its Price cell(s) land in the exact real Price column, same as every other
    price on the sheet (condensedPriceCellsHTML). Everything left of Price is one
    merged span (.cond-span) laid out as a small purpose-built grid (NOT the real
    per-lot column grid) — Lot/Head/Loads/BaseWt get fixed narrow tracks so values
    line up row-to-row, Delivery gets the remaining flexible space since it's the
-   field most likely to run long, and diffs/+Note share one trailing flexible cell
-   so their variable length never disturbs the other columns' alignment. Fields
-   stay on one line each (white-space:nowrap) so wrapping, if a group ever needs
-   more room than one line, only ever happens between whole fields, never mid-word. */
+   field most likely to run long, and diffs/+Note share one trailing capped-width
+   cell so their variable length never disturbs the other columns' alignment or
+   reaches toward Price. Fields stay on one line each (white-space:nowrap) so
+   wrapping, if a group ever needs more room than one line, only ever happens
+   between whole fields, never mid-word. */
 .cond-group-wrap{position:relative;display:flex;flex-shrink:0}
-.cond-outer-bar{position:absolute;left:0;top:0;bottom:0;width:2.4px;background:var(--deepblue)}
-.cond-gutter{position:absolute;left:0;top:0;bottom:0;width:64px;pointer-events:none}
-.cond-option-label{position:absolute;top:0;bottom:0;right:12px;width:20px;
-  display:flex;align-items:center;justify-content:center}
-.cond-option-label span{display:inline-block;transform:rotate(-90deg);white-space:nowrap;
-  font-family:'Oswald';font-weight:800;font-size:9.5px;letter-spacing:1.3px;
-  color:var(--deepblue);text-transform:uppercase}
-.cond-bracket{position:absolute;top:6px;bottom:6px;right:6px;border-left:1.5px solid var(--deepblue)}
-.cond-bracket::before{content:'';position:absolute;left:0;top:0;width:6px;border-top:1.5px solid var(--deepblue)}
-.cond-bracket::after{content:'';position:absolute;left:0;bottom:0;width:6px;border-bottom:1.5px solid var(--deepblue)}
+.cond-elbow{position:absolute;left:0;top:0;width:44px;height:2.4px;background:var(--deepblue)}
+.cond-bar{position:absolute;left:44px;top:0;bottom:0;width:2.4px;background:var(--deepblue)}
 .cond-subrows{flex:1;min-width:0}
 .lotrow-condensed{position:relative;display:grid;align-items:stretch;flex-shrink:0;
-  min-height:34px;border-bottom:1px solid var(--line);
-  background:none;font-size:calc(11px * var(--ts,1))}
+  min-height:34px;background:none;font-size:calc(11px * var(--ts,1))}
 .lotrow-condensed.cond-last{border-bottom:6px solid var(--lot-divider,#d3d3d3)}
+/* margin-left (not padding-left) for the gutter offset — a background/border on this
+   box must never paint into that space, and padding is inside the box (so a tinted
+   background there would bleed under the white indentation); margin is genuinely
+   outside the box, so nothing about .cond-span's own fill/border can ever reach it. */
 .cond-span{display:grid;grid-template-columns:54px 68px 76px 58px minmax(150px,1fr) auto;
-  align-items:center;column-gap:12px;min-width:0;padding:5px 12px 5px 64px;
-  color:#2a3354;background:rgba(51,102,153,.07)}
+  align-items:center;column-gap:12px;min-width:0;margin-left:64px;padding:5px 12px;
+  color:#2a3354;background:rgba(51,102,153,.07);border-bottom:1px solid var(--line)}
+.cond-last .cond-span,.cond-last .cond-price{border-bottom:0}
 .cond-field{white-space:nowrap;min-width:0}
 .cond-field.cond-lot{font-family:'Oswald';font-weight:700;font-size:1.15em;color:var(--deepblue)}
 .cond-field-delivery{font-weight:600;color:#1a2444}
@@ -299,9 +295,15 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    their value is actually different. */
 .cond-differs{font-weight:700;color:#0c1430}
 .cond-field .cc{display:inline}
-.cond-extra{display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:2px;min-width:0}
+.cond-extra{display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:2px;
+  min-width:0;max-width:230px}
 .cond-extra .cond-diff b{font-weight:700;color:#5a6488;margin-right:2px}
-.cond-extra .cond-note .cc{font-style:italic}
+/* At rest a note is plain text (italic, no box); the moment it's focused for
+   editing it gets a real input-like treatment (border, white fill, tight padding)
+   so there's a clear affordance that it's now an editable field, not just a label. */
+.cond-extra .cond-note .cc{font-style:italic;overflow-wrap:break-word}
+.cond-extra .cond-note .cc:focus{font-style:normal;outline:none;background:#fff;
+  border:1px solid var(--deepblue);border-radius:3px;padding:1px 5px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
 .cond-add-note{border:1px solid #c7cee0;background:#fff;cursor:pointer;font-size:.9em;
   font-weight:600;color:#5a6488;padding:3px 8px;min-height:20px;border-radius:4px;white-space:nowrap}
 .cond-add-note:hover{color:var(--deepblue);border-color:var(--deepblue);background:rgba(51,102,153,.12)}
@@ -309,7 +311,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .cond-price{display:flex;align-items:center;justify-content:center;padding-left:8px;
   border-left:1px solid var(--line);font-family:'Oswald';font-weight:700;
   color:var(--deepblue);font-size:1.3em;background:rgba(51,102,153,.07)}
-.cond-price .cc{width:100%;text-align:center}
+.cond-price .cc{width:100%;text-align:center;white-space:nowrap}
 
 /* footer */
 .s-foot{height:34px;border-top:2px solid var(--blue);display:flex;align-items:center;
@@ -1514,23 +1516,19 @@ function condensedOptionRowHTML(lot,first,li,bi,page,isLast,grid,cols){
       ${condensedPriceCellsHTML(lot,cols)}
     </div>`;
 }
-// One shared vertical "OPTION" label + bracket, sized to the whole group's actual
-// rendered height via CSS (top:0;bottom:0 inside a position:relative wrapper whose
-// own height is just whatever its stacked sublots need) — works identically for one
-// sublot or many, nothing here assumes a specific count or lot-letter scheme. The
-// outer bar is a separate element from the label/bracket pairing so it can carry the
-// parent row's own navy weight/color continuously, while the label+bracket stay a
-// tighter, lighter unit right next to the actual option content.
+// No text label — the grouping bar itself communicates the hierarchy. .cond-elbow
+// is a short horizontal stub matching where the parent lot's own left border ends,
+// turning right into .cond-bar, which then runs the full height of the group (CSS
+// top:0;bottom:0 inside this position:relative wrapper, whose own height is just
+// whatever its stacked .cond-subrows need) — works identically for one sublot or
+// many, nothing here assumes a specific count or lot-letter scheme.
 function condensedOptionGroupHTML(subLots,masterLot,bi,page,grid,cols){
   const rowsHtml=subLots.map((lot,i)=>
     condensedOptionRowHTML(lot,masterLot,i+1,bi,page,i===subLots.length-1,grid,cols)
   ).join('');
   return `<div class="cond-group-wrap">
-      <div class="cond-outer-bar"></div>
-      <div class="cond-gutter">
-        <div class="cond-option-label"><span>Option</span></div>
-        <div class="cond-bracket"></div>
-      </div>
+      <div class="cond-elbow"></div>
+      <div class="cond-bar"></div>
       <div class="cond-subrows">${rowsHtml}</div>
     </div>`;
 }
@@ -2124,6 +2122,17 @@ function wireSheetEvents(){
         if(lot)clearLotEdit(lot,'condNote');
       }
       renderEditor();
+    });
+  });
+  // Note field is a single-line freeform note edited in place (not a textarea), so
+  // Enter saves instead of inserting a line break, and Escape reverts to whatever it
+  // held when editing started (a brand-new empty note reverting on Escape naturally
+  // falls through the empty-on-blur rule above and turns back into "+ Note").
+  $$('#zoomwrap [data-c="condNote"]').forEach(el=>{
+    el.addEventListener('focus',()=>{el.dataset.orig=el.innerHTML;});
+    el.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){e.preventDefault();el.blur();}
+      else if(e.key==='Escape'){e.preventDefault();el.innerHTML=el.dataset.orig??'';el.blur();}
     });
   });
   // move buttons
