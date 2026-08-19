@@ -55,6 +55,13 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 
 .view{flex:1;display:none;padding:34px}
+/* The editor view manages its own full-bleed layout (.ed-wrap is sized to
+   exactly fill the viewport below the topbar via calc(100vh - Npx)) — the
+   generic 34px view padding above was adding on top of that math, pushing
+   the actual rendered height past the viewport and forcing the whole page
+   to scroll instead of just .ed-canvas internally. Start/Settings keep the
+   normal padding; only the editor needs none. */
+#v-editor{padding:0}
 .view.on{display:block}
 
 /* ---------- upload ---------- */
@@ -103,7 +110,8 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .thumb.over{outline:2px solid #e0483c;outline-offset:1px}
 .ed-main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .ed-tools{display:flex;align-items:center;gap:8px;padding:10px 16px;
-  background:var(--bg2);border-bottom:1px solid #2a3257;flex-wrap:wrap}
+  background:var(--bg2);border-bottom:1px solid #2a3257;flex-wrap:wrap;
+  position:sticky;top:0;z-index:20}
 .ed-tools .grp{display:flex;gap:6px;align-items:center}
 .ed-tools .vr{width:1px;height:22px;background:#333d68;margin:0 4px}
 .ed-tools .lbl{font-size:11px;color:var(--dim);letter-spacing:.6px;text-transform:uppercase}
@@ -114,18 +122,33 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .results-upload{display:none;align-items:center;gap:8px;margin-left:auto}
 .results-upload.on{display:flex}
 .ed-tools .col-w-val{min-width:42px;text-align:center}
-.ed-canvas{flex:1;overflow:auto;padding:30px 30px 30px 44px;background:#0c1024;text-align:center}
-.color-editor-bar{display:flex;align-items:center;gap:12px;padding:5px 16px;background:#fff;border-bottom:1px solid #e6e0d4;flex-wrap:wrap}
-.color-editor-bar .color-bar-toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:#555b66;
-  letter-spacing:.6px;text-transform:uppercase;font-weight:600;background:none;padding:4px 6px;border-radius:6px;cursor:pointer}
-.color-editor-bar .color-bar-toggle:hover{background:#f2ede2;color:#1a1d23}
-.color-editor-bar .color-bar-toggle .caret{display:inline-block;transition:transform .12s;font-size:10px}
-.color-editor-bar:not(.collapsed) .color-bar-toggle .caret{transform:rotate(90deg)}
-.color-editor-bar.collapsed .color-grid{display:none}
-.color-editor-bar .color-grid{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.color-editor-bar .field{margin:0;display:flex;align-items:center;gap:6px}
-.color-editor-bar .field label{margin:0;font-size:10.5px;color:#555b66;white-space:nowrap}
-.color-editor-bar input[type="color"]{width:38px;height:28px;padding:2px;border:1px solid #d4cdbd;background:#fff;border-radius:6px}
+.ed-canvas{flex:1;overflow:auto;padding:30px 30px 30px 200px;background:#0c1024;text-align:center}
+/* Catalog Colors used to be a persistent full-width bar above the canvas,
+   taking up its own horizontal strip even collapsed. Moved into a modal
+   (same #c-blue etc ids, same updateColorsFromEditor wiring) reached from
+   the toolbar's Colors button, so that strip is reclaimed for the catalog
+   preview; nothing about what the controls do changed. */
+.modal .color-grid{display:flex;gap:10px 14px;flex-wrap:wrap}
+.modal .color-grid .field{margin:0;display:flex;align-items:center;gap:6px}
+.modal .color-grid .field label{margin:0;font-size:11px;color:#555b66;white-space:nowrap}
+.modal .color-grid input[type="color"]{width:38px;height:28px;padding:2px;border:1px solid #d4cdbd;background:#fff;border-radius:6px}
+
+/* Auto-Bold Terms chip list */
+.bold-terms-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;min-height:32px}
+.bold-terms-empty{color:#8a8f99;font-size:13px;padding:6px 0}
+.bold-term-chip{display:inline-flex;align-items:center;gap:6px;background:#f5f1ea;
+  border:1px solid #d4cdbd;border-radius:999px;padding:5px 6px 5px 12px;font-size:13px;color:#1a1d23}
+.bold-term-text{cursor:text;border-radius:4px;padding:1px 3px}
+.bold-term-text:hover{background:#fff;box-shadow:inset 0 0 0 1px #b8860b}
+.bold-term-x{width:18px;height:18px;border-radius:50%;background:transparent;color:#8a8f99;
+  font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center}
+.bold-term-x:hover{background:#c0392b;color:#fff}
+.bold-term-edit{font-size:13px;font-family:inherit;border:1px solid #b8860b;border-radius:4px;
+  padding:1px 4px;min-width:80px}
+.bold-terms-add{display:flex;gap:8px}
+.bold-terms-add input{flex:1;background:#fff;border:1px solid #d4cdbd;color:#1a1d23;
+  padding:9px 12px;border-radius:8px;font-family:inherit;font-size:13.5px}
+.bold-terms-add input:focus{outline:0;border-color:#b8860b}
 
 .zoomwrap{display:inline-block;transform-origin:top center}
 
@@ -284,37 +307,48 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .editing [contenteditable]:hover{box-shadow:inset 0 0 0 1.5px #b9c4ef}
 .editing [contenteditable]:focus{box-shadow:inset 0 0 0 2px var(--blue);
   background:#eef1fc}
-/* Left gutter layout: checkbox column at -66px, control panel at -38px..-4px
-   (a 34px strip), so the two never overlap. */
-.lot-ctl{position:absolute;left:-38px;top:0;width:34px;display:none;
-  flex-direction:column;gap:0;z-index:10;background:#0f1730;border-radius:8px;
-  padding:2px;box-shadow:0 2px 8px rgba(0,0,0,.35)}
-.editing .lot-ctl{display:flex;opacity:.45;transition:opacity .12s}
-.editing .lotrow:hover .lot-ctl,.lot-ctl:hover{opacity:1;z-index:30}
-.lot-ctl button{width:30px;height:20px;background:transparent;color:#fff;
+/* Editor-only row gutter — one compact horizontal control strip per row, living
+   in the fixed-width gutter reserved to the left of the sheet (see .ed-canvas
+   padding-left). Replaces the old three-piece system (a separate checkbox, a
+   5-button VERTICAL stack for a full lot, and a separate split button for a
+   continuation row) — that stack was 100px tall (5 x 20px) anchored to the top
+   of its own row, so on any row shorter than that (any option-group
+   continuation row, or any full row with a custom short height) it spilled
+   down into the row below and visually overlapped that row's own controls.
+   A horizontal strip is at most ~24px tall regardless of how many actions it
+   holds, so it always fits inside even the shortest row. Master lots get the
+   full set; continuation rows in an option group (.row-gutter-sub) only get
+   what they actually support today (select + split) — never a second copy of
+   the master's full control set. Less-common actions (jump to adjacent page)
+   live behind the "more" (⋯) toggle instead of being permanent buttons, per
+   row. */
+.row-gutter{position:absolute;left:-142px;top:50%;transform:translateY(-50%);
+  display:none;align-items:center;gap:3px;z-index:10;opacity:.5;transition:opacity .12s}
+.editing .row-gutter{display:flex}
+.editing .lotrow:hover .row-gutter,.row-gutter:hover,.row-gutter.menu-open{opacity:1;z-index:30}
+.row-gutter input[type="checkbox"]{width:16px;height:16px;accent-color:#b8860b;
+  cursor:pointer;margin:0;flex-shrink:0}
+.row-gutter button{width:20px;height:20px;flex-shrink:0;background:#0f1730;color:#fff;
   border-radius:5px;font-size:11px;line-height:1;display:flex;align-items:center;
-  justify-content:center}
-.lot-ctl button.step:hover{background:var(--blue)}
-.lot-ctl button.pgbtn{color:#aeb9e2;font-size:8.5px;font-weight:700;letter-spacing:.3px;
-  border-top:1px solid rgba(255,255,255,.10);border-bottom:1px solid rgba(255,255,255,.10)}
-.lot-ctl button.pgbtn:hover{background:var(--blue);color:#fff}
-.lot-ctl .drag-grip{color:#8a94b8;font-size:11px;letter-spacing:1px;cursor:grab}
-.lot-ctl .drag-grip:hover{background:#2a3560;color:#fff}
-.lot-ctl .drag-grip:active{cursor:grabbing}
-/* split control on option-group continuation rows */
-.lot-split{position:absolute;left:-38px;top:50%;transform:translateY(-50%);width:34px;
-  display:none;justify-content:center;z-index:10}
-.editing .lot-split{display:flex;opacity:.45;transition:opacity .12s}
-.editing .lotrow:hover .lot-split,.lot-split:hover{opacity:1;z-index:30}
-.lot-split button{width:30px;height:20px;background:#7a5a12;color:#fff;
-  border-radius:6px;font-size:11px;line-height:1;display:flex;align-items:center;
-  justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)}
-.lot-split button:hover{background:#b8860b}
-.hidectl .lot-split{display:none!important}
+  justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.row-gutter button:hover{background:var(--blue);color:#fff}
+.row-gutter .drag-grip{cursor:grab;color:#cfd6ef;background:transparent;box-shadow:none}
+.row-gutter .drag-grip:hover{background:#2a3560}
+.row-gutter .drag-grip:active{cursor:grabbing}
+.row-gutter-sub .split-btn{background:#7a5a12}
+.row-gutter-sub .split-btn:hover{background:#b8860b}
+.row-more-wrap{position:relative}
+.row-more-menu{display:none;position:absolute;left:0;top:calc(100% + 3px);
+  background:#0f1730;border-radius:7px;padding:3px;box-shadow:0 4px 16px rgba(0,0,0,.4);
+  flex-direction:column;gap:1px;min-width:168px;z-index:40}
+.row-gutter.menu-open .row-more-menu{display:flex}
+.row-more-menu button{width:auto;height:auto;justify-content:flex-start;padding:6px 9px;
+  font-size:11.5px;font-weight:500;white-space:nowrap;box-shadow:none;color:#cfd6ef}
+.row-more-menu button:hover{background:var(--blue);color:#fff}
 .over-badge{position:absolute;top:6px;right:84px;background:#e0483c;color:#fff;
   font-size:10px;font-weight:700;padding:3px 9px;border-radius:11px;letter-spacing:.5px;
   font-family:'Barlow'}
-.hidectl .lot-ctl,.hidectl .over-badge{display:none!important}
+.hidectl .row-gutter,.hidectl .over-badge{display:none!important}
 
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
   background:var(--navy);color:#fff;padding:11px 22px;border-radius:9px;font-size:13.5px;
@@ -387,8 +421,8 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .s-thead{background:#313844;}
 .s-foot{border-top-color:#b8860b;}
 .editing [contenteditable]:focus{box-shadow:inset 0 0 0 2px #b8860b;background:#fff8e8;}
-.lot-ctl button{background:#131820;}
-.lot-ctl button:hover{background:#b8860b;color:#fff;}
+.row-gutter button{background:#131820;}
+.row-gutter button:hover{background:#b8860b;color:#fff;}
 .toast{background:#131820;border-color:#d4a017;color:#fff;}
 
 /* PDF/catalog sheet styling: keep CMS blue print output separate from Auction Suite chrome. */
@@ -501,7 +535,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .tools-toggle-bar{display:flex;align-items:center;gap:8px;padding:8px 16px;background:#fff;border-bottom:1px solid #e6e0d4;}
 .tools-toggle-bar label{font-size:11px;color:#555b66;letter-spacing:.6px;text-transform:uppercase;font-weight:600;}
 .tools-toggle-bar select{height:30px;background:#fff;border:1px solid #d4cdbd;color:#1a1d23;border-radius:6px;padding:0 8px;font-family:inherit;font-size:12.5px;}
-.ed-main.tools-hidden #editTools,.ed-main.tools-hidden .color-editor-bar{display:none !important;}
+.ed-main.tools-hidden #editTools{display:none !important;}
 
 /* Compact action bar (always visible) */
 .action-bar{display:flex;align-items:center;gap:10px;padding:8px 16px;background:#fff;border-bottom:1px solid #e6e0d4;}
@@ -510,17 +544,45 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .tools-check input{width:16px;height:16px;accent-color:#b8860b;cursor:pointer}
 
 /* Compact, clearer editing toolbar */
-.ed-tools{gap:5px !important;padding:5px 10px !important;row-gap:5px !important;}
-.ed-tools .grp{gap:3px;padding:1px 3px;border-radius:6px}
+.ed-tools{gap:5px !important;padding:5px 10px !important;row-gap:5px !important;flex-wrap:nowrap !important;overflow-x:auto;overflow-y:hidden}
+.ed-tools .grp{gap:3px;padding:1px 3px;border-radius:6px;flex-shrink:0}
 .ed-tools .grp .lbl{font-size:9px !important;letter-spacing:.3px}
 .ed-tools .btn.sm{padding:3px 7px;font-size:11px;border-radius:5px;line-height:1.5}
-.ed-tools .vr{height:16px;margin:0 2px}
+.ed-tools .vr{height:16px;margin:0 2px;flex-shrink:0}
 .ed-tools .sel-grp{background:rgba(184,134,11,.12);border:1px solid #d4a017;border-radius:8px;padding:2px 7px}
 .ed-tools .sel-grp .lbl{color:#9a7209}
 .ed-tools .sel-grp .lbl b{color:#1a1d23;font-size:12px}
 
-/* Undo/redo disabled state */
+/* Undo/redo (and other contextual) disabled state */
 .ed-tools .btn[disabled]{opacity:.35;cursor:default;pointer-events:none}
+
+/* Destructive action: looks like every other ghost button at rest (not
+   large or alarming), but its hover/active state reads unmistakably as
+   "this deletes" instead of blending in with Duplicate/Group next to it. */
+.ed-tools .btn.danger:hover{background:#c0392b;border-color:#c0392b;color:#fff}
+.ed-tools .btn.danger:active{background:#a03325;border-color:#a03325}
+
+/* Size adjuster component: [label][-][value][+], used identically for Row/Text/
+   Box/Cal so the four read as one family of control rather than four different-
+   looking button clusters (ROW -/+, TEXT A-/A+, BOX A-/A+, CAL A-/A+). The label
+   plus the value readout are what make each one's job — and why they're separate
+   controls — legible at a glance instead of relying on the reader to infer it
+   from a bare "A-/A+" pair. Row/Box show "—" until a row/box is actually focused,
+   since (unlike Text/Cal, which are single whole-sheet settings) their value is
+   specific to whatever's currently selected. */
+.size-grp{gap:8px !important}
+.adj{display:flex;align-items:center;gap:2px}
+.adj-lbl{font-size:9px;letter-spacing:.3px;color:var(--dim);text-transform:uppercase;
+  margin-right:1px}
+.adj-btn{width:20px;padding:3px 0 !important;text-align:center}
+.adj-val{min-width:34px;text-align:center;font-size:10.5px;font-weight:600;
+  color:var(--txt);font-variant-numeric:tabular-nums}
+.adj-val.adj-editable{cursor:text;border-radius:3px}
+.adj-val.adj-editable:hover{background:rgba(255,255,255,.08)}
+.adj-val-edit{width:38px;background:#0e1330;border:1.5px solid var(--blue);border-radius:3px;
+  color:var(--txt);font-size:10.5px;font-weight:600;text-align:center;padding:0 2px;
+  font-family:inherit;font-variant-numeric:tabular-nums}
+.adj-reset{margin-left:1px}
 
 /* Autosave restore card (upload view) */
 .autosave-card{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
@@ -534,8 +596,8 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .lotrow.drag-src{opacity:.35}
 .lotrow.drop-above{box-shadow:inset 0 4px 0 #b8860b}
 .lotrow.drop-below{box-shadow:inset 0 -4px 0 #b8860b}
-.lotrow.sel-on.drop-above{box-shadow:inset 4px 0 0 #b8860b,inset 0 4px 0 #b8860b}
-.lotrow.sel-on.drop-below{box-shadow:inset 4px 0 0 #b8860b,inset 0 -4px 0 #b8860b}
+.sheet:not(.hidectl) .lotrow.sel-on.drop-above{box-shadow:inset 4px 0 0 #b8860b,inset 0 4px 0 #b8860b}
+.sheet:not(.hidectl) .lotrow.sel-on.drop-below{box-shadow:inset 4px 0 0 #b8860b,inset 0 -4px 0 #b8860b}
 
 /* Drag-to-resize column handles (Excel style) */
 .s-thead .cell{position:relative}
@@ -544,13 +606,22 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .col-drag:hover,.col-drag.dragging{background:rgba(184,134,11,.55);border-radius:2px}
 .hidectl .col-drag{display:none !important}
 
-/* Per-lot select checkbox (editing only; hidden in PDF) */
-.lot-select{position:absolute;left:-66px;top:50%;transform:translateY(-50%);display:none;align-items:center;justify-content:center}
-.editing .lot-select{display:flex}
-.lot-select input{width:20px;height:20px;accent-color:#b8860b;cursor:pointer}
-.lotrow.sel-on{box-shadow:inset 4px 0 0 #b8860b}
-.lotrow-condensed.sel-on{box-shadow:inset 4px 0 0 #b8860b}
-.hidectl .lot-select{display:none !important}
+/* Selection is an editor-only state — never let it show up in the exported
+   PDF (html2canvas screenshots whatever's actually in the DOM at export
+   time, and a lot can easily still be checked when you hit export). Scoped
+   to :not(.hidectl), the class each .sheet gets for the duration of a PDF/
+   thumbnail capture, rather than to .editing, since .editing stays on the
+   whole time — including during export — so it can't be used as the "not
+   exporting" signal. Background tint (not just the left bar) so it's obvious
+   even for a row you're not looking directly at the left edge of; for an
+   option group, every sublot that's part of it lights up individually as
+   you check them, so which of "just this sublot" / "the whole group" is
+   selected is always visible from the accumulated tint rather than a
+   separate group-level indicator. Condensed subrows get the identical
+   treatment (same fix, same tint) since they're a row type only this
+   merged branch has. */
+.sheet:not(.hidectl) .lotrow.sel-on{box-shadow:inset 4px 0 0 #b8860b;background:rgba(184,134,11,.07) !important}
+.sheet:not(.hidectl) .lotrow-condensed.sel-on{box-shadow:inset 4px 0 0 #b8860b;background:rgba(184,134,11,.07) !important}
 
 /* Modal */
 .modal-back{position:fixed;inset:0;background:rgba(19,24,32,.55);display:none;align-items:flex-start;justify-content:center;z-index:5000;padding:40px 16px;overflow:auto}
@@ -802,7 +873,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
           <button class="btn sm" id="saveProjectBtn">💾 Save Project</button>
         </div>
         <div class="ed-tools" id="editTools">
-          <div class="grp">
+          <div class="grp" aria-label="History actions">
             <button class="btn ghost sm" id="undoBtn" title="Undo (Ctrl+Z / Cmd+Z)" disabled>↶</button>
             <button class="btn ghost sm" id="redoBtn" title="Redo (Ctrl+Shift+Z / Ctrl+Y)" disabled>↷</button>
           </div>
@@ -811,77 +882,69 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
             <span class="lbl">Sel <b id="selCount">0</b></span>
             <button class="btn ghost sm" id="selRowMinus" title="Shorter rows (selected lots)">H−</button>
             <button class="btn ghost sm" id="selRowPlus" title="Taller rows (selected lots)">H+</button>
-            <button class="btn ghost sm" id="selDelete" title="Delete selected lots">🗑</button>
+            <button class="btn ghost sm danger" id="selDelete" title="Delete selected lots">🗑</button>
             <button class="btn ghost sm" id="selClear" title="Clear selection">✕</button>
           </div>
-          <div class="grp">
-            <button class="btn ghost sm" id="boldBtn" title="Bold selected text"><b>B</b></button>
-            <button class="btn ghost sm" id="scratchBtn" title="Scratch / unscratch the focused lot"><s>S</s></button>
+          <div class="grp" aria-label="Text and box formatting">
+            <button class="btn ghost sm" id="boldBtn" title="Bold the selected text"><b>B</b></button>
+            <button class="btn ghost sm" id="scratchBtn" title="Scratch / unscratch the focused lot (auction-day strike-through)"><s>S</s></button>
             <button class="btn ghost sm" id="suppBtn" title="Toggle supplemental on the focused lot">Sup</button>
             <button class="btn ghost sm" id="highlightBtn" title="Highlight the box your cursor is in">🖍</button>
             <button class="btn ghost sm" id="clearHlBtn" title="Remove all highlights in this view">🖍✕</button>
           </div>
           <span class="vr"></span>
-          <div class="grp">
-            <button class="btn ghost sm" id="dupLotBtn" title="Duplicate the focused lot — the copy appears directly below it">⧉ Dup</button>
-            <button class="btn ghost sm" id="deleteLotBtn" title="Delete the focused lot">🗑 Lot</button>
+          <div class="grp" aria-label="Catalog styling">
+            <button class="btn ghost sm" id="colorsBtn" title="Edit the catalog's colors (blue, dividers, highlight, etc.)">🎨 Colors</button>
+            <button class="btn ghost sm" id="boldTermsBtn" title="Manage the list of terms automatically bolded in listing text">B̲ Auto-Bold</button>
           </div>
           <span class="vr"></span>
-          <div class="grp">
+          <div class="grp" aria-label="Lot actions">
+            <button class="btn ghost sm" id="dupLotBtn" title="Duplicate the focused lot — the copy appears directly below it">⧉ Dup</button>
+            <button class="btn ghost sm danger" id="deleteLotBtn" title="Delete the focused lot (or the checked lots)">🗑 Delete</button>
             <button class="btn ghost sm" id="manualGroupBtn" title="Check the boxes next to 2+ lots, then click to group them into an option group">Group</button>
             <button class="btn ghost sm" id="ungroupBtn" title="Remove the checked lots (or the focused lot) from their option group">Ungroup</button>
           </div>
           <span class="vr"></span>
-          <div class="grp" title="Row height of the focused lot">
-            <span class="lbl">Row</span>
-            <button class="btn ghost sm" id="rowMinus">−</button>
-            <button class="btn ghost sm" id="rowPlus">+</button>
-          </div>
-          <div class="grp" title="Whole-sheet text size">
-            <span class="lbl">Text</span>
-            <button class="btn ghost sm" id="txtMinus">A−</button>
-            <button class="btn ghost sm" id="txtPlus">A+</button>
-          </div>
-          <div class="grp" title="Text size of the box your cursor is in">
-            <span class="lbl">Box</span>
-            <button class="btn ghost sm" id="boxTxtMinus">A−</button>
-            <button class="btn ghost sm" id="boxTxtPlus">A+</button>
-            <button class="btn ghost sm" id="boxTxtReset" title="Reset box text size">↺</button>
-          </div>
-          <div class="grp" title="Calendar text size">
-            <span class="lbl">Cal</span>
-            <button class="btn ghost sm" id="calTxtMinus">A−</button>
-            <button class="btn ghost sm" id="calTxtPlus">A+</button>
+          <div class="grp size-grp" aria-label="Size controls">
+            <div class="adj" title="Increase or decrease the height of the selected row.">
+              <span class="adj-lbl">Row</span>
+              <button class="btn ghost sm adj-btn" id="rowMinus">−</button>
+              <span class="adj-val" id="rowVal">—</span>
+              <button class="btn ghost sm adj-btn" id="rowPlus">+</button>
+            </div>
+            <div class="adj" title="Increase or decrease catalog text size (whole sheet).">
+              <span class="adj-lbl">Text</span>
+              <button class="btn ghost sm adj-btn" id="txtMinus">−</button>
+              <span class="adj-val" id="txtVal">100%</span>
+              <button class="btn ghost sm adj-btn" id="txtPlus">+</button>
+            </div>
+            <div class="adj" title="Increase or decrease the text size of the box your cursor is in.">
+              <span class="adj-lbl">Box</span>
+              <button class="btn ghost sm adj-btn" id="boxTxtMinus">−</button>
+              <span class="adj-val" id="boxVal">—</span>
+              <button class="btn ghost sm adj-btn" id="boxTxtPlus">+</button>
+              <button class="btn ghost sm adj-reset" id="boxTxtReset" title="Reset this box's text size to default">↺</button>
+            </div>
+            <div class="adj" title="Increase or decrease the text size of the Next Auction calendar badge.">
+              <span class="adj-lbl">Cal</span>
+              <button class="btn ghost sm adj-btn" id="calTxtMinus">−</button>
+              <span class="adj-val" id="calVal">100%</span>
+              <button class="btn ghost sm adj-btn" id="calTxtPlus">+</button>
+            </div>
           </div>
           <span class="vr"></span>
-          <div class="grp">
+          <div class="grp" aria-label="Layout controls">
             <button class="btn ghost sm" id="colReset" title="Reset column widths — drag the edges between column headers to resize columns">↔ Cols ↺</button>
             <button class="btn ghost sm" id="autofit" title="Re-flow lots across pages">Auto-fit</button>
           </div>
           <span class="vr"></span>
-          <div class="grp" title="Zoom">
+          <div class="grp" aria-label="Zoom" title="Zoom changes only how the editor displays the page — it does not affect the exported PDF's size.">
             <button class="btn ghost sm" id="zOut">−</button>
             <span class="lbl" id="zVal">70%</span>
             <button class="btn ghost sm" id="zIn">+</button>
           </div>
           <div class="spacer" style="flex:1"></div>
           <button class="btn ghost sm" id="backToSettings">Settings</button>
-        </div>
-        <div class="color-editor-bar collapsed" id="colorBar">
-          <button class="color-bar-toggle" id="colorBarToggle" title="Show / hide the catalog color pickers">
-            <span class="caret">▸</span> Catalog Colors
-          </button>
-          <div class="color-grid">
-            <div class="field"><label>Primary Blue</label><input type="color" id="c-blue"></div>
-            <div class="field"><label>Section Fade End</label><input type="color" id="c-section-end"></div>
-            <div class="field"><label>Section Text</label><input type="color" id="c-section-text"></div>
-            <div class="field"><label>Table Header</label><input type="color" id="c-table-head"></div>
-            <div class="field"><label>Lot Dividers</label><input type="color" id="c-divider"></div>
-            <div class="field"><label>Calendar Grey</label><input type="color" id="c-calendar"></div>
-            <div class="field"><label>Supplemental Accent</label><input type="color" id="c-supp-accent"></div>
-            <div class="field"><label>Supplemental Fill</label><input type="color" id="c-supp-bg"></div>
-            <div class="field"><label>Highlight Color</label><input type="color" id="c-change"></div>
-          </div>
         </div>
         <div class="ed-canvas" id="canvas">
           <div class="zoomwrap" id="zoomwrap"></div>
@@ -956,6 +1019,46 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
     <div class="modal-foot">
       <button class="btn ghost" data-close>Cancel</button>
       <button class="btn" id="addLotConfirmBtn">Add Lot</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="colorsModalBack">
+  <div class="modal">
+    <div class="modal-head"><h3>Catalog Colors</h3><button class="modal-x" data-close>×</button></div>
+    <div class="modal-body">
+      <p class="modal-note">These colors apply to the printed catalog itself — changes show up in the preview immediately.</p>
+      <div class="color-grid">
+        <div class="field"><label>Primary Blue</label><input type="color" id="c-blue"></div>
+        <div class="field"><label>Section Fade End</label><input type="color" id="c-section-end"></div>
+        <div class="field"><label>Section Text</label><input type="color" id="c-section-text"></div>
+        <div class="field"><label>Table Header</label><input type="color" id="c-table-head"></div>
+        <div class="field"><label>Lot Dividers</label><input type="color" id="c-divider"></div>
+        <div class="field"><label>Calendar Grey</label><input type="color" id="c-calendar"></div>
+        <div class="field"><label>Supplemental Accent</label><input type="color" id="c-supp-accent"></div>
+        <div class="field"><label>Supplemental Fill</label><input type="color" id="c-supp-bg"></div>
+        <div class="field"><label>Highlight Color</label><input type="color" id="c-change"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close>Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="boldTermsModalBack">
+  <div class="modal">
+    <div class="modal-head"><h3>Auto-Bold Terms</h3><button class="modal-x" data-close>×</button></div>
+    <div class="modal-body">
+      <p class="modal-note">Terms found in listing text are automatically shown in bold in the catalog. Changes apply immediately — the underlying listing text itself is never changed, only how it's displayed.</p>
+      <div class="bold-terms-list" id="boldTermsList"></div>
+      <div class="bold-terms-add">
+        <input type="text" id="boldTermInput" placeholder="Add a term or phrase, e.g. NHTC" maxlength="120">
+        <button class="btn ghost sm" id="boldTermAddBtn">+ Add Term</button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close>Done</button>
     </div>
   </div>
 </div>
@@ -1173,6 +1276,85 @@ function applyBoldRules(html){
   return html;
 }
 
+/* ===== Auto-Bold Terms editor (modal) =====
+ * S.boldRules already existed and already drove applyBoldRules() above —
+ * this only adds a friendlier UI on top of it (a chip list instead of the
+ * Settings page's raw newline-per-rule textarea, which still exists and
+ * still works identically off the same array). Each rule is normally a
+ * plain phrase; the engine also supports "phrase | unless: term1, term2"
+ * (used by two of the five built-in default rules to avoid bolding
+ * "Holstein Cow(s)" inside a Jersey listing) — that matching logic is
+ * untouched, so a chip for a compound rule shows just its phrase with the
+ * full rule (including the unless clause) as its tooltip, and editing it
+ * inline edits the full raw string so the exception clause round-trips.
+ * Every change re-renders the live catalog preview immediately and calls
+ * saveGlobal() — the exact same cross-project persistence the Settings-
+ * page textarea already used (Firebase 'listings' settings doc, with a
+ * window.storage/local fallback); this is not a new persistence path. */
+function renderBoldTermsList(){
+  const list=$('#boldTermsList');
+  if(!list)return;
+  if(!S.boldRules||!S.boldRules.length){
+    list.innerHTML='<div class="bold-terms-empty">No auto-bold terms yet — add one below.</div>';
+    return;
+  }
+  list.innerHTML=S.boldRules.map((rule,i)=>{
+    const {phrase}=parseBoldRule(rule);
+    return `<span class="bold-term-chip" data-i="${i}" title="${escAttr(rule)}">`
+      +`<span class="bold-term-text" data-i="${i}">${escAttr(phrase)}</span>`
+      +`<button type="button" class="bold-term-x" data-i="${i}" title="Remove this term">×</button></span>`;
+  }).join('');
+}
+function commitBoldRules(){
+  renderEditor();
+  saveGlobal();
+}
+function addBoldTerm(){
+  const input=$('#boldTermInput');
+  const v=(input.value||'').trim();
+  if(!v)return;
+  if(S.boldRules.some(r=>parseBoldRule(r).phrase.toLowerCase()===parseBoldRule(v).phrase.toLowerCase())){
+    toast('That term is already in the list.');
+    return;
+  }
+  S.boldRules.push(v);
+  input.value='';
+  renderBoldTermsList();
+  commitBoldRules();
+}
+function removeBoldTerm(i){
+  S.boldRules.splice(i,1);
+  renderBoldTermsList();
+  commitBoldRules();
+}
+function editBoldTermInline(chipTextEl){
+  const i=+chipTextEl.dataset.i;
+  const current=S.boldRules[i]||'';
+  const input=document.createElement('input');
+  input.type='text';input.className='bold-term-edit';input.value=current;
+  chipTextEl.replaceWith(input);
+  input.focus();input.select();
+  const commit=()=>{
+    const v=input.value.trim();
+    if(v)S.boldRules[i]=v; else S.boldRules.splice(i,1);
+    renderBoldTermsList();
+    commitBoldRules();
+  };
+  input.addEventListener('blur',commit);
+  input.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();input.blur();}
+    else if(e.key==='Escape'){e.preventDefault();renderBoldTermsList();}
+  });
+}
+document.addEventListener('click',e=>{
+  const x=e.target.closest('.bold-term-x');
+  if(x){removeBoldTerm(+x.dataset.i);return;}
+  const t=e.target.closest('.bold-term-text');
+  if(t){editBoldTermInline(t);return;}
+});
+$('#boldTermAddBtn').onclick=addBoldTerm;
+$('#boldTermInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addBoldTerm();}});
+
 function displayLotNumber(lot){
   const raw=(lotEdit(lot,'lot')!=null?lotEdit(lot,'lot'):lot.lot)||'';
   const text=String(raw).replace(/<[^>]*>/g,'').trim();
@@ -1265,9 +1447,12 @@ function condensedOptionRowHTML(lot,first,li,bi,page,isLast,grid,cols){
   if(noteActive)diffPieces.push(`<span class="cond-note"><span class="cc" contenteditable data-id="${lot.id}" data-c="condNote">${noteRaw}</span></span>`);
   const diffsHtml=diffPieces.join('<span class="cond-sep">·</span>');
   const addNoteBtn=noteActive?'':`<button type="button" class="cond-add-note" data-id="${lot.id}" title="Add a custom note for this option">+ Note</button>`;
-  return `<div class="lotrow-condensed${isLast?' cond-last':''}" data-id="${lot.id}" data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}" style="grid-template-columns:${grid};min-height:${condensedLotHeight(lot)}px">
-      <div class="lot-select"><input type="checkbox" class="lot-cb" data-id="${lot.id}" title="Select lot"></div>
-      <div class="lot-split"><button class="split-btn" data-li="${li}" title="Split the option group here — this lot and the ones below it move to the top of the next page">✂</button></div>
+  const selOn=S.selected&&S.selected.has(lot.id);
+  return `<div class="lotrow-condensed${isLast?' cond-last':''}${selOn?' sel-on':''}" data-id="${lot.id}" data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}" style="grid-template-columns:${grid};min-height:${condensedLotHeight(lot)}px">
+      <div class="row-gutter row-gutter-sub">
+        <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
+        <button class="split-btn" data-li="${li}" title="Split the option group here — this lot and the ones below it move to the top of the next page">✂</button>
+      </div>
       <div class="cond-span" style="grid-column:1 / ${spanEnd}">
         <div class="cond-fields">
           ${condField('cond-lot',lot,'lot',esc(displayLotNumber(lot)),undefined,'')}
@@ -1649,18 +1834,28 @@ function sheetHTML(page,pageNum,totalPages){
       h+=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lotFlag(lot,'scratched')?'scratched':''} ${lotFlag(lot,'supplemental')?'supplemental':''} ${selOn?'sel-on':''}" data-id="${lot.id}"
             data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}"
             style="grid-template-columns:${grid};min-height:${lotHeight(lot)+rowExtra()}px">`;
-      h+=`<div class="lot-select"><input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot"></div>`;
       if(li===0){
-        h+=`<div class="lot-ctl">
-            <button data-mv="-1" class="step" title="Move up one spot">▲</button>
-            <button data-pg="-1" class="pgbtn" title="Move to the previous page">PG▲</button>
+        h+=`<div class="row-gutter">
+            <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
             <button class="drag-grip" draggable="true" title="Drag to move this lot anywhere in the section">⠿</button>
-            <button data-pg="1" class="pgbtn" title="Move to the next page (creates one if needed)">PG▼</button>
+            <button data-mv="-1" class="step" title="Move up one spot">▲</button>
             <button data-mv="1" class="step" title="Move down one spot">▼</button>
+            <div class="row-more-wrap">
+              <button class="row-more-toggle" title="More row actions">⋯</button>
+              <div class="row-more-menu">
+                <button data-pg="-1" class="pgbtn">Move to previous page</button>
+                <button data-pg="1" class="pgbtn">Move to next page</button>
+              </div>
+            </div>
           </div>`;
       }else if(b.grouped){
-        h+=`<div class="lot-split">
+        h+=`<div class="row-gutter row-gutter-sub">
+            <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
             <button class="split-btn" data-li="${li}" title="Split the option group here — this lot and the ones below it move to the top of the next page">✂</button>
+          </div>`;
+      }else{
+        h+=`<div class="row-gutter row-gutter-sub">
+            <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
           </div>`;
       }
       cols.forEach(c=>{
@@ -1717,6 +1912,7 @@ function renderEditor(){
   $('#zVal').textContent=Math.round(S.zoom*100)+'%';
   const tv=$('#toolsToggle'); if(tv){tv.checked=!S.toolsHidden; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden);}
   if(typeof updateSelectionUI==='function')updateSelectionUI();
+  if(typeof updateContextualToolbar==='function')updateContextualToolbar();
   // keep manual row heights stable; overflow detection below flags pages without changing layout.
   // overflow detection — measure where the last row actually ends (fraction-accurate
   // and zoom-aware) instead of scrollHeight rounding, and allow a few px of slop
@@ -1769,10 +1965,42 @@ function renderThumbs(){
       c.classList.add('hidectl');c.style.margin='0';c.style.boxShadow='none';
       holder.appendChild(c);}
     t.querySelector('div').style.height='117px';
-    t.onclick=()=>{pgEls[i]&&pgEls[i].scrollIntoView({behavior:'smooth',block:'start'});};
+    t.onclick=()=>{
+      if(!pgEls[i])return;
+      pgEls[i].scrollIntoView({behavior:'smooth',block:'start'});
+      // Set active immediately rather than waiting on the scroll listener —
+      // a smooth-scroll animation firing intermediate scroll events isn't
+      // guaranteed the same way across browsers, so the click itself is the
+      // reliable signal here; the scroll listener still keeps it in sync
+      // afterward as you scroll manually.
+      $$('#thumbs .thumb').forEach((el,idx)=>el.classList.toggle('on',idx===i));
+    };
     if(pgEls[i]&&pgEls[i].classList.contains('over'))t.classList.add('over');
   });
+  updateActiveThumb();
 }
+// Highlights whichever page is currently at (or nearest) the top of the
+// scrolled canvas, so the rail always shows where you actually are —
+// there was no "current page" concept before this.
+function updateActiveThumb(){
+  const canvas=$('#canvas');
+  const pgEls=$$('#zoomwrap .sheet');
+  const thumbs=$$('#thumbs .thumb');
+  if(!canvas||!pgEls.length||!thumbs.length)return;
+  const canvasTop=canvas.getBoundingClientRect().top;
+  let activeIdx=0,bestDist=Infinity;
+  pgEls.forEach((el,i)=>{
+    const d=Math.abs(el.getBoundingClientRect().top-canvasTop);
+    if(d<bestDist){bestDist=d;activeIdx=i;}
+  });
+  thumbs.forEach((t,i)=>t.classList.toggle('on',i===activeIdx));
+}
+let _thumbScrollRaf=null;
+document.addEventListener('scroll',e=>{
+  if(!e.target||e.target.id!=='canvas')return;
+  if(_thumbScrollRaf)return;
+  _thumbScrollRaf=requestAnimationFrame(()=>{_thumbScrollRaf=null;updateActiveThumb();});
+},true);
 function wireSheetEvents(){
   // contenteditable saves
   $$('#zoomwrap [contenteditable]').forEach(el=>{
@@ -1804,11 +2032,23 @@ function wireSheetEvents(){
       renderEditor();
     });
   });
+  // more-actions popover (row gutter): one open at a time, closes on an
+  // outside click or a second click on its own toggle.
+  $$('#zoomwrap .row-more-toggle').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const wrap=btn.closest('.row-gutter');
+      const wasOpen=wrap.classList.contains('menu-open');
+      $$('#zoomwrap .row-gutter.menu-open').forEach(g=>g.classList.remove('menu-open'));
+      if(!wasOpen)wrap.classList.add('menu-open');
+    });
+  });
   // move buttons
-  $$('#zoomwrap .lot-ctl button[data-pg]').forEach(btn=>{
+  $$('#zoomwrap .row-gutter button[data-pg]').forEach(btn=>{
     btn.addEventListener('click',e=>{
       e.stopPropagation();
       const row=e.target.closest('.lotrow');
+      row.querySelector('.row-gutter')?.classList.remove('menu-open');
       moveBlockPage(+row.dataset.si,+row.dataset.pi,+row.dataset.bi,+btn.dataset.pg);
     });
   });
@@ -1837,7 +2077,7 @@ function wireSheetEvents(){
       });
     });
   });
-  $$('#zoomwrap .lot-ctl button[data-mv]').forEach(btn=>{
+  $$('#zoomwrap .row-gutter button[data-mv]').forEach(btn=>{
     btn.addEventListener('click',e=>{
       const row=e.target.closest('.lotrow');
       moveBlock(+row.dataset.si,+row.dataset.pi,+row.dataset.bi,+btn.dataset.mv);
@@ -1852,6 +2092,7 @@ function wireSheetEvents(){
       const row=e.target.closest('.lotrow, .lotrow-condensed');
       if(row)row.classList.toggle('sel-on',e.target.checked);
       if(typeof updateSelectionUI==='function')updateSelectionUI();
+  if(typeof updateContextualToolbar==='function')updateContextualToolbar();
     });
   });
   // Excel-style column resize: drag the handle on a column header's right edge.
@@ -2019,6 +2260,13 @@ document.addEventListener('focusin',e=>{
   if(e.target&&e.target.matches&&e.target.matches('[contenteditable][data-id][data-c]')){
     lastFocusCell={id:e.target.dataset.id,c:e.target.dataset.c};
   }
+  if(typeof updateContextualToolbar==='function')updateContextualToolbar();
+});
+// Row gutter "more" popover: close it on any click outside the gutter, so at
+// most one is ever open and it never lingers over the catalog.
+document.addEventListener('click',e=>{
+  if(e.target.closest('.row-gutter'))return;
+  $$('#zoomwrap .row-gutter.menu-open').forEach(g=>g.classList.remove('menu-open'));
 });
 function adjustRow(delta){
   if(!lastFocusLot){toast('Click a lot first.');return;}
@@ -2288,6 +2536,104 @@ function updateSelectionUI(){
   grp.style.display=n?'flex':'none';
   if(cnt)cnt.textContent=n;
 }
+// Toolbar buttons that only act on a focused/selected lot or cell show as
+// visibly disabled instead of doing nothing (or toasting an error) when
+// nothing applicable is targeted yet — keeps the toolbar's layout stable
+// (nothing appears/disappears) while still being honest about what's
+// currently clickable. Doesn't change what any button DOES, only whether
+// it's clickable right now; every one of these ids already no-ops safely
+// (with its own toast) if clicked in a state where it has nothing to act on.
+function updateContextualToolbar(){
+  const hasLot=!!(lastFocusLot&&S.lots.some(l=>l.id===lastFocusLot));
+  const hasSelOrFocus=hasLot||(S.selected&&S.selected.size>0);
+  const hasCell=!!(lastFocusCell&&S.lots.some(l=>l.id===lastFocusCell.id));
+  ['dupLotBtn','scratchBtn','suppBtn','rowMinus','rowPlus'].forEach(id=>{
+    const el=$('#'+id); if(el)el.disabled=!hasLot;
+  });
+  ['deleteLotBtn','ungroupBtn'].forEach(id=>{
+    const el=$('#'+id); if(el)el.disabled=!hasSelOrFocus;
+  });
+  ['boxTxtMinus','boxTxtPlus','boxTxtReset','highlightBtn'].forEach(id=>{
+    const el=$('#'+id); if(el)el.disabled=!hasCell;
+  });
+  const grpBtn=$('#manualGroupBtn'); if(grpBtn)grpBtn.disabled=!S.lots.length;
+  // Size-adjuster value readouts. Text/Cal are single whole-sheet settings, so
+  // they always have a value to show; Row/Box are specific to whatever's
+  // currently focused, so they read "—" until something applicable is.
+  // Skipped while a readout is mid-edit (has its own <input> in it right now)
+  // so an unrelated re-render can't clobber what the user is typing.
+  const rowVal=$('#rowVal');
+  if(rowVal&&!rowVal.querySelector('input')){
+    const focusedLot=hasLot?S.lots.find(l=>l.id===lastFocusLot):null;
+    rowVal.textContent=focusedLot?Math.round(isCondensedRow(focusedLot)?condensedLotHeight(focusedLot):lotHeight(focusedLot))+'px':'—';
+  }
+  const boxVal=$('#boxVal');
+  if(boxVal&&!boxVal.querySelector('input'))boxVal.textContent=hasCell?Math.round(lotCellScale(S.lots.find(l=>l.id===lastFocusCell.id),lastFocusCell.c)*100)+'%':'—';
+  const txtVal=$('#txtVal');
+  if(txtVal&&!txtVal.querySelector('input'))txtVal.textContent=Math.round((S.textScale||1)*100)+'%';
+  const calVal=$('#calVal');
+  if(calVal&&!calVal.querySelector('input'))calVal.textContent=Math.round((S.calendarTextScale||1)*100)+'%';
+}
+// Optional direct-value editing: click a size readout to type a precise
+// number instead of clicking -/+ repeatedly. Every commit path below calls
+// the exact same setter the +/- buttons use (setLotHeight, setLotCellScale,
+// S.textScale/S.calendarTextScale assignment) with the same clamping range
+// those buttons already enforce, so this is strictly an alternate way to
+// reach the same values -/+ can reach — it doesn't add a new range or a new
+// storage location.
+function wireAdjValEdit(id,{clampToText,getRaw,commit}){
+  const el=$('#'+id);
+  if(!el)return;
+  el.classList.add('adj-editable');
+  el.addEventListener('click',()=>{
+    if(el.querySelector('input'))return;
+    const raw=getRaw();
+    if(raw==null)return; // "—" state: nothing focused to edit yet
+    const input=document.createElement('input');
+    input.type='number';input.className='adj-val-edit';input.step='any';input.value=raw;
+    el.textContent='';el.appendChild(input);
+    input.focus();input.select();
+    let committed=false;
+    const doCommit=()=>{
+      if(committed)return; committed=true;
+      const n=parseFloat(input.value);
+      input.remove(); // clear the input first so the re-render below (which
+      // skips readouts that still contain a live <input>) actually refreshes
+      // this one instead of leaving it blank
+      if(Number.isFinite(n))commit(n);
+      updateContextualToolbar();
+    };
+    input.addEventListener('blur',doCommit);
+    input.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){e.preventDefault();input.blur();}
+      else if(e.key==='Escape'){e.preventDefault();committed=true;input.remove();updateContextualToolbar();}
+    });
+  });
+}
+wireAdjValEdit('rowVal',{
+  getRaw:()=>{
+    const lot=lastFocusLot&&S.lots.find(l=>l.id===lastFocusLot);
+    if(!lot)return null;
+    return Math.round(isCondensedRow(lot)?condensedLotHeight(lot):lotHeight(lot));
+  },
+  commit:n=>{
+    const lot=S.lots.find(l=>l.id===lastFocusLot); if(!lot)return;
+    if(isCondensedRow(lot))setCondensedLotHeight(lot,n); else setLotHeight(lot,n);
+    renderEditor();
+  }
+});
+wireAdjValEdit('txtVal',{
+  getRaw:()=>Math.round((S.textScale||1)*100),
+  commit:n=>{S.textScale=Math.max(.7,Math.min(1.5,n/100)); renderEditor();}
+});
+wireAdjValEdit('boxVal',{
+  getRaw:()=>lastFocusCell&&S.lots.some(l=>l.id===lastFocusCell.id)?Math.round(lotCellScale(S.lots.find(l=>l.id===lastFocusCell.id),lastFocusCell.c)*100):null,
+  commit:n=>{const lot=S.lots.find(l=>l.id===lastFocusCell.id); if(!lot)return; setLotCellScale(lot,lastFocusCell.c,Math.max(.65,Math.min(1.8,n/100))); renderEditor();}
+});
+wireAdjValEdit('calVal',{
+  getRaw:()=>Math.round((S.calendarTextScale||1)*100),
+  commit:n=>{S.calendarTextScale=Math.max(.75,Math.min(1.35,n/100)); renderEditor();}
+});
 function clearSelection(){ S.selected.clear(); renderEditor(); }
 function bulkAdjustHeight(delta){
   const lots=selectedLots();
@@ -2546,7 +2892,8 @@ async function deleteProjectById(id,name){
 /* ----- wiring ----- */
 $('#addLotBtn').onclick=openAddLot;
 $('#dupLotBtn').onclick=duplicateFocusedLot;
-$('#colorBarToggle').onclick=()=>$('#colorBar').classList.toggle('collapsed');
+$('#colorsBtn').onclick=()=>openModal('colorsModalBack');
+$('#boldTermsBtn').onclick=()=>{renderBoldTermsList();openModal('boldTermsModalBack');};
 $('#saveProjectBtn').onclick=openSaveModal;
 $('#openProjectsBtn').onclick=openProjectsModal;
 $('#openProjectsBtnUpload').onclick=openProjectsModal;
