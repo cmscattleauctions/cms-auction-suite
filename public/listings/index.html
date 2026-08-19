@@ -233,6 +233,65 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 /* manual cell highlight — color set by --change-hl (editable in Colors panel) */
 .lotrow .cell.cell-hl{background:var(--change-hl,#fff7cc)!important}
 
+/* condensed option-lot subrows — experimental, toggled per-auction via
+   Settings > Output Options > Condensed Option Lots (S.issue.optionLotLayout).
+   Only ever used for li>0 rows of a grouped block; the group's first lot
+   always renders as a normal full .lotrow. See condensedOptionRowHTML().
+   Uses the SAME grid-template-columns string as the full row (passed in
+   as `grid`), with explicit inline grid-column on .cond-span and each
+   .cond-price cell (computed from where the real Price/Start Price/PO
+   Price column(s) sit in activeCols()) so every column boundary lines up
+   exactly with the real column above/below it — including in Starting/
+   PO mode, which has two trailing price-like columns instead of one.
+   Everything left of the first price-like column is one merged, flexible
+   area (cond-span) — its internal layout is a small fixed field-width
+   rhythm (Lot/Head/Loads/Wt/Delivery/Consignor) followed by a flexible
+   Differences area, deliberately NOT tied to the 11-column grid, since
+   forcing subrow values into those column widths is what made earlier
+   attempts look like miniature, misaligned table rows.
+   The connector line reuses the master row's own bracket color
+   (var(--deepblue)) at the same x-position as its border-left
+   (.sheet .lotrow.gtop .cell.lot), so it reads as one continuous line
+   down through the option instead of two disconnected pieces; it's kept
+   thinner than the master's 2.4px bracket so it stays visually light. */
+.lotrow-condensed{position:relative;display:grid;align-items:stretch;flex-shrink:0;
+  min-height:32px;border-bottom:1px solid var(--line);
+  background:rgba(51,102,153,.09);font-size:calc(11px * var(--ts,1))}
+.lotrow-condensed.cond-last{border-bottom:6px solid var(--lot-divider,#d3d3d3);padding-bottom:5px}
+.lotrow-condensed .cond-span{position:relative;display:flex;
+  align-items:center;min-width:0;padding:0 10px 0 27px}
+.lotrow-condensed .cond-span::before{content:'';position:absolute;left:0;top:0;bottom:0;
+  border-left:1.5px solid var(--deepblue)}
+.lotrow-condensed.cond-last .cond-span::before{bottom:50%}
+.lotrow-condensed .cond-span::after{content:'';position:absolute;left:0;top:50%;width:16px;
+  border-top:1.5px solid var(--deepblue)}
+.lotrow-condensed .cond-fields{flex:1;display:flex;align-items:baseline;min-width:0}
+.lotrow-condensed .cond-field{flex:0 0 auto;color:#2a3354;white-space:nowrap;overflow:hidden}
+.lotrow-condensed .cond-field .cc{display:inline-block;min-width:.6em}
+/* differs-from-master flag: bolded rather than colored so it still reads correctly
+   in black & white print/PDF, matching the Differences list's own bold labels. */
+.lotrow-condensed .cond-field.cond-differs .cc{font-weight:700;color:#0c1430}
+.lotrow-condensed .cond-lot{width:55px;font-family:'Oswald';font-weight:700;
+  font-size:1.1em;color:var(--deepblue)}
+.lotrow-condensed .cond-head{width:70px}
+.lotrow-condensed .cond-loads{width:75px}
+.lotrow-condensed .cond-wt{width:70px}
+.lotrow-condensed .cond-delivery{width:135px}
+.lotrow-condensed .cond-consignor{width:112px;overflow:hidden;text-overflow:ellipsis}
+.lotrow-condensed .cond-diffs{flex:1 1 auto;min-width:0;color:#2a3354;font-size:.95em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lotrow-condensed .cond-diffs b{font-weight:700;color:#0c1430}
+.lotrow-condensed .cond-diffs .cond-sep{margin:0 7px;color:#b3b9cc}
+.lotrow-condensed .cond-note .cc{font-style:italic}
+.lotrow-condensed .cond-add-note{flex:0 0 auto;margin-left:8px;border:0;background:none;
+  cursor:pointer;font-size:.85em;color:#7c86a8;padding:1px 4px;border-radius:3px;white-space:nowrap}
+.lotrow-condensed .cond-add-note:hover{color:var(--deepblue);background:rgba(51,102,153,.12)}
+.hidectl .cond-add-note{display:none !important}
+.lotrow-condensed .cond-price{display:flex;align-items:center;
+  justify-content:center;border-left:1px solid var(--line);font-family:'Oswald';
+  font-weight:700;color:var(--deepblue);font-size:1.05em}
+.lotrow-condensed .cond-price .cc{width:100%;text-align:center}
+
 /* footer */
 .s-foot{height:34px;border-top:2px solid var(--blue);display:flex;align-items:center;
   gap:14px;font-size:11px;color:#3a4568;margin-top:auto}
@@ -558,8 +617,11 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
    option group, every sublot that's part of it lights up individually as
    you check them, so which of "just this sublot" / "the whole group" is
    selected is always visible from the accumulated tint rather than a
-   separate group-level indicator. */
+   separate group-level indicator. Condensed subrows get the identical
+   treatment (same fix, same tint) since they're a row type only this
+   merged branch has. */
 .sheet:not(.hidectl) .lotrow.sel-on{box-shadow:inset 4px 0 0 #b8860b;background:rgba(184,134,11,.07) !important}
+.sheet:not(.hidectl) .lotrow-condensed.sel-on{box-shadow:inset 4px 0 0 #b8860b;background:rgba(184,134,11,.07) !important}
 
 /* Modal */
 .modal-back{position:fixed;inset:0;background:rgba(19,24,32,.55);display:none;align-items:flex-start;justify-content:center;z-index:5000;padding:40px 16px;overflow:auto}
@@ -772,6 +834,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
         <div class="field"><label>Header Text Alignment</label><select id="i-header-align"><option value="left">Left Align</option><option value="center">Center Align</option></select>
           <div class="hint">Controls the CMS/title/date text block in the printable header.</div></div>
         <div class="check-field"><input type="checkbox" id="i-show-calendar"><div><label for="i-show-calendar">Show Next Auction Badge</label><div class="hint">Turn this off to remove the top-right next auction badge and give the header more room.</div></div></div>
+        <div class="check-field"><input type="checkbox" id="i-condensed-options"><div><label for="i-condensed-options">Condensed Option Lots</label><div class="hint">Experimental. Renders additional options in an option group as short indented subrows instead of full rows. Applies only to this auction — off by default, and existing auctions keep their current layout unless you turn this on for them.</div></div></div>
       </div>
       <div class="card advanced-only">
         <h3>Bold Rules</h3>
@@ -1021,7 +1084,7 @@ const S = {
   global:{house:'CMS Livestock Auction',phone:'(806) 355-7505',
     email:'info@cmslivestock.com',web:'www.CattleMarketingServices.com',
     addr:'6900 I40 West, Ste 135, Amarillo, TX 79106'},
-  issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:'',showCalendar:true,headerAlign:'center'},
+  issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:'',showCalendar:true,headerAlign:'center',optionLotLayout:'legacy'},
   sections:[], zoom:.70, rowStep:14, textScale:1, calendarTextScale:1, toolsHidden:false, builderMode:'basic',
   colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff',changeHL:'#fff7cc'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows','Holstein Cows | unless: Jersey, Jers','Holstein Cow | unless: Jersey, Jers'],
@@ -1161,7 +1224,7 @@ function syncSettingsUI(){
   $('#i-date').value=S.issue.date; $('#i-time').value=S.issue.time;
   $('#i-name').value=S.issue.name; $('#i-ndate').value=S.issue.ndate;
   $('#i-nname').value=S.issue.nname; $('#i-ntag').value=S.issue.ntag;
-  $('#i-show-calendar').checked=S.issue.showCalendar!==false; $('#i-header-align').value=S.issue.headerAlign||'center'; $('#builder-mode').value=S.builderMode||'basic'; $('#v-settings').classList.toggle('basic-builder',(S.builderMode||'basic')==='basic');
+  $('#i-show-calendar').checked=S.issue.showCalendar!==false; $('#i-header-align').value=S.issue.headerAlign||'center'; $('#i-condensed-options').checked=(S.issue.optionLotLayout==='condensed'); $('#builder-mode').value=S.builderMode||'basic'; $('#v-settings').classList.toggle('basic-builder',(S.builderMode||'basic')==='basic');
   $('#c-blue').value=S.colors.blue; $('#c-section-end').value=S.colors.sectionEnd;
   $('#c-section-text').value=S.colors.sectionText; $('#c-table-head').value=S.colors.tableHead;
   $('#c-calendar').value=S.colors.calendar; $('#c-divider').value=S.colors.divider||'#d3d3d3'; $('#c-supp-accent').value=S.colors.suppAccent;
@@ -1172,7 +1235,8 @@ function readSettingsUI(){
     email:$('#g-email').value,web:$('#g-web').value,addr:$('#g-addr').value};
   S.issue={date:$('#i-date').value,time:$('#i-time').value,name:$('#i-name').value,
     ndate:$('#i-ndate').value,nname:$('#i-nname').value,ntag:$('#i-ntag').value,
-    showCalendar:$('#i-show-calendar').checked,headerAlign:$('#i-header-align').value||'left'};
+    showCalendar:$('#i-show-calendar').checked,headerAlign:$('#i-header-align').value||'left',
+    optionLotLayout:$('#i-condensed-options').checked?'condensed':'legacy'};
   S.builderMode=$('#builder-mode').value||'basic';
   $('#v-settings').classList.toggle('basic-builder',S.builderMode==='basic');
   S.colors={blue:$('#c-blue').value,sectionEnd:$('#c-section-end').value,
@@ -1312,6 +1376,97 @@ function notesHTML(lot){
 function sellerHTML(lot){
   if(lotEdit(lot,'seller')!=null) return lotEdit(lot,'seller');
   return `<span class="seller-name">${esc(lot.consignor)}</span>`+(lot.location?`<i>${esc(lot.location)}</i>`:'');
+}
+
+/* ===== condensed option-lot rendering (experimental, toggle: S.issue.optionLotLayout) =====
+ * Rendering only — never touches S.lots/group/CSV data on toggle. Legacy render path (the
+ * col-based .lotrow loop in sheetHTML) is untouched; this is purely an additional branch for
+ * li>0 rows of a grouped block when the per-auction toggle is on.
+ *
+ * Every value here is lotEdit-aware in both directions: the same lotEdit key drives what's
+ * displayed AND what's compared against the master row (condField's `firstValue` arg, and
+ * condensedFieldDiffs below), so editing a value to match the master — or clearing it — makes
+ * a "differs from master" indicator (bold field, or a Differences badge) disappear on its own.
+ * That's the mechanism for removing a flagged auto-detected difference; there's no separate
+ * delete control for those. A manually-added note (condNote) works the same way in reverse:
+ * clearing its text removes it and brings back the "+ Note" control.
+ * Fields reuse the exact [data-id][data-c] contenteditable pattern legacy cells use, so saves
+ * go through the app's one generic blur handler in wireSheetEvents() for free. Seller/Notes
+ * diffs are edited as plain flattened text through condSellerVal()/condNotesVal() rather than
+ * the raw 'seller'/'notes' HTML keys' full name+location / multi-line structure — if you edit
+ * the Consignor field or the Notes diff value, that lot's own Seller/Notes cell (only relevant
+ * if you switch back to legacy view, where every lot in a group still renders as a full row)
+ * will show that same plain text instead of its previous rich formatting. Sex/Shrink/Slide/
+ * Head/Loads/Weight/Delivery/Price don't have that caveat — those keys were always plain. */
+function condPlain(v){return stripTags(String(v||'')).replace(/\s+/g,' ').trim();}
+function condSellerVal(lot){const e=lotEdit(lot,'seller');return e!=null?condPlain(e):(lot.consignor||'');}
+function condNotesVal(lot){const e=lotEdit(lot,'notes');return e!=null?condPlain(e):[lot.desc1,lot.desc2].filter(Boolean).join(' ');}
+function condensedFieldDiffs(lot,first){
+  const diffs=[];
+  const sexV=flat(lotEdit(lot,'sex')??lot.sex), sexF=flat(lotEdit(first,'sex')??first.sex);
+  if(sexV&&sexV!==sexF)diffs.push({label:'Sex',value:sexV,c:'sex'});
+  const shrinkV=esc(lotEdit(lot,'shrink')??lot.shrink), shrinkF=esc(lotEdit(first,'shrink')??first.shrink);
+  if(shrinkV&&shrinkV!==shrinkF)diffs.push({label:'Shrink',value:shrinkV,c:'shrink'});
+  const slideV=flat(lotEdit(lot,'slide')??lot.slide), slideF=flat(lotEdit(first,'slide')??first.slide);
+  if(slideV&&slideV!==slideF)diffs.push({label:'Slide',value:slideV,c:'slide'});
+  const notesV=esc(condNotesVal(lot)), notesF=esc(condNotesVal(first));
+  if(notesV&&notesV!==notesF)diffs.push({label:'Notes',value:notesV,c:'notes'});
+  return diffs;
+}
+function condField(cls,lot,c,value,firstValue,suffix){
+  const differs=firstValue!==undefined&&value&&String(value).trim()!==String(firstValue??'').trim();
+  return `<span class="cond-field ${cls}${differs?' cond-differs':''}"><span class="cc" contenteditable data-id="${lot.id}" data-c="${c}">${value}</span>${suffix?`<span class="cond-suffix">${suffix}</span>`:''}</span>`;
+}
+// Where "price" sits in the active column set (11th column normally; also 11th in
+// Starting/PO mode, which appends a 12th "PO Price" column after it). Everything
+// from that index onward is rendered as its own grid-aligned price cell so each
+// one's divider carries down through the option exactly like every other column —
+// in PO mode that's two cells (Start Price, PO Price), not one.
+function condensedPriceCellsHTML(lot,cols){
+  const priceIdx=cols.indexOf('price');
+  if(priceIdx<0)return '';
+  return cols.slice(priceIdx).map((c,i)=>{
+    const idx=priceIdx+i;
+    const v=lotEdit(lot,c)??(lot[c]?esc(lot[c]):'');
+    return `<div class="cond-price" style="grid-column:${idx+1} / ${idx+2}"><span class="cc" contenteditable data-id="${lot.id}" data-c="${c}">${v}</span></div>`;
+  }).join('');
+}
+function condensedOptionRowHTML(lot,first,li,bi,page,isLast,grid,cols){
+  const headV=esc(lotEdit(lot,'head')??lot.head??''), headF=esc(lotEdit(first,'head')??first.head??'');
+  const loadV=esc(lotEdit(lot,'loadCount')??lot.loadCount??''), loadF=esc(lotEdit(first,'loadCount')??first.loadCount??'');
+  const loadN=parseInt(loadV)||0;
+  const basewtV=esc(lotEdit(lot,'basewt')??lot.basewt??''), basewtF=esc(lotEdit(first,'basewt')??first.basewt??'');
+  const deliveryV=esc(lotEdit(lot,'delivery')??lot.delivery??''), deliveryF=esc(lotEdit(first,'delivery')??first.delivery??'');
+  const consignorV=esc(condSellerVal(lot)), consignorF=esc(condSellerVal(first));
+  const priceIdx=cols.indexOf('price');
+  const spanEnd=priceIdx<0?cols.length+1:priceIdx+1;
+  const diffs=condensedFieldDiffs(lot,first);
+  const noteRaw=lotEdit(lot,'condNote');
+  const noteActive=noteRaw!=null;
+  const diffPieces=diffs.map(d=>`<b>${esc(d.label)}:</b> <span class="cc" contenteditable data-id="${lot.id}" data-c="${d.c}">${d.value}</span>`);
+  if(noteActive)diffPieces.push(`<span class="cond-note"><span class="cc" contenteditable data-id="${lot.id}" data-c="condNote">${noteRaw}</span></span>`);
+  const diffsHtml=diffPieces.join('<span class="cond-sep">·</span>');
+  const addNoteBtn=noteActive?'':`<button type="button" class="cond-add-note" data-id="${lot.id}" title="Add a custom note for this option">+ Note</button>`;
+  const selOn=S.selected&&S.selected.has(lot.id);
+  return `<div class="lotrow-condensed${isLast?' cond-last':''}${selOn?' sel-on':''}" data-id="${lot.id}" data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}" style="grid-template-columns:${grid};min-height:${condensedLotHeight(lot)}px">
+      <div class="row-gutter row-gutter-sub">
+        <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
+        <button class="split-btn" data-li="${li}" title="Split the option group here — this lot and the ones below it move to the top of the next page">✂</button>
+      </div>
+      <div class="cond-span" style="grid-column:1 / ${spanEnd}">
+        <div class="cond-fields">
+          ${condField('cond-lot',lot,'lot',esc(displayLotNumber(lot)),undefined,'')}
+          ${condField('cond-head',lot,'head',headV,headF,headV?' hd':'')}
+          ${condField('cond-loads',lot,'loadCount',loadV,loadF,loadV?` load${loadN===1?'':'s'}`:'')}
+          ${condField('cond-wt',lot,'basewt',basewtV,basewtF,basewtV?'#':'')}
+          ${condField('cond-delivery',lot,'delivery',deliveryV,deliveryF,'')}
+          ${condField('cond-consignor',lot,'seller',consignorV,consignorF,'')}
+          <span class="cond-diffs">${diffsHtml}</span>
+          ${addNoteBtn}
+        </div>
+      </div>
+      ${condensedPriceCellsHTML(lot,cols)}
+    </div>`;
 }
 
 /* ===== build sections & pagination ===== */
@@ -1474,6 +1629,7 @@ function modeState(mode=modeKey()){
   if(!S.modeStates[mode])S.modeStates[mode]={edits:{},cellScales:{},heights:{},scratched:{},supplemental:{},hl:{}};
   const ms=S.modeStates[mode];
   if(!ms.hl)ms.hl={}; // backfill projects saved before highlighting existed
+  if(!ms.condHeights)ms.condHeights={}; // backfill projects saved before condensed row-height existed
   return ms;
 }
 const MIRROR_FROM_LISTINGS=['po','results'];
@@ -1504,6 +1660,7 @@ function normalizeInheritedModes(){
       Object.keys(a).forEach(c=>{if(!!a[c]===!!b[c])delete a[c];});
       if(!Object.keys(a).length)delete ms.hl[id];
     });
+    if(ms.condHeights&&def.condHeights)Object.keys(ms.condHeights).forEach(id=>{if(ms.condHeights[id]===def.condHeights[id])delete ms.condHeights[id];});
   });
 }
 // ----- edits (text + bold content), per lot per column -----
@@ -1514,12 +1671,26 @@ function lotEdits(lot){
 }
 function lotEdit(lot,c){const e=lotEdits(lot); return e[c];}
 function setLotEdit(lot,c,v){const st=modeState(); if(!st.edits[lot.id])st.edits[lot.id]={}; st.edits[lot.id][c]=v;}
+function clearLotEdit(lot,c){const st=modeState(); if(st.edits[lot.id])delete st.edits[lot.id][c];}
 // ----- row height, per lot -----
 function lotHeight(lot){
   for(const m of modeChain()){const h=modeState(m).heights[lot.id]; if(Number.isFinite(h))return h;}
   return lot.h||74;
 }
 function setLotHeight(lot,h){modeState().heights[lot.id]=Math.max(54,Math.round(h));}
+// ----- row height, per lot, for condensed option-lot subrows — a separate store from
+// lotHeight/setLotHeight above (different default/floor) since a lot renders with very
+// different natural height as a full row vs. a condensed subrow, and the same lot can be
+// either one at different times (e.g. it stops being an option's 2nd+ member). -----
+function condensedLotHeight(lot){
+  for(const m of modeChain()){const h=modeState(m).condHeights[lot.id]; if(Number.isFinite(h))return h;}
+  return 32;
+}
+function setCondensedLotHeight(lot,h){modeState().condHeights[lot.id]=Math.max(22,Math.round(h));}
+// Whether `lot` is currently on-screen as a condensed subrow (vs. a normal full .lotrow) —
+// read from the live DOM rather than re-deriving group/position, since every caller of this
+// only runs in response to a user interacting with what's actually rendered right now.
+function isCondensedRow(lot){return !!document.querySelector('#zoomwrap .lotrow-condensed[data-id="'+lot.id+'"]');}
 // ----- per-box text scale, per lot per column -----
 function lotCellScale(lot,c){
   for(const m of modeChain()){const cs=modeState(m).cellScales[lot.id]; if(cs&&cs[c])return cs[c];}
@@ -1650,7 +1821,13 @@ function sheetHTML(page,pageNum,totalPages){
   // rows
   let alt=0;
   page.blocks.forEach((b,bi)=>{
+    const condensedGroup=S.issue.optionLotLayout==='condensed'&&b.grouped;
     b.lots.forEach((lot,li)=>{
+      if(condensedGroup&&li>0){
+        h+=condensedOptionRowHTML(lot,b.lots[0],li,bi,page,li===b.lots.length-1,grid,cols);
+        alt++;
+        return;
+      }
       const gpos=b.grouped?(li===0?'gtop':(li===b.lots.length-1?'gbot':'gmid')):'';
       const isFirst=li===0;
       const selOn=S.selected&&S.selected.has(lot.id);
@@ -1744,7 +1921,7 @@ function renderEditor(){
   $$('.sheet').forEach(sh=>{
     const tbl=sh.querySelector('.s-tbl');
     let overBy=0;
-    const rows=tbl.querySelectorAll('.lotrow');
+    const rows=tbl.querySelectorAll('.lotrow, .lotrow-condensed');
     if(rows.length){
       const last=rows[rows.length-1].getBoundingClientRect();
       const box=tbl.getBoundingClientRect();
@@ -1837,6 +2014,24 @@ function wireSheetEvents(){
       else if(el.dataset.f==='nextTag')S.issue.ntag=el.textContent;
     });
   });
+  // Condensed option-lot subrows show computed text next to what's actually being
+  // edited (hd/load(s)/# unit suffixes, bold-if-differs-from-master, whether a
+  // difference badge shows at all) — none of that lives in the field the user is
+  // typing into, so unlike a legacy cell (which is its own whole editable surface)
+  // it has to be recomputed after the edit. Re-render once the field is done being
+  // edited, after the generic save handler above has already run.
+  $$('#zoomwrap .lotrow-condensed [contenteditable]').forEach(el=>{
+    el.addEventListener('blur',()=>{
+      // A manual note left empty after editing reverts to the "+ Note" button
+      // instead of lingering as a blank chip — clear the key entirely (rather
+      // than leaving it as '') so noteActive's presence check picks this up.
+      if(el.dataset.c==='condNote'&&!el.textContent.trim()){
+        const lot=S.lots.find(l=>l.id===el.dataset.id);
+        if(lot)clearLotEdit(lot,'condNote');
+      }
+      renderEditor();
+    });
+  });
   // more-actions popover (row gutter): one open at a time, closes on an
   // outside click or a second click on its own toggle.
   $$('#zoomwrap .row-more-toggle').forEach(btn=>{
@@ -1860,8 +2055,26 @@ function wireSheetEvents(){
   $$('#zoomwrap .split-btn').forEach(btn=>{
     btn.addEventListener('click',e=>{
       e.stopPropagation();
-      const row=e.target.closest('.lotrow');
+      const row=e.target.closest('.lotrow, .lotrow-condensed');
+      if(!row)return;
       splitBlockAt(+row.dataset.si,+row.dataset.pi,+row.dataset.bi,+btn.dataset.li);
+    });
+  });
+  // "+ Note" on a condensed subrow — adds one manual, freeform difference note
+  // (stored as lotEdit(lot,'condNote')) alongside the auto-detected Sex/Shrink/
+  // Slide/Notes differences. Clearing its text back to empty removes it and
+  // brings this button back, same "edit it away" pattern the other diffs use.
+  $$('#zoomwrap .cond-add-note').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const lot=S.lots.find(l=>l.id===btn.dataset.id);
+      if(!lot)return;
+      if(lotEdit(lot,'condNote')==null)setLotEdit(lot,'condNote','');
+      renderEditor();
+      requestAnimationFrame(()=>{
+        const el=document.querySelector('#zoomwrap [data-id="'+lot.id+'"][data-c="condNote"]');
+        if(el)el.focus();
+      });
     });
   });
   $$('#zoomwrap .row-gutter button[data-mv]').forEach(btn=>{
@@ -1876,7 +2089,7 @@ function wireSheetEvents(){
     cb.addEventListener('change',e=>{
       const id=e.target.dataset.id;
       if(e.target.checked)S.selected.add(id); else S.selected.delete(id);
-      const row=e.target.closest('.lotrow');
+      const row=e.target.closest('.lotrow, .lotrow-condensed');
       if(row)row.classList.toggle('sel-on',e.target.checked);
       if(typeof updateSelectionUI==='function')updateSelectionUI();
   if(typeof updateContextualToolbar==='function')updateContextualToolbar();
@@ -1897,7 +2110,7 @@ function wireSheetEvents(){
       let raf=null;
       const applyLive=()=>{raf=null;
         const grid=gridTemplate();
-        $$('#zoomwrap .s-thead, #zoomwrap .lotrow').forEach(el=>{el.style.gridTemplateColumns=grid;});
+        $$('#zoomwrap .s-thead, #zoomwrap .lotrow, #zoomwrap .lotrow-condensed').forEach(el=>{el.style.gridTemplateColumns=grid;});
       };
       const onMove=ev=>{
         let next=Math.max(MIN_COL_WIDTHS[col],startW[col]+(ev.clientX-startX)/(S.zoom||1));
@@ -2042,7 +2255,7 @@ function ungroupFocusedLot(){
 let lastFocusLot=null;
 let lastFocusCell=null;
 document.addEventListener('focusin',e=>{
-  const r=e.target.closest('.lotrow');
+  const r=e.target.closest('.lotrow, .lotrow-condensed');
   if(r)lastFocusLot=r.dataset.id;
   if(e.target&&e.target.matches&&e.target.matches('[contenteditable][data-id][data-c]')){
     lastFocusCell={id:e.target.dataset.id,c:e.target.dataset.c};
@@ -2059,7 +2272,8 @@ function adjustRow(delta){
   if(!lastFocusLot){toast('Click a lot first.');return;}
   const lot=S.lots.find(l=>l.id===lastFocusLot);
   if(!lot)return;
-  setLotHeight(lot,lotHeight(lot)+delta);
+  if(isCondensedRow(lot))setCondensedLotHeight(lot,condensedLotHeight(lot)+delta);
+  else setLotHeight(lot,lotHeight(lot)+delta);
   renderEditor();
 }
 
@@ -2349,7 +2563,10 @@ function updateContextualToolbar(){
   // Skipped while a readout is mid-edit (has its own <input> in it right now)
   // so an unrelated re-render can't clobber what the user is typing.
   const rowVal=$('#rowVal');
-  if(rowVal&&!rowVal.querySelector('input'))rowVal.textContent=hasLot?Math.round(lotHeight(S.lots.find(l=>l.id===lastFocusLot)))+'px':'—';
+  if(rowVal&&!rowVal.querySelector('input')){
+    const focusedLot=hasLot?S.lots.find(l=>l.id===lastFocusLot):null;
+    rowVal.textContent=focusedLot?Math.round(isCondensedRow(focusedLot)?condensedLotHeight(focusedLot):lotHeight(focusedLot))+'px':'—';
+  }
   const boxVal=$('#boxVal');
   if(boxVal&&!boxVal.querySelector('input'))boxVal.textContent=hasCell?Math.round(lotCellScale(S.lots.find(l=>l.id===lastFocusCell.id),lastFocusCell.c)*100)+'%':'—';
   const txtVal=$('#txtVal');
@@ -2394,8 +2611,16 @@ function wireAdjValEdit(id,{clampToText,getRaw,commit}){
   });
 }
 wireAdjValEdit('rowVal',{
-  getRaw:()=>lastFocusLot&&S.lots.some(l=>l.id===lastFocusLot)?Math.round(lotHeight(S.lots.find(l=>l.id===lastFocusLot))):null,
-  commit:n=>{const lot=S.lots.find(l=>l.id===lastFocusLot); if(!lot)return; setLotHeight(lot,n); renderEditor();}
+  getRaw:()=>{
+    const lot=lastFocusLot&&S.lots.find(l=>l.id===lastFocusLot);
+    if(!lot)return null;
+    return Math.round(isCondensedRow(lot)?condensedLotHeight(lot):lotHeight(lot));
+  },
+  commit:n=>{
+    const lot=S.lots.find(l=>l.id===lastFocusLot); if(!lot)return;
+    if(isCondensedRow(lot))setCondensedLotHeight(lot,n); else setLotHeight(lot,n);
+    renderEditor();
+  }
 });
 wireAdjValEdit('txtVal',{
   getRaw:()=>Math.round((S.textScale||1)*100),
@@ -2413,7 +2638,7 @@ function clearSelection(){ S.selected.clear(); renderEditor(); }
 function bulkAdjustHeight(delta){
   const lots=selectedLots();
   if(!lots.length){toast('Select one or more lots first (use the checkboxes).');return;}
-  lots.forEach(l=>setLotHeight(l,lotHeight(l)+delta));
+  lots.forEach(l=>isCondensedRow(l)?setCondensedLotHeight(l,condensedLotHeight(l)+delta):setLotHeight(l,lotHeight(l)+delta));
   renderEditor();
   toast('Adjusted height on '+lots.length+' lot'+(lots.length===1?'':'s')+'.');
 }
@@ -2562,6 +2787,7 @@ function applyProject(payload){
   S.results=!!payload.results;
   if(payload.global)Object.assign(S.global,payload.global);
   if(payload.issue)Object.assign(S.issue,payload.issue);
+  S.issue.optionLotLayout=payload.issue?.optionLotLayout==='condensed'?'condensed':'legacy';
   if(payload.colors)Object.assign(S.colors,payload.colors);
   if(Array.isArray(payload.boldRules))S.boldRules=payload.boldRules.slice();
   if(payload.rowStep)S.rowStep=payload.rowStep;
