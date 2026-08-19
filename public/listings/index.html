@@ -241,49 +241,62 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 /* manual cell highlight — color set by --change-hl (editable in Colors panel) */
 .lotrow .cell.cell-hl{background:var(--change-hl,#fff7cc)!important}
 
-/* condensed option-lot subrows — experimental, toggled per-auction via
-   Settings > Output Options > Condensed Option Lots (S.issue.optionLotLayout).
-   Only ever used for li>0 rows of a grouped block; the group's first lot
-   always renders as a normal full .lotrow. See condensedOptionRowHTML().
-   Uses the SAME grid-template-columns string as the full row (the `grid`
-   param), and — unlike earlier attempts, which merged everything left of
-   Price into one flexible area with its own small fixed-width rhythm —
-   every value now sits in its own cell in the SAME real column it belongs
-   to (Consignor under Seller/Location, Head under Head, Delivery under
-   Delivery, etc.), so subrow values visually line up under the master
-   row's own columns instead of following an independent layout. Cells
-   wrap (no truncation, no ellipsis) rather than clip, so nothing is ever
-   hidden — a long delivery range or consignor name just takes more
-   height, and the row grows to fit since only min-height is set. The
-   left border on the row itself continues the master row's own bracket
-   (same color, same 2.4px thickness) at the same x — no separate indent/
-   connector needed now that content aligns to the real grid instead of
-   sitting in an inset flexible area. */
+/* Condensed option lots — toggled per-auction via Settings > Output Options >
+   Condensed Option Lots (S.issue.optionLotLayout). The group's master lot always
+   renders through legacyLotRowHTML() (see above sheetHTML()) exactly like any other
+   full row — untouched, unmodified. Only the group's continuation lots become
+   compact sub-rows, all wrapped together under ONE shared vertical "OPTION" label
+   and bracket (.cond-group-wrap), rather than each row getting its own indent
+   marker. .cond-gutter is absolutely positioned (top:0;bottom:0) inside
+   .cond-group-wrap, whose own height is simply whatever its stacked .cond-subrows
+   need — so the label/bracket automatically span however many sub-rows exist, one
+   or many, with no manual height math anywhere.
+   Each sub-row keeps the same grid-template-columns the header/master row use SOLELY
+   so its Price cell(s) land in the exact real Price column, same as every other
+   price on the sheet (condensedPriceCellsHTML) — everything left of Price is one
+   merged flexible span (.cond-span), not tied to the other 10 columns, since forcing
+   values through that full grid is what made this look like a miniature table row
+   instead of a compact nested line. .cond-span gets left padding to clear the
+   overlaid gutter, so content starts roughly under Seller/Location rather than
+   under Lot. Fields wrap as whole units (never mid-word) if a group needs more
+   room than one line — row height is a minimum, not fixed, so nothing truncates. */
+.cond-group-wrap{position:relative;display:flex;flex-shrink:0}
+.cond-gutter{position:absolute;left:0;top:0;bottom:0;width:52px;display:flex;
+  align-items:center;justify-content:center;pointer-events:none}
+.cond-bracket{position:absolute;left:34px;top:6px;bottom:6px;border-left:1.25px solid #8d97b8}
+.cond-bracket::before{content:'';position:absolute;left:0;top:0;width:7px;border-top:1.25px solid #8d97b8}
+.cond-bracket::after{content:'';position:absolute;left:0;bottom:0;width:7px;border-bottom:1.25px solid #8d97b8}
+.cond-option-label{position:absolute;left:2px;top:0;bottom:0;width:22px;
+  display:flex;align-items:center;justify-content:center}
+.cond-option-label span{display:inline-block;transform:rotate(-90deg);white-space:nowrap;
+  font-family:'Oswald';font-weight:600;font-size:8.5px;letter-spacing:1.6px;
+  color:#5a6488;text-transform:uppercase}
+.cond-subrows{flex:1;min-width:0}
 .lotrow-condensed{position:relative;display:grid;align-items:stretch;flex-shrink:0;
-  min-height:42px;border-bottom:1px solid var(--line);border-left:2.4px solid var(--deepblue);
-  background:rgba(51,102,153,.09);font-size:calc(11px * var(--ts,1))}
+  min-height:34px;border-bottom:1px solid var(--line);
+  background:rgba(51,102,153,.06);font-size:calc(11px * var(--ts,1))}
 .lotrow-condensed.cond-last{border-bottom:6px solid var(--lot-divider,#d3d3d3)}
-.lotrow-condensed .cond-cell{display:flex;align-items:center;min-width:0;padding:4px 7px;
-  color:#2a3354;overflow-wrap:break-word;word-break:break-word}
-.lotrow-condensed .cond-cell .cc{width:100%}
+.cond-span{display:flex;flex-wrap:wrap;align-items:baseline;align-content:center;
+  row-gap:2px;column-gap:14px;min-width:0;padding:5px 10px 5px 58px;color:#2a3354}
+.cond-field{white-space:nowrap;flex:0 0 auto}
+.cond-field.cond-lot{font-family:'Oswald';font-weight:700;font-size:1.1em;color:var(--deepblue)}
 /* differs-from-master flag: bolded rather than colored so it still reads correctly
-   in black & white print/PDF. Shrink/Slide only ever render when they DO differ
-   (there's nothing to show otherwise), so they're always flagged when present;
-   Consignor/Head/Weight/Delivery are always shown and only flag when different. */
-.lotrow-condensed .cond-differs{font-weight:700;color:#0c1430}
-.lotrow-condensed .cond-lot-cell .cc{font-family:'Oswald';font-weight:700;
-  font-size:1.1em;color:var(--deepblue)}
-.lotrow-condensed .cond-note .cc{font-style:italic}
-.lotrow-condensed .cond-add-note{border:1px solid #c7cee0;
-  background:#fff;cursor:pointer;font-size:.9em;font-weight:600;color:#5a6488;
-  padding:4px 9px;min-height:22px;border-radius:4px;white-space:nowrap}
-.lotrow-condensed .cond-add-note:hover{color:var(--deepblue);border-color:var(--deepblue);
-  background:rgba(51,102,153,.12)}
+   in black & white print/PDF. Shrink/Slide/Sex/Seller/Notes only ever render when
+   they DO differ from the master (there's nothing to show otherwise), so they're
+   always flagged; Head/Loads/Weight/Delivery are always shown and only flag when
+   their value is actually different. */
+.cond-differs{font-weight:700;color:#0c1430}
+.cond-field .cc{display:inline}
+.cond-field.cond-diff b{font-weight:700;color:#5a6488;margin-right:2px}
+.cond-field.cond-note .cc{font-style:italic}
+.cond-add-note{border:1px solid #c7cee0;background:#fff;cursor:pointer;font-size:.9em;
+  font-weight:600;color:#5a6488;padding:3px 8px;min-height:20px;border-radius:4px;white-space:nowrap}
+.cond-add-note:hover{color:var(--deepblue);border-color:var(--deepblue);background:rgba(51,102,153,.12)}
 .hidectl .cond-add-note{display:none !important}
-.lotrow-condensed .cond-price{display:flex;align-items:center;
-  justify-content:center;border-left:1px solid var(--line);font-family:'Oswald';
-  font-weight:700;color:var(--deepblue);font-size:1.35em}
-.lotrow-condensed .cond-price .cc{width:100%;text-align:center}
+.cond-price{display:flex;align-items:center;justify-content:center;
+  border-left:1px solid var(--line);font-family:'Oswald';font-weight:700;
+  color:var(--deepblue);font-size:1.3em}
+.cond-price .cc{width:100%;text-align:center}
 
 /* footer */
 .s-foot{height:34px;border-top:2px solid var(--blue);display:flex;align-items:center;
@@ -1386,31 +1399,44 @@ function sellerHTML(lot){
   return `<span class="seller-name">${esc(lot.consignor)}</span>`+(lot.location?`<i>${esc(lot.location)}</i>`:'');
 }
 
-/* ===== condensed option-lot rendering (experimental, toggle: S.issue.optionLotLayout) =====
- * Rendering only — never touches S.lots/group/CSV data on toggle. Legacy render path (the
- * col-based .lotrow loop in sheetHTML) is untouched; this is purely an additional branch for
- * li>0 rows of a grouped block when the per-auction toggle is on.
+/* ===== condensed option-lot rendering (toggle: S.issue.optionLotLayout) =====
+ * Rendering only — never touches S.lots/group/CSV data on toggle. Legacy render path
+ * (legacyLotRowHTML below) is untouched; the master lot in a condensed group still
+ * renders through that exact same function, so it looks and behaves identically to any
+ * other full row. Only the group's continuation lots (li>0) get the compact treatment,
+ * grouped under one shared vertical "OPTION" label + bracket that spans the whole
+ * group's actual rendered height (condensedOptionGroupHTML) — never per-row.
  *
- * Every value here is lotEdit-aware in both directions: the same lotEdit key drives what's
- * displayed AND what's compared against the master row (condField's `firstValue` arg, and
- * condensedFieldDiffs below), so editing a value to match the master — or clearing it — makes
- * a "differs from master" indicator (bold field, or a Differences badge) disappear on its own.
- * That's the mechanism for removing a flagged auto-detected difference; there's no separate
- * delete control for those. A manually-added note (condNote) works the same way in reverse:
- * clearing its text removes it and brings back the "+ Note" control.
- * Fields reuse the exact [data-id][data-c] contenteditable pattern legacy cells use, so saves
- * go through the app's one generic blur handler in wireSheetEvents() for free. Seller/Notes
- * diffs are edited as plain flattened text through condSellerVal()/condNotesVal() rather than
- * the raw 'seller'/'notes' HTML keys' full name+location / multi-line structure — if you edit
- * the Consignor field or the Notes diff value, that lot's own Seller/Notes cell (only relevant
- * if you switch back to legacy view, where every lot in a group still renders as a full row)
- * will show that same plain text instead of its previous rich formatting. Sex/Shrink/Slide/
- * Head/Loads/Weight/Delivery/Price don't have that caveat — those keys were always plain. */
+ * A sublot shows only: Lot, Head, Loads, Weight, Delivery always, bolded individually
+ * when that value differs from the master row; everything else (Sex, Seller, Shrink,
+ * Slide, Notes) only appears at all when it differs from the master — nothing gets
+ * silently duplicated onto every option just because the data has a value for it.
+ * Content flows as one flexible line per sublot and wraps as whole fields (never
+ * mid-word) if there's more to show than fits — the row's height is a minimum, not a
+ * fixed size, so it grows instead of ever truncating.
+ * Every value is lotEdit-aware in both directions: the same lotEdit key drives what's
+ * displayed AND what's compared against the master row, so editing a value to match the
+ * master — or clearing it — makes a "differs" indicator disappear on its own; that's the
+ * mechanism for removing a flagged difference, there's no separate delete control for
+ * those. A manually-added note (condNote) works the same way in reverse: clearing its
+ * text removes it and brings back the "+ Note" control.
+ * Fields reuse the exact [data-id][data-c] contenteditable pattern legacy cells use, so
+ * saves go through the app's one generic blur handler in wireSheetEvents() for free.
+ * Seller/Notes diffs are edited as plain flattened text through condSellerVal()/
+ * condNotesVal() rather than the raw 'seller'/'notes' HTML keys' full name+location /
+ * multi-line structure — if you edit one, that lot's own Seller/Notes cell (only
+ * relevant if you switch to legacy view, where every lot in a group still renders as a
+ * full row) will show that plain text instead of its previous rich formatting.
+ * Sex/Shrink/Slide/Head/Loads/Weight/Delivery/Price don't have that caveat. */
 function condPlain(v){return stripTags(String(v||'')).replace(/\s+/g,' ').trim();}
 function condSellerVal(lot){const e=lotEdit(lot,'seller');return e!=null?condPlain(e):(lot.consignor||'');}
 function condNotesVal(lot){const e=lotEdit(lot,'notes');return e!=null?condPlain(e):[lot.desc1,lot.desc2].filter(Boolean).join(' ');}
 function condensedFieldDiffs(lot,first){
   const diffs=[];
+  const sexV=flat(lotEdit(lot,'sex')??lot.sex), sexF=flat(lotEdit(first,'sex')??first.sex);
+  if(sexV&&sexV!==sexF)diffs.push({label:'Sex',value:sexV,c:'sex'});
+  const sellerV=esc(condSellerVal(lot)), sellerF=esc(condSellerVal(first));
+  if(sellerV&&sellerV!==sellerF)diffs.push({label:'Seller',value:sellerV,c:'seller'});
   const shrinkV=esc(lotEdit(lot,'shrink')??lot.shrink), shrinkF=esc(lotEdit(first,'shrink')??first.shrink);
   if(shrinkV&&shrinkV!==shrinkF)diffs.push({label:'Shrink',value:shrinkV,c:'shrink'});
   const slideV=flat(lotEdit(lot,'slide')??lot.slide), slideF=flat(lotEdit(first,'slide')??first.slide);
@@ -1419,18 +1445,18 @@ function condensedFieldDiffs(lot,first){
   if(notesV&&notesV!==notesF)diffs.push({label:'Notes',value:notesV,c:'notes'});
   return diffs;
 }
-// One editable value for a grid cell, bolded when it differs from the master row's
-// equivalent value (pass firstValue===undefined to skip the differs check entirely,
-// e.g. for the Lot number itself, which always legitimately differs).
-function condGridVal(lot,c,value,firstValue,suffix){
-  const differs=firstValue!==undefined&&value&&String(value).trim()!==String(firstValue??'').trim();
-  return `<span class="cc${differs?' cond-differs':''}" contenteditable data-id="${lot.id}" data-c="${c}">${value}</span>${suffix?`<span class="cond-suffix">${suffix}</span>`:''}`;
+// One always-shown value, bolded when it differs from the master row's equivalent.
+function condVal(lot,c,value,firstValue,suffix){
+  const differs=value&&String(value).trim()!==String(firstValue??'').trim();
+  return `<span class="cond-field${differs?' cond-differs':''}"><span class="cc" contenteditable data-id="${lot.id}" data-c="${c}">${value}</span>${suffix?`<span class="cond-suffix">${suffix}</span>`:''}</span>`;
 }
 // Where "price" sits in the active column set (11th column normally; also 11th in
 // Starting/PO mode, which appends a 12th "PO Price" column after it). Everything
 // from that index onward is rendered as its own grid-aligned price cell so each
 // one's divider carries down through the option exactly like every other column —
-// in PO mode that's two cells (Start Price, PO Price), not one.
+// in PO mode that's two cells (Start Price, PO Price), not one. This is the one part
+// of a sublot that DOES align to the real grid — the price column stays exactly where
+// every other price on the sheet is, never repositioned into the middle of the row.
 function condensedPriceCellsHTML(lot,cols){
   const priceIdx=cols.indexOf('price');
   if(priceIdx<0)return '';
@@ -1446,43 +1472,49 @@ function condensedOptionRowHTML(lot,first,li,bi,page,isLast,grid,cols){
   const loadN=parseInt(loadV)||0;
   const basewtV=esc(lotEdit(lot,'basewt')??lot.basewt??''), basewtF=esc(lotEdit(first,'basewt')??first.basewt??'');
   const deliveryV=esc(lotEdit(lot,'delivery')??lot.delivery??''), deliveryF=esc(lotEdit(first,'delivery')??first.delivery??'');
-  const consignorV=esc(condSellerVal(lot)), consignorF=esc(condSellerVal(first));
   const diffs=condensedFieldDiffs(lot,first);
-  const shrinkDiff=diffs.find(d=>d.c==='shrink'), slideDiff=diffs.find(d=>d.c==='slide'), notesDiff=diffs.find(d=>d.c==='notes');
   const noteRaw=lotEdit(lot,'condNote');
   const noteActive=noteRaw!=null;
-  let notesCellHtml;
-  if(notesDiff)notesCellHtml=`<b>Notes:</b> <span class="cc cond-differs" contenteditable data-id="${lot.id}" data-c="notes">${notesDiff.value}</span>`;
-  else if(noteActive)notesCellHtml=`<span class="cond-note"><span class="cc" contenteditable data-id="${lot.id}" data-c="condNote">${noteRaw}</span></span>`;
-  else notesCellHtml=`<button type="button" class="cond-add-note" data-id="${lot.id}" title="Add a custom note for this option">+ Note</button>`;
-  // Every value sits in the SAME real column it belongs to (matching activeCols()),
-  // so subrow values align under the master row's own columns instead of following
-  // an independent layout. 'sex' is intentionally omitted — no cell renders for it.
-  const cellByCol={
-    lot:condGridVal(lot,'lot',esc(displayLotNumber(lot)),undefined,''),
-    seller:condGridVal(lot,'seller',consignorV,consignorF,''),
-    head:condGridVal(lot,'head',headV,headF,headV?' hd':''),
-    desc:loadV?condGridVal(lot,'loadCount',loadV,loadF,` load${loadN===1?'':'s'}`):'',
-    basewt:condGridVal(lot,'basewt',basewtV,basewtF,basewtV?'#':''),
-    delivery:condGridVal(lot,'delivery',deliveryV,deliveryF,''),
-    shrink:shrinkDiff?`<b>Shrink:</b> <span class="cc cond-differs" contenteditable data-id="${lot.id}" data-c="shrink">${shrinkDiff.value}</span>`:'',
-    slide:slideDiff?`<b>Slide:</b> <span class="cc cond-differs" contenteditable data-id="${lot.id}" data-c="slide">${slideDiff.value}</span>`:'',
-    notes:notesCellHtml
-  };
-  const bodyCells=cols.map((c,i)=>{
-    if(c==='price'||c==='poPrice')return '';
-    const content=cellByCol[c];
-    if(!content)return '';
-    return `<div class="cond-cell${c==='lot'?' cond-lot-cell':''}" style="grid-column:${i+1} / ${i+2}">${content}</div>`;
-  }).join('');
+  const diffPieces=diffs.map(d=>`<span class="cond-field cond-diff"><b>${esc(d.label)}:</b> <span class="cc cond-differs" contenteditable data-id="${lot.id}" data-c="${d.c}">${d.value}</span></span>`);
+  if(noteActive)diffPieces.push(`<span class="cond-field cond-note"><span class="cc" contenteditable data-id="${lot.id}" data-c="condNote">${noteRaw}</span></span>`);
+  const diffsHtml=diffPieces.join('');
+  const addNoteBtn=noteActive?'':`<button type="button" class="cond-add-note" data-id="${lot.id}" title="Add a custom note for this option">+ Note</button>`;
+  const priceIdx=cols.indexOf('price');
+  const spanEnd=priceIdx<0?cols.length+1:priceIdx+1;
   const selOn=S.selected&&S.selected.has(lot.id);
-  return `<div class="lotrow-condensed${isLast?' cond-last':''}${selOn?' sel-on':''}" data-id="${lot.id}" data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}" style="grid-template-columns:${grid};min-height:${condensedLotHeight(lot)+(isLast?14:0)}px">
+  const rowH=condensedLotHeight(lot)+(isLast?14:0); // real height, not padding — box-sizing:border-box
+  // silently absorbs padding on a min-height box that doesn't already need the full height
+  return `<div class="lotrow-condensed${isLast?' cond-last':''}${selOn?' sel-on':''}" data-id="${lot.id}" data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}" style="grid-template-columns:${grid};min-height:${rowH}px">
       <div class="row-gutter row-gutter-sub">
         <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
         <button class="split-btn" data-li="${li}" title="Split the option group here — this lot and the ones below it move to the top of the next page">✂</button>
       </div>
-      ${bodyCells}
+      <div class="cond-span" style="grid-column:1 / ${spanEnd}">
+        <span class="cond-field cond-lot">${esc(displayLotNumber(lot))}</span>
+        ${condVal(lot,'head',headV,headF,headV?' hd':'')}
+        ${condVal(lot,'loadCount',loadV,loadF,loadV?` load${loadN===1?'':'s'}`:'')}
+        ${condVal(lot,'basewt',basewtV,basewtF,basewtV?'#':'')}
+        ${condVal(lot,'delivery',deliveryV,deliveryF,'')}
+        ${diffsHtml}
+        ${addNoteBtn}
+      </div>
       ${condensedPriceCellsHTML(lot,cols)}
+    </div>`;
+}
+// One shared vertical "OPTION" label + bracket, sized to the whole group's actual
+// rendered height via CSS (top:0;bottom:0 inside a position:relative wrapper whose
+// own height is just whatever its stacked sublots need) — works identically for one
+// sublot or many, nothing here assumes a specific count or lot-letter scheme.
+function condensedOptionGroupHTML(subLots,masterLot,bi,page,grid,cols){
+  const rowsHtml=subLots.map((lot,i)=>
+    condensedOptionRowHTML(lot,masterLot,i+1,bi,page,i===subLots.length-1,grid,cols)
+  ).join('');
+  return `<div class="cond-group-wrap">
+      <div class="cond-gutter">
+        <div class="cond-bracket"></div>
+        <div class="cond-option-label"><span>Option</span></div>
+      </div>
+      <div class="cond-subrows">${rowsHtml}</div>
     </div>`;
 }
 
@@ -1509,13 +1541,29 @@ function buildSections(){
   });
   autofit();
 }
+// Height a block will actually render at, for pagination purposes. A condensed
+// option group's continuation rows render much shorter than a full row — using
+// lotHeight() (the full-row figure) for them here would make every option group
+// look far taller than it really is, wasting space and forcing premature page
+// breaks. Blocks are always packed as one atomic unit already (a block is either
+// entirely on a page or pushed whole to the next one — see the loop below), so
+// getting this per-block total right is what makes that packing decision correct.
+function blockRenderedHeight(b){
+  const condensed=S.issue.optionLotLayout==='condensed'&&b.grouped;
+  return b.lots.reduce((s,l,li)=>{
+    if(condensed&&li>0)return s+condensedLotHeight(l)+(li===b.lots.length-1?14:0); // +14 matches the
+    // last-sublot divider whitespace added in condensedOptionRowHTML — must agree or autofit()
+    // will pack pages as if the group were shorter than it actually renders.
+    return s+lotHeight(l)+rowExtra();
+  },0);
+}
 function autofit(){
   S.sections.forEach((sec,si)=>{
     const hdr=p=>(si===0&&p===0); // header band only on the document's first page
     const pages=[[]]; let pi=0;
     let cap=rowsAreaH(hdr(0),true), used=0;
     sec.blocks.forEach(b=>{
-      const bh=b.lots.reduce((s,l)=>s+lotHeight(l)+rowExtra(),0);
+      const bh=blockRenderedHeight(b);
       if(used+bh>cap && pages[pi].length){
         pages.push([]); pi++; cap=rowsAreaH(hdr(pi),pi===0); used=0;
       }
@@ -1701,7 +1749,7 @@ function setLotHeight(lot,h){modeState().heights[lot.id]=Math.max(54,Math.round(
 // either one at different times (e.g. it stops being an option's 2nd+ member). -----
 function condensedLotHeight(lot){
   for(const m of modeChain()){const h=modeState(m).condHeights[lot.id]; if(Number.isFinite(h))return h;}
-  return 42;
+  return 34; // ~46% of the default 74px full row — within the 40-55% compact-sublot target
 }
 function setCondensedLotHeight(lot,h){modeState().condHeights[lot.id]=Math.max(22,Math.round(h));}
 // Whether `lot` is currently on-screen as a condensed subrow (vs. a normal full .lotrow) —
@@ -1796,6 +1844,63 @@ function updateColControls(){
   val.textContent=Math.round(S.colWidths[pick.value]||0)+'px';
 }
 
+// A single full-width lot row, in the normal 11-column grid. Used for every row that
+// isn't a condensed option group's continuation lot — a normal lot, a supplemental
+// lot, a legacy-grouped row, and the MASTER lot of a condensed group all render
+// through this exact same function, unmodified, so none of them look or behave any
+// differently because of anything condensed mode does elsewhere.
+function legacyLotRowHTML(lot,li,b,bi,page,grid,cols,alt){
+  const gpos=b.grouped?(li===0?'gtop':(li===b.lots.length-1?'gbot':'gmid')):'';
+  const selOn=S.selected&&S.selected.has(lot.id);
+  let h=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lotFlag(lot,'scratched')?'scratched':''} ${lotFlag(lot,'supplemental')?'supplemental':''} ${selOn?'sel-on':''}" data-id="${lot.id}"
+        data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}"
+        style="grid-template-columns:${grid};min-height:${lotHeight(lot)+rowExtra()}px">`;
+  if(li===0){
+    h+=`<div class="row-gutter">
+        <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
+        <button class="drag-grip" draggable="true" title="Drag to move this lot anywhere in the section">⠿</button>
+        <button data-mv="-1" class="step" title="Move up one spot">▲</button>
+        <button data-mv="1" class="step" title="Move down one spot">▼</button>
+        <button data-pg="-1" class="pgbtn" title="Move to the previous page">PG▲</button>
+        <button data-pg="1" class="pgbtn" title="Move to the next page">PG▼</button>
+      </div>`;
+  }else if(b.grouped){
+    h+=`<div class="row-gutter row-gutter-sub">
+        <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
+        <button class="split-btn" data-li="${li}" title="Split the option group here — this lot and the ones below it move to the top of the next page">✂</button>
+      </div>`;
+  }else{
+    h+=`<div class="row-gutter row-gutter-sub">
+        <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
+      </div>`;
+  }
+  cols.forEach(c=>{
+    let v='',cls='cell';
+    if(c==='lot'){cls+=' lot';v=esc(displayLotNumber(lot));}
+    else if(c==='seller'){cls+=' seller';v=sellerHTML(lot);}
+    else if(c==='head'){cls+=' head ctr';v=esc(lotEdit(lot,'head')??lot.head);}
+    else if(c==='desc'){cls+=' desc';v=descHTML(lot);}
+    else if(c==='sex'){cls+=' sex ctr';v=(lotEdit(lot,'sex')??flat(lot.sex));}
+    else if(c==='basewt'){cls+=' basewt ctr';
+      v=lotEdit(lot,'basewt')??(lot.basewt?esc(lot.basewt)+'#':'');}
+    else if(c==='delivery'){cls+=' delivery ctr';v=esc(lotEdit(lot,'delivery')??lot.delivery);}
+    else if(c==='shrink'){cls+=' shrink ctr';v=esc(lotEdit(lot,'shrink')??lot.shrink);}
+    else if(c==='slide'){cls+=' slide ctr';v=(lotEdit(lot,'slide')??flat(lot.slide));}
+    else if(c==='notes'){cls+=' notes';v=notesHTML(lot);}
+    else if(c==='price'){cls+=' price ctr';
+      v=lotEdit(lot,'price')??(lot.price?esc(lot.price):'');}
+    else if(c==='poPrice'){cls+=' price po-price ctr';
+      v=lotEdit(lot,'poPrice')??(lot.poPrice?esc(lot.poPrice):'');}
+    const sc=lotCellScale(lot,c);
+    const cellScale=sc&&sc!==1?` style="font-size:${sc}em !important"`:'';
+    const hlCls=lotCellHL(lot,c)?' cell-hl':'';
+    h+=`<div class="${cls}${hlCls}"><div class="cc" contenteditable${cellScale}
+          data-id="${lot.id}" data-c="${c}">${v}</div></div>`;
+  });
+  h+=`</div>`;
+  return h;
+}
+
 function sheetHTML(page,pageNum,totalPages){
   const cols=activeCols(), grid=gridTemplate();
   const sec=page.sec;
@@ -1838,62 +1943,22 @@ function sheetHTML(page,pageNum,totalPages){
   // rows
   let alt=0;
   page.blocks.forEach((b,bi)=>{
+    // Condensed mode only changes the group's CONTINUATION lots. The master (li===0)
+    // always renders through legacyLotRowHTML() below — the exact same function every
+    // normal/ungrouped/legacy-grouped row uses — so it's never special-cased or
+    // visually altered just because options follow it.
     const condensedGroup=S.issue.optionLotLayout==='condensed'&&b.grouped;
+    if(condensedGroup){
+      h+=legacyLotRowHTML(b.lots[0],0,b,bi,page,grid,cols,alt);
+      alt++;
+      if(b.lots.length>1){
+        h+=condensedOptionGroupHTML(b.lots.slice(1),b.lots[0],bi,page,grid,cols);
+        alt+=b.lots.length-1;
+      }
+      return;
+    }
     b.lots.forEach((lot,li)=>{
-      if(condensedGroup&&li>0){
-        h+=condensedOptionRowHTML(lot,b.lots[0],li,bi,page,li===b.lots.length-1,grid,cols);
-        alt++;
-        return;
-      }
-      const gpos=b.grouped?(li===0?'gtop':(li===b.lots.length-1?'gbot':'gmid')):'';
-      const isFirst=li===0;
-      const selOn=S.selected&&S.selected.has(lot.id);
-      h+=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lotFlag(lot,'scratched')?'scratched':''} ${lotFlag(lot,'supplemental')?'supplemental':''} ${selOn?'sel-on':''}" data-id="${lot.id}"
-            data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}"
-            style="grid-template-columns:${grid};min-height:${lotHeight(lot)+rowExtra()}px">`;
-      if(li===0){
-        h+=`<div class="row-gutter">
-            <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
-            <button class="drag-grip" draggable="true" title="Drag to move this lot anywhere in the section">⠿</button>
-            <button data-mv="-1" class="step" title="Move up one spot">▲</button>
-            <button data-mv="1" class="step" title="Move down one spot">▼</button>
-            <button data-pg="-1" class="pgbtn" title="Move to the previous page">PG▲</button>
-            <button data-pg="1" class="pgbtn" title="Move to the next page">PG▼</button>
-          </div>`;
-      }else if(b.grouped){
-        h+=`<div class="row-gutter row-gutter-sub">
-            <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
-            <button class="split-btn" data-li="${li}" title="Split the option group here — this lot and the ones below it move to the top of the next page">✂</button>
-          </div>`;
-      }else{
-        h+=`<div class="row-gutter row-gutter-sub">
-            <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
-          </div>`;
-      }
-      cols.forEach(c=>{
-        let v='',cls='cell';
-        if(c==='lot'){cls+=' lot';v=esc(displayLotNumber(lot));}
-        else if(c==='seller'){cls+=' seller';v=sellerHTML(lot);}
-        else if(c==='head'){cls+=' head ctr';v=esc(lotEdit(lot,'head')??lot.head);}
-        else if(c==='desc'){cls+=' desc';v=descHTML(lot);}
-        else if(c==='sex'){cls+=' sex ctr';v=(lotEdit(lot,'sex')??flat(lot.sex));}
-        else if(c==='basewt'){cls+=' basewt ctr';
-          v=lotEdit(lot,'basewt')??(lot.basewt?esc(lot.basewt)+'#':'');}
-        else if(c==='delivery'){cls+=' delivery ctr';v=esc(lotEdit(lot,'delivery')??lot.delivery);}
-        else if(c==='shrink'){cls+=' shrink ctr';v=esc(lotEdit(lot,'shrink')??lot.shrink);}
-        else if(c==='slide'){cls+=' slide ctr';v=(lotEdit(lot,'slide')??flat(lot.slide));}
-        else if(c==='notes'){cls+=' notes';v=notesHTML(lot);}
-        else if(c==='price'){cls+=' price ctr';
-          v=lotEdit(lot,'price')??(lot.price?esc(lot.price):'');}
-        else if(c==='poPrice'){cls+=' price po-price ctr';
-          v=lotEdit(lot,'poPrice')??(lot.poPrice?esc(lot.poPrice):'');}
-        const sc=lotCellScale(lot,c);
-        const cellScale=sc&&sc!==1?` style="font-size:${sc}em !important"`:'';
-        const hlCls=lotCellHL(lot,c)?' cell-hl':'';
-        h+=`<div class="${cls}${hlCls}"><div class="cc" contenteditable${cellScale}
-              data-id="${lot.id}" data-c="${c}">${v}</div></div>`;
-      });
-      h+=`</div>`;
+      h+=legacyLotRowHTML(lot,li,b,bi,page,grid,cols,alt);
       alt++;
     });
   });
