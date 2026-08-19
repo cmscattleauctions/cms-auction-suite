@@ -114,7 +114,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .results-upload{display:none;align-items:center;gap:8px;margin-left:auto}
 .results-upload.on{display:flex}
 .ed-tools .col-w-val{min-width:42px;text-align:center}
-.ed-canvas{flex:1;overflow:auto;padding:30px 30px 30px 44px;background:#0c1024;text-align:center}
+.ed-canvas{flex:1;overflow:auto;padding:30px 30px 30px 200px;background:#0c1024;text-align:center}
 .color-editor-bar{display:flex;align-items:center;gap:12px;padding:5px 16px;background:#fff;border-bottom:1px solid #e6e0d4;flex-wrap:wrap}
 .color-editor-bar .color-bar-toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:#555b66;
   letter-spacing:.6px;text-transform:uppercase;font-weight:600;background:none;padding:4px 6px;border-radius:6px;cursor:pointer}
@@ -225,37 +225,48 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .editing [contenteditable]:hover{box-shadow:inset 0 0 0 1.5px #b9c4ef}
 .editing [contenteditable]:focus{box-shadow:inset 0 0 0 2px var(--blue);
   background:#eef1fc}
-/* Left gutter layout: checkbox column at -66px, control panel at -38px..-4px
-   (a 34px strip), so the two never overlap. */
-.lot-ctl{position:absolute;left:-38px;top:0;width:34px;display:none;
-  flex-direction:column;gap:0;z-index:10;background:#0f1730;border-radius:8px;
-  padding:2px;box-shadow:0 2px 8px rgba(0,0,0,.35)}
-.editing .lot-ctl{display:flex;opacity:.45;transition:opacity .12s}
-.editing .lotrow:hover .lot-ctl,.lot-ctl:hover{opacity:1;z-index:30}
-.lot-ctl button{width:30px;height:20px;background:transparent;color:#fff;
+/* Editor-only row gutter — one compact horizontal control strip per row, living
+   in the fixed-width gutter reserved to the left of the sheet (see .ed-canvas
+   padding-left). Replaces the old three-piece system (a separate checkbox, a
+   5-button VERTICAL stack for a full lot, and a separate split button for a
+   continuation row) — that stack was 100px tall (5 x 20px) anchored to the top
+   of its own row, so on any row shorter than that (any option-group
+   continuation row, or any full row with a custom short height) it spilled
+   down into the row below and visually overlapped that row's own controls.
+   A horizontal strip is at most ~24px tall regardless of how many actions it
+   holds, so it always fits inside even the shortest row. Master lots get the
+   full set; continuation rows in an option group (.row-gutter-sub) only get
+   what they actually support today (select + split) — never a second copy of
+   the master's full control set. Less-common actions (jump to adjacent page)
+   live behind the "more" (⋯) toggle instead of being permanent buttons, per
+   row. */
+.row-gutter{position:absolute;left:-142px;top:50%;transform:translateY(-50%);
+  display:none;align-items:center;gap:3px;z-index:10;opacity:.5;transition:opacity .12s}
+.editing .row-gutter{display:flex}
+.editing .lotrow:hover .row-gutter,.row-gutter:hover,.row-gutter.menu-open{opacity:1;z-index:30}
+.row-gutter input[type="checkbox"]{width:16px;height:16px;accent-color:#b8860b;
+  cursor:pointer;margin:0;flex-shrink:0}
+.row-gutter button{width:20px;height:20px;flex-shrink:0;background:#0f1730;color:#fff;
   border-radius:5px;font-size:11px;line-height:1;display:flex;align-items:center;
-  justify-content:center}
-.lot-ctl button.step:hover{background:var(--blue)}
-.lot-ctl button.pgbtn{color:#aeb9e2;font-size:8.5px;font-weight:700;letter-spacing:.3px;
-  border-top:1px solid rgba(255,255,255,.10);border-bottom:1px solid rgba(255,255,255,.10)}
-.lot-ctl button.pgbtn:hover{background:var(--blue);color:#fff}
-.lot-ctl .drag-grip{color:#8a94b8;font-size:11px;letter-spacing:1px;cursor:grab}
-.lot-ctl .drag-grip:hover{background:#2a3560;color:#fff}
-.lot-ctl .drag-grip:active{cursor:grabbing}
-/* split control on option-group continuation rows */
-.lot-split{position:absolute;left:-38px;top:50%;transform:translateY(-50%);width:34px;
-  display:none;justify-content:center;z-index:10}
-.editing .lot-split{display:flex;opacity:.45;transition:opacity .12s}
-.editing .lotrow:hover .lot-split,.lot-split:hover{opacity:1;z-index:30}
-.lot-split button{width:30px;height:20px;background:#7a5a12;color:#fff;
-  border-radius:6px;font-size:11px;line-height:1;display:flex;align-items:center;
-  justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)}
-.lot-split button:hover{background:#b8860b}
-.hidectl .lot-split{display:none!important}
+  justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.row-gutter button:hover{background:var(--blue);color:#fff}
+.row-gutter .drag-grip{cursor:grab;color:#cfd6ef;background:transparent;box-shadow:none}
+.row-gutter .drag-grip:hover{background:#2a3560}
+.row-gutter .drag-grip:active{cursor:grabbing}
+.row-gutter-sub .split-btn{background:#7a5a12}
+.row-gutter-sub .split-btn:hover{background:#b8860b}
+.row-more-wrap{position:relative}
+.row-more-menu{display:none;position:absolute;left:0;top:calc(100% + 3px);
+  background:#0f1730;border-radius:7px;padding:3px;box-shadow:0 4px 16px rgba(0,0,0,.4);
+  flex-direction:column;gap:1px;min-width:168px;z-index:40}
+.row-gutter.menu-open .row-more-menu{display:flex}
+.row-more-menu button{width:auto;height:auto;justify-content:flex-start;padding:6px 9px;
+  font-size:11.5px;font-weight:500;white-space:nowrap;box-shadow:none;color:#cfd6ef}
+.row-more-menu button:hover{background:var(--blue);color:#fff}
 .over-badge{position:absolute;top:6px;right:84px;background:#e0483c;color:#fff;
   font-size:10px;font-weight:700;padding:3px 9px;border-radius:11px;letter-spacing:.5px;
   font-family:'Barlow'}
-.hidectl .lot-ctl,.hidectl .over-badge{display:none!important}
+.hidectl .row-gutter,.hidectl .over-badge{display:none!important}
 
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
   background:var(--navy);color:#fff;padding:11px 22px;border-radius:9px;font-size:13.5px;
@@ -328,8 +339,8 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .s-thead{background:#313844;}
 .s-foot{border-top-color:#b8860b;}
 .editing [contenteditable]:focus{box-shadow:inset 0 0 0 2px #b8860b;background:#fff8e8;}
-.lot-ctl button{background:#131820;}
-.lot-ctl button:hover{background:#b8860b;color:#fff;}
+.row-gutter button{background:#131820;}
+.row-gutter button:hover{background:#b8860b;color:#fff;}
 .toast{background:#131820;border-color:#d4a017;color:#fff;}
 
 /* PDF/catalog sheet styling: keep CMS blue print output separate from Auction Suite chrome. */
@@ -451,17 +462,34 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .tools-check input{width:16px;height:16px;accent-color:#b8860b;cursor:pointer}
 
 /* Compact, clearer editing toolbar */
-.ed-tools{gap:5px !important;padding:5px 10px !important;row-gap:5px !important;}
-.ed-tools .grp{gap:3px;padding:1px 3px;border-radius:6px}
+.ed-tools{gap:5px !important;padding:5px 10px !important;row-gap:5px !important;flex-wrap:nowrap !important;overflow-x:auto;overflow-y:hidden}
+.ed-tools .grp{gap:3px;padding:1px 3px;border-radius:6px;flex-shrink:0}
 .ed-tools .grp .lbl{font-size:9px !important;letter-spacing:.3px}
 .ed-tools .btn.sm{padding:3px 7px;font-size:11px;border-radius:5px;line-height:1.5}
-.ed-tools .vr{height:16px;margin:0 2px}
+.ed-tools .vr{height:16px;margin:0 2px;flex-shrink:0}
 .ed-tools .sel-grp{background:rgba(184,134,11,.12);border:1px solid #d4a017;border-radius:8px;padding:2px 7px}
 .ed-tools .sel-grp .lbl{color:#9a7209}
 .ed-tools .sel-grp .lbl b{color:#1a1d23;font-size:12px}
 
-/* Undo/redo disabled state */
+/* Undo/redo (and other contextual) disabled state */
 .ed-tools .btn[disabled]{opacity:.35;cursor:default;pointer-events:none}
+
+/* Size adjuster component: [label][-][value][+], used identically for Row/Text/
+   Box/Cal so the four read as one family of control rather than four different-
+   looking button clusters (ROW -/+, TEXT A-/A+, BOX A-/A+, CAL A-/A+). The label
+   plus the value readout are what make each one's job — and why they're separate
+   controls — legible at a glance instead of relying on the reader to infer it
+   from a bare "A-/A+" pair. Row/Box show "—" until a row/box is actually focused,
+   since (unlike Text/Cal, which are single whole-sheet settings) their value is
+   specific to whatever's currently selected. */
+.size-grp{gap:8px !important}
+.adj{display:flex;align-items:center;gap:2px}
+.adj-lbl{font-size:9px;letter-spacing:.3px;color:var(--dim);text-transform:uppercase;
+  margin-right:1px}
+.adj-btn{width:20px;padding:3px 0 !important;text-align:center}
+.adj-val{min-width:34px;text-align:center;font-size:10.5px;font-weight:600;
+  color:var(--txt);font-variant-numeric:tabular-nums}
+.adj-reset{margin-left:1px}
 
 /* Autosave restore card (upload view) */
 .autosave-card{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
@@ -485,12 +513,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .col-drag:hover,.col-drag.dragging{background:rgba(184,134,11,.55);border-radius:2px}
 .hidectl .col-drag{display:none !important}
 
-/* Per-lot select checkbox (editing only; hidden in PDF) */
-.lot-select{position:absolute;left:-66px;top:50%;transform:translateY(-50%);display:none;align-items:center;justify-content:center}
-.editing .lot-select{display:flex}
-.lot-select input{width:20px;height:20px;accent-color:#b8860b;cursor:pointer}
 .lotrow.sel-on{box-shadow:inset 4px 0 0 #b8860b}
-.hidectl .lot-select{display:none !important}
 
 /* Modal */
 .modal-back{position:fixed;inset:0;background:rgba(19,24,32,.55);display:none;align-items:flex-start;justify-content:center;z-index:5000;padding:40px 16px;overflow:auto}
@@ -741,7 +764,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
           <button class="btn sm" id="saveProjectBtn">💾 Save Project</button>
         </div>
         <div class="ed-tools" id="editTools">
-          <div class="grp">
+          <div class="grp" aria-label="History actions">
             <button class="btn ghost sm" id="undoBtn" title="Undo (Ctrl+Z / Cmd+Z)" disabled>↶</button>
             <button class="btn ghost sm" id="redoBtn" title="Redo (Ctrl+Shift+Z / Ctrl+Y)" disabled>↷</button>
           </div>
@@ -753,52 +776,55 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
             <button class="btn ghost sm" id="selDelete" title="Delete selected lots">🗑</button>
             <button class="btn ghost sm" id="selClear" title="Clear selection">✕</button>
           </div>
-          <div class="grp">
-            <button class="btn ghost sm" id="boldBtn" title="Bold selected text"><b>B</b></button>
-            <button class="btn ghost sm" id="scratchBtn" title="Scratch / unscratch the focused lot"><s>S</s></button>
+          <div class="grp" aria-label="Text and box formatting">
+            <button class="btn ghost sm" id="boldBtn" title="Bold the selected text"><b>B</b></button>
+            <button class="btn ghost sm" id="scratchBtn" title="Scratch / unscratch the focused lot (auction-day strike-through)"><s>S</s></button>
             <button class="btn ghost sm" id="suppBtn" title="Toggle supplemental on the focused lot">Sup</button>
             <button class="btn ghost sm" id="highlightBtn" title="Highlight the box your cursor is in">🖍</button>
             <button class="btn ghost sm" id="clearHlBtn" title="Remove all highlights in this view">🖍✕</button>
           </div>
           <span class="vr"></span>
-          <div class="grp">
+          <div class="grp" aria-label="Lot actions">
             <button class="btn ghost sm" id="dupLotBtn" title="Duplicate the focused lot — the copy appears directly below it">⧉ Dup</button>
-            <button class="btn ghost sm" id="deleteLotBtn" title="Delete the focused lot">🗑 Lot</button>
-          </div>
-          <span class="vr"></span>
-          <div class="grp">
+            <button class="btn ghost sm" id="deleteLotBtn" title="Delete the focused lot (or the checked lots)">🗑 Delete</button>
             <button class="btn ghost sm" id="manualGroupBtn" title="Check the boxes next to 2+ lots, then click to group them into an option group">Group</button>
             <button class="btn ghost sm" id="ungroupBtn" title="Remove the checked lots (or the focused lot) from their option group">Ungroup</button>
           </div>
           <span class="vr"></span>
-          <div class="grp" title="Row height of the focused lot">
-            <span class="lbl">Row</span>
-            <button class="btn ghost sm" id="rowMinus">−</button>
-            <button class="btn ghost sm" id="rowPlus">+</button>
-          </div>
-          <div class="grp" title="Whole-sheet text size">
-            <span class="lbl">Text</span>
-            <button class="btn ghost sm" id="txtMinus">A−</button>
-            <button class="btn ghost sm" id="txtPlus">A+</button>
-          </div>
-          <div class="grp" title="Text size of the box your cursor is in">
-            <span class="lbl">Box</span>
-            <button class="btn ghost sm" id="boxTxtMinus">A−</button>
-            <button class="btn ghost sm" id="boxTxtPlus">A+</button>
-            <button class="btn ghost sm" id="boxTxtReset" title="Reset box text size">↺</button>
-          </div>
-          <div class="grp" title="Calendar text size">
-            <span class="lbl">Cal</span>
-            <button class="btn ghost sm" id="calTxtMinus">A−</button>
-            <button class="btn ghost sm" id="calTxtPlus">A+</button>
+          <div class="grp size-grp" aria-label="Size controls">
+            <div class="adj" title="Increase or decrease the height of the selected row.">
+              <span class="adj-lbl">Row</span>
+              <button class="btn ghost sm adj-btn" id="rowMinus">−</button>
+              <span class="adj-val" id="rowVal">—</span>
+              <button class="btn ghost sm adj-btn" id="rowPlus">+</button>
+            </div>
+            <div class="adj" title="Increase or decrease catalog text size (whole sheet).">
+              <span class="adj-lbl">Text</span>
+              <button class="btn ghost sm adj-btn" id="txtMinus">−</button>
+              <span class="adj-val" id="txtVal">100%</span>
+              <button class="btn ghost sm adj-btn" id="txtPlus">+</button>
+            </div>
+            <div class="adj" title="Increase or decrease the text size of the box your cursor is in.">
+              <span class="adj-lbl">Box</span>
+              <button class="btn ghost sm adj-btn" id="boxTxtMinus">−</button>
+              <span class="adj-val" id="boxVal">—</span>
+              <button class="btn ghost sm adj-btn" id="boxTxtPlus">+</button>
+              <button class="btn ghost sm adj-reset" id="boxTxtReset" title="Reset this box's text size to default">↺</button>
+            </div>
+            <div class="adj" title="Increase or decrease the text size of the Next Auction calendar badge.">
+              <span class="adj-lbl">Cal</span>
+              <button class="btn ghost sm adj-btn" id="calTxtMinus">−</button>
+              <span class="adj-val" id="calVal">100%</span>
+              <button class="btn ghost sm adj-btn" id="calTxtPlus">+</button>
+            </div>
           </div>
           <span class="vr"></span>
-          <div class="grp">
+          <div class="grp" aria-label="Layout controls">
             <button class="btn ghost sm" id="colReset" title="Reset column widths — drag the edges between column headers to resize columns">↔ Cols ↺</button>
             <button class="btn ghost sm" id="autofit" title="Re-flow lots across pages">Auto-fit</button>
           </div>
           <span class="vr"></span>
-          <div class="grp" title="Zoom">
+          <div class="grp" aria-label="Zoom" title="Zoom changes only how the editor displays the page — it does not affect the exported PDF's size.">
             <button class="btn ghost sm" id="zOut">−</button>
             <span class="lbl" id="zVal">70%</span>
             <button class="btn ghost sm" id="zIn">+</button>
@@ -1477,18 +1503,28 @@ function sheetHTML(page,pageNum,totalPages){
       h+=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lotFlag(lot,'scratched')?'scratched':''} ${lotFlag(lot,'supplemental')?'supplemental':''} ${selOn?'sel-on':''}" data-id="${lot.id}"
             data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}"
             style="grid-template-columns:${grid};min-height:${lotHeight(lot)+rowExtra()}px">`;
-      h+=`<div class="lot-select"><input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot"></div>`;
       if(li===0){
-        h+=`<div class="lot-ctl">
-            <button data-mv="-1" class="step" title="Move up one spot">▲</button>
-            <button data-pg="-1" class="pgbtn" title="Move to the previous page">PG▲</button>
+        h+=`<div class="row-gutter">
+            <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
             <button class="drag-grip" draggable="true" title="Drag to move this lot anywhere in the section">⠿</button>
-            <button data-pg="1" class="pgbtn" title="Move to the next page (creates one if needed)">PG▼</button>
+            <button data-mv="-1" class="step" title="Move up one spot">▲</button>
             <button data-mv="1" class="step" title="Move down one spot">▼</button>
+            <div class="row-more-wrap">
+              <button class="row-more-toggle" title="More row actions">⋯</button>
+              <div class="row-more-menu">
+                <button data-pg="-1" class="pgbtn">Move to previous page</button>
+                <button data-pg="1" class="pgbtn">Move to next page</button>
+              </div>
+            </div>
           </div>`;
       }else if(b.grouped){
-        h+=`<div class="lot-split">
+        h+=`<div class="row-gutter row-gutter-sub">
+            <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
             <button class="split-btn" data-li="${li}" title="Split the option group here — this lot and the ones below it move to the top of the next page">✂</button>
+          </div>`;
+      }else{
+        h+=`<div class="row-gutter row-gutter-sub">
+            <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
           </div>`;
       }
       cols.forEach(c=>{
@@ -1545,6 +1581,7 @@ function renderEditor(){
   $('#zVal').textContent=Math.round(S.zoom*100)+'%';
   const tv=$('#toolsToggle'); if(tv){tv.checked=!S.toolsHidden; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden);}
   if(typeof updateSelectionUI==='function')updateSelectionUI();
+  if(typeof updateContextualToolbar==='function')updateContextualToolbar();
   // keep manual row heights stable; overflow detection below flags pages without changing layout.
   // overflow detection — measure where the last row actually ends (fraction-accurate
   // and zoom-aware) instead of scrollHeight rounding, and allow a few px of slop
@@ -1614,11 +1651,23 @@ function wireSheetEvents(){
       else if(el.dataset.f==='nextTag')S.issue.ntag=el.textContent;
     });
   });
+  // more-actions popover (row gutter): one open at a time, closes on an
+  // outside click or a second click on its own toggle.
+  $$('#zoomwrap .row-more-toggle').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const wrap=btn.closest('.row-gutter');
+      const wasOpen=wrap.classList.contains('menu-open');
+      $$('#zoomwrap .row-gutter.menu-open').forEach(g=>g.classList.remove('menu-open'));
+      if(!wasOpen)wrap.classList.add('menu-open');
+    });
+  });
   // move buttons
-  $$('#zoomwrap .lot-ctl button[data-pg]').forEach(btn=>{
+  $$('#zoomwrap .row-gutter button[data-pg]').forEach(btn=>{
     btn.addEventListener('click',e=>{
       e.stopPropagation();
       const row=e.target.closest('.lotrow');
+      row.querySelector('.row-gutter')?.classList.remove('menu-open');
       moveBlockPage(+row.dataset.si,+row.dataset.pi,+row.dataset.bi,+btn.dataset.pg);
     });
   });
@@ -1629,7 +1678,7 @@ function wireSheetEvents(){
       splitBlockAt(+row.dataset.si,+row.dataset.pi,+row.dataset.bi,+btn.dataset.li);
     });
   });
-  $$('#zoomwrap .lot-ctl button[data-mv]').forEach(btn=>{
+  $$('#zoomwrap .row-gutter button[data-mv]').forEach(btn=>{
     btn.addEventListener('click',e=>{
       const row=e.target.closest('.lotrow');
       moveBlock(+row.dataset.si,+row.dataset.pi,+row.dataset.bi,+btn.dataset.mv);
@@ -1644,6 +1693,7 @@ function wireSheetEvents(){
       const row=e.target.closest('.lotrow');
       if(row)row.classList.toggle('sel-on',e.target.checked);
       if(typeof updateSelectionUI==='function')updateSelectionUI();
+  if(typeof updateContextualToolbar==='function')updateContextualToolbar();
     });
   });
   // Excel-style column resize: drag the handle on a column header's right edge.
@@ -1811,6 +1861,13 @@ document.addEventListener('focusin',e=>{
   if(e.target&&e.target.matches&&e.target.matches('[contenteditable][data-id][data-c]')){
     lastFocusCell={id:e.target.dataset.id,c:e.target.dataset.c};
   }
+  if(typeof updateContextualToolbar==='function')updateContextualToolbar();
+});
+// Row gutter "more" popover: close it on any click outside the gutter, so at
+// most one is ever open and it never lingers over the catalog.
+document.addEventListener('click',e=>{
+  if(e.target.closest('.row-gutter'))return;
+  $$('#zoomwrap .row-gutter.menu-open').forEach(g=>g.classList.remove('menu-open'));
 });
 function adjustRow(delta){
   if(!lastFocusLot){toast('Click a lot first.');return;}
@@ -2078,6 +2135,39 @@ function updateSelectionUI(){
   const n=S.selected?S.selected.size:0;
   grp.style.display=n?'flex':'none';
   if(cnt)cnt.textContent=n;
+}
+// Toolbar buttons that only act on a focused/selected lot or cell show as
+// visibly disabled instead of doing nothing (or toasting an error) when
+// nothing applicable is targeted yet — keeps the toolbar's layout stable
+// (nothing appears/disappears) while still being honest about what's
+// currently clickable. Doesn't change what any button DOES, only whether
+// it's clickable right now; every one of these ids already no-ops safely
+// (with its own toast) if clicked in a state where it has nothing to act on.
+function updateContextualToolbar(){
+  const hasLot=!!(lastFocusLot&&S.lots.some(l=>l.id===lastFocusLot));
+  const hasSelOrFocus=hasLot||(S.selected&&S.selected.size>0);
+  const hasCell=!!(lastFocusCell&&S.lots.some(l=>l.id===lastFocusCell.id));
+  ['dupLotBtn','scratchBtn','suppBtn','rowMinus','rowPlus'].forEach(id=>{
+    const el=$('#'+id); if(el)el.disabled=!hasLot;
+  });
+  ['deleteLotBtn','ungroupBtn'].forEach(id=>{
+    const el=$('#'+id); if(el)el.disabled=!hasSelOrFocus;
+  });
+  ['boxTxtMinus','boxTxtPlus','boxTxtReset','highlightBtn'].forEach(id=>{
+    const el=$('#'+id); if(el)el.disabled=!hasCell;
+  });
+  const grpBtn=$('#manualGroupBtn'); if(grpBtn)grpBtn.disabled=!S.lots.length;
+  // Size-adjuster value readouts. Text/Cal are single whole-sheet settings, so
+  // they always have a value to show; Row/Box are specific to whatever's
+  // currently focused, so they read "—" until something applicable is.
+  const rowVal=$('#rowVal');
+  if(rowVal)rowVal.textContent=hasLot?Math.round(lotHeight(S.lots.find(l=>l.id===lastFocusLot)))+'px':'—';
+  const boxVal=$('#boxVal');
+  if(boxVal)boxVal.textContent=hasCell?Math.round(lotCellScale(S.lots.find(l=>l.id===lastFocusCell.id),lastFocusCell.c)*100)+'%':'—';
+  const txtVal=$('#txtVal');
+  if(txtVal)txtVal.textContent=Math.round((S.textScale||1)*100)+'%';
+  const calVal=$('#calVal');
+  if(calVal)calVal.textContent=Math.round((S.calendarTextScale||1)*100)+'%';
 }
 function clearSelection(){ S.selected.clear(); renderEditor(); }
 function bulkAdjustHeight(delta){
