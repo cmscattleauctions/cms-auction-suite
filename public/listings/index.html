@@ -237,6 +237,9 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .lotrow-condensed .cond-fields{flex:1;display:flex;align-items:baseline;min-width:0}
 .lotrow-condensed .cond-field{flex:0 0 auto;color:#2a3354;white-space:nowrap;overflow:hidden}
 .lotrow-condensed .cond-field .cc{display:inline-block;min-width:.6em}
+/* differs-from-master flag: bolded rather than colored so it still reads correctly
+   in black & white print/PDF, matching the Differences list's own bold labels. */
+.lotrow-condensed .cond-field.cond-differs .cc{font-weight:700;color:#0c1430}
 .lotrow-condensed .cond-lot{width:55px;font-family:'Oswald';font-weight:700;
   font-size:1.1em;color:var(--deepblue)}
 .lotrow-condensed .cond-head{width:70px}
@@ -1179,17 +1182,26 @@ function sellerHTML(lot){
 }
 
 /* ===== condensed option-lot rendering (experimental, toggle: S.issue.optionLotLayout) =====
- * Rendering only — never touches S.lots/group/CSV data. Legacy renderExistingOptionGroup
- * path (the col-based .lotrow loop in sheetHTML) is untouched; this is purely an
- * additional branch for li>0 rows of a grouped block when the per-auction toggle is on.
- * Diff entries carry a `c` (the same column key legacy full rows use for that field)
- * whenever the field maps 1:1 to a simple legacy text field, so the value can be made
- * contenteditable through the exact same generic save wiring (wireSheetEvents' blur
- * handler keys off [data-id][data-c] regardless of which row template rendered it).
- * Seller/Notes are left read-only here: their legacy cells store a whole HTML block
- * (name+location, multi-line notes), and writing a bare diff string into that key on
- * blur would clobber formatting those fields already carry — editing them still works
- * normally by switching to legacy view or the Edit Lot modal. */
+ * Rendering only — never touches S.lots/group/CSV data on toggle. Legacy render path (the
+ * col-based .lotrow loop in sheetHTML) is untouched; this is purely an additional branch for
+ * li>0 rows of a grouped block when the per-auction toggle is on.
+ *
+ * Every value here is lotEdit-aware in both directions: the same lotEdit key drives what's
+ * displayed AND what's compared against the master row (condField's `firstValue` arg, and
+ * condensedFieldDiffs below), so editing a value to match the master — or clearing it — makes
+ * a "differs from master" indicator (bold field, or a Differences badge) disappear on its own.
+ * That's the mechanism for removing a flagged difference; there's no separate delete control.
+ * Fields reuse the exact [data-id][data-c] contenteditable pattern legacy cells use, so saves
+ * go through the app's one generic blur handler in wireSheetEvents() for free. Seller/Notes
+ * diffs are edited as plain flattened text through condSellerVal()/condNotesVal() rather than
+ * the raw 'seller'/'notes' HTML keys' full name+location / multi-line structure — if you edit
+ * one of those two diff values, that lot's own Seller/Notes cell (only relevant if you switch
+ * back to legacy view, where every lot in a group still renders as a full row) will show that
+ * same plain text instead of its previous rich formatting. Sex/Shrink/Slide/Head/Loads/
+ * Weight/Delivery/Price don't have that caveat — those keys were always plain values. */
+function condPlain(v){return stripTags(String(v||'')).replace(/\s+/g,' ').trim();}
+function condSellerVal(lot){const e=lotEdit(lot,'seller');return e!=null?condPlain(e):(lot.consignor||'');}
+function condNotesVal(lot){const e=lotEdit(lot,'notes');return e!=null?condPlain(e):[lot.desc1,lot.desc2].filter(Boolean).join(' ');}
 function condensedFieldDiffs(lot,first){
   const diffs=[];
   const sexV=flat(lotEdit(lot,'sex')??lot.sex), sexF=flat(lotEdit(first,'sex')??first.sex);
@@ -1198,36 +1210,37 @@ function condensedFieldDiffs(lot,first){
   if(shrinkV&&shrinkV!==shrinkF)diffs.push({label:'Shrink',value:shrinkV,c:'shrink'});
   const slideV=flat(lotEdit(lot,'slide')??lot.slide), slideF=flat(lotEdit(first,'slide')??first.slide);
   if(slideV&&slideV!==slideF)diffs.push({label:'Slide',value:slideV,c:'slide'});
-  if(lot.consignor&&lot.consignor!==first.consignor)diffs.push({label:'Seller',value:esc(lot.consignor)});
-  const notesV=[lot.desc1,lot.desc2].filter(Boolean).join(' '), notesF=[first.desc1,first.desc2].filter(Boolean).join(' ');
-  if(notesV&&notesV!==notesF)diffs.push({label:'Notes',value:flat(notesV)});
+  const sellerV=esc(condSellerVal(lot)), sellerF=esc(condSellerVal(first));
+  if(sellerV&&sellerV!==sellerF)diffs.push({label:'Seller',value:sellerV,c:'seller'});
+  const notesV=esc(condNotesVal(lot)), notesF=esc(condNotesVal(first));
+  if(notesV&&notesV!==notesF)diffs.push({label:'Notes',value:notesV,c:'notes'});
   return diffs;
 }
-function condField(cls,lot,c,value,suffix){
-  return `<span class="cond-field ${cls}"><span class="cc" contenteditable data-id="${lot.id}" data-c="${c}">${value}</span>${suffix?`<span class="cond-suffix">${suffix}</span>`:''}</span>`;
+function condField(cls,lot,c,value,firstValue,suffix){
+  const differs=firstValue!==undefined&&value&&String(value).trim()!==String(firstValue??'').trim();
+  return `<span class="cond-field ${cls}${differs?' cond-differs':''}"><span class="cc" contenteditable data-id="${lot.id}" data-c="${c}">${value}</span>${suffix?`<span class="cond-suffix">${suffix}</span>`:''}</span>`;
 }
 function condensedOptionRowHTML(lot,first,li,bi,page,isLast,grid){
-  const headV=esc(lotEdit(lot,'head')??lot.head??'');
-  const loadV=esc(lotEdit(lot,'loadCount')??lot.loadCount??'');
+  const headV=esc(lotEdit(lot,'head')??lot.head??''), headF=esc(lotEdit(first,'head')??first.head??'');
+  const loadV=esc(lotEdit(lot,'loadCount')??lot.loadCount??''), loadF=esc(lotEdit(first,'loadCount')??first.loadCount??'');
   const loadN=parseInt(loadV)||0;
-  const basewtV=esc(lotEdit(lot,'basewt')??lot.basewt??'');
-  const deliveryV=esc(lotEdit(lot,'delivery')??lot.delivery??'');
+  const basewtV=esc(lotEdit(lot,'basewt')??lot.basewt??''), basewtF=esc(lotEdit(first,'basewt')??first.basewt??'');
+  const deliveryV=esc(lotEdit(lot,'delivery')??lot.delivery??''), deliveryF=esc(lotEdit(first,'delivery')??first.delivery??'');
   const priceV=lotEdit(lot,'price')??(lot.price?esc(lot.price):'');
   const diffs=condensedFieldDiffs(lot,first);
-  const diffsHtml=diffs.map(d=>{
-    const val=d.c?`<span class="cc" contenteditable data-id="${lot.id}" data-c="${d.c}">${d.value}</span>`:d.value;
-    return `<b>${esc(d.label)}:</b> ${val}`;
-  }).join('<span class="cond-sep">·</span>');
+  const diffsHtml=diffs.map(d=>
+    `<b>${esc(d.label)}:</b> <span class="cc" contenteditable data-id="${lot.id}" data-c="${d.c}">${d.value}</span>`
+  ).join('<span class="cond-sep">·</span>');
   return `<div class="lotrow-condensed${isLast?' cond-last':''}" data-id="${lot.id}" data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}" style="grid-template-columns:${grid}">
       <div class="lot-select"><input type="checkbox" class="lot-cb" data-id="${lot.id}" title="Select lot"></div>
       <div class="lot-split"><button class="split-btn" data-li="${li}" title="Split the option group here — this lot and the ones below it move to the top of the next page">✂</button></div>
       <div class="cond-span">
         <div class="cond-fields">
-          ${condField('cond-lot',lot,'lot',esc(displayLotNumber(lot)),'')}
-          ${condField('cond-head',lot,'head',headV,headV?' hd':'')}
-          ${condField('cond-loads',lot,'loadCount',loadV,loadV?` load${loadN===1?'':'s'}`:'')}
-          ${condField('cond-wt',lot,'basewt',basewtV,basewtV?'#':'')}
-          ${condField('cond-delivery',lot,'delivery',deliveryV,'')}
+          ${condField('cond-lot',lot,'lot',esc(displayLotNumber(lot)),undefined,'')}
+          ${condField('cond-head',lot,'head',headV,headF,headV?' hd':'')}
+          ${condField('cond-loads',lot,'loadCount',loadV,loadF,loadV?` load${loadN===1?'':'s'}`:'')}
+          ${condField('cond-wt',lot,'basewt',basewtV,basewtF,basewtV?'#':'')}
+          ${condField('cond-delivery',lot,'delivery',deliveryV,deliveryF,'')}
           <span class="cond-diffs">${diffsHtml}</span>
         </div>
       </div>
@@ -1720,6 +1733,15 @@ function wireSheetEvents(){
       else if(el.dataset.f==='nextName')S.issue.nname=el.textContent;
       else if(el.dataset.f==='nextTag')S.issue.ntag=el.textContent;
     });
+  });
+  // Condensed option-lot subrows show computed text next to what's actually being
+  // edited (hd/load(s)/# unit suffixes, bold-if-differs-from-master, whether a
+  // difference badge shows at all) — none of that lives in the field the user is
+  // typing into, so unlike a legacy cell (which is its own whole editable surface)
+  // it has to be recomputed after the edit. Re-render once the field is done being
+  // edited, after the generic save handler above has already run.
+  $$('#zoomwrap .lotrow-condensed [contenteditable]').forEach(el=>{
+    el.addEventListener('blur',()=>{renderEditor();});
   });
   // move buttons
   $$('#zoomwrap .lot-ctl button[data-pg]').forEach(btn=>{
