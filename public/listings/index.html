@@ -128,10 +128,18 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    (same #c-blue etc ids, same updateColorsFromEditor wiring) reached from
    the toolbar's Colors button, so that strip is reclaimed for the catalog
    preview; nothing about what the controls do changed. */
-.modal .color-grid{display:flex;gap:10px 14px;flex-wrap:wrap}
-.modal .color-grid .field{margin:0;display:flex;align-items:center;gap:6px}
-.modal .color-grid .field label{margin:0;font-size:11px;color:#555b66;white-space:nowrap}
-.modal .color-grid input[type="color"]{width:38px;height:28px;padding:2px;border:1px solid #d4cdbd;background:#fff;border-radius:6px}
+.modal .color-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.modal .color-grid .field{margin:0;display:flex;align-items:center;gap:12px;
+  padding:10px 12px;border:1px solid #e6e0d4;border-radius:10px;background:#faf8f4;
+  transition:border-color .12s}
+.modal .color-grid .field:hover{border-color:#b8860b}
+.modal .color-grid .field label{margin:0;font-size:12.5px;font-weight:600;color:#3a3f48;
+  white-space:normal;line-height:1.25}
+.modal .color-grid input[type="color"]{width:42px;height:42px;padding:0;flex-shrink:0;
+  border:2px solid #fff;box-shadow:0 0 0 1.5px #d4cdbd;border-radius:9px;cursor:pointer;
+  -webkit-appearance:none;appearance:none}
+.modal .color-grid input[type="color"]::-webkit-color-swatch-wrapper{padding:0;border-radius:7px;overflow:hidden}
+.modal .color-grid input[type="color"]::-webkit-color-swatch{border:0;border-radius:7px}
 
 /* Auto-Bold Terms chip list */
 .bold-terms-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;min-height:32px}
@@ -237,61 +245,36 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    Settings > Output Options > Condensed Option Lots (S.issue.optionLotLayout).
    Only ever used for li>0 rows of a grouped block; the group's first lot
    always renders as a normal full .lotrow. See condensedOptionRowHTML().
-   Uses the SAME grid-template-columns string as the full row (passed in
-   as `grid`), with explicit inline grid-column on .cond-span and each
-   .cond-price cell (computed from where the real Price/Start Price/PO
-   Price column(s) sit in activeCols()) so every column boundary lines up
-   exactly with the real column above/below it — including in Starting/
-   PO mode, which has two trailing price-like columns instead of one.
-   Everything left of the first price-like column is one merged, flexible
-   area (cond-span) — its internal layout is a small fixed field-width
-   rhythm (Lot/Head/Loads/Wt/Delivery/Consignor) followed by a flexible
-   Differences area, deliberately NOT tied to the 11-column grid, since
-   forcing subrow values into those column widths is what made earlier
-   attempts look like miniature, misaligned table rows.
-   The connector line reuses the master row's own bracket color
-   (var(--deepblue)) at the same x-position as its border-left
-   (.sheet .lotrow.gtop .cell.lot), so it reads as one continuous line
-   down through the option instead of two disconnected pieces; it's kept
-   thinner than the master's 2.4px bracket so it stays visually light. */
+   Uses the SAME grid-template-columns string as the full row (the `grid`
+   param), and — unlike earlier attempts, which merged everything left of
+   Price into one flexible area with its own small fixed-width rhythm —
+   every value now sits in its own cell in the SAME real column it belongs
+   to (Consignor under Seller/Location, Head under Head, Delivery under
+   Delivery, etc.), so subrow values visually line up under the master
+   row's own columns instead of following an independent layout. Cells
+   wrap (no truncation, no ellipsis) rather than clip, so nothing is ever
+   hidden — a long delivery range or consignor name just takes more
+   height, and the row grows to fit since only min-height is set. The
+   left border on the row itself continues the master row's own bracket
+   (same color, same 2.4px thickness) at the same x — no separate indent/
+   connector needed now that content aligns to the real grid instead of
+   sitting in an inset flexible area. */
 .lotrow-condensed{position:relative;display:grid;align-items:stretch;flex-shrink:0;
-  min-height:42px;border-bottom:1px solid var(--line);
+  min-height:42px;border-bottom:1px solid var(--line);border-left:2.4px solid var(--deepblue);
   background:rgba(51,102,153,.09);font-size:calc(11px * var(--ts,1))}
-.lotrow-condensed.cond-last{border-bottom:6px solid var(--lot-divider,#d3d3d3);padding-bottom:14px}
-.lotrow-condensed .cond-span{position:relative;display:flex;
-  align-items:center;min-width:0;padding:0 10px 0 27px}
-.lotrow-condensed .cond-span::before{content:'';position:absolute;left:0;top:0;bottom:0;
-  border-left:2.4px solid var(--deepblue)}
-.lotrow-condensed.cond-last .cond-span::before{bottom:50%}
-.lotrow-condensed .cond-span::after{content:'';position:absolute;left:0;top:50%;width:16px;
-  border-top:2.4px solid var(--deepblue)}
-.lotrow-condensed .cond-fields{flex:1;display:flex;align-items:center;min-width:0}
-/* overflow:hidden + text-overflow:ellipsis on every fixed-width field (not
-   just Consignor, which had it before) — each field's box is a hard stop,
-   so a value that's too long to fit (a long delivery date range, a long
-   consignor name) truncates with "…" inside its own column instead of
-   silently spilling past its edge into whatever text sits next to it. */
-.lotrow-condensed .cond-field{flex:0 0 auto;color:#2a3354;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis}
-.lotrow-condensed .cond-field .cc{display:inline-block;min-width:.6em;max-width:100%;
-  overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+.lotrow-condensed.cond-last{border-bottom:6px solid var(--lot-divider,#d3d3d3)}
+.lotrow-condensed .cond-cell{display:flex;align-items:center;min-width:0;padding:4px 7px;
+  color:#2a3354;overflow-wrap:break-word;word-break:break-word}
+.lotrow-condensed .cond-cell .cc{width:100%}
 /* differs-from-master flag: bolded rather than colored so it still reads correctly
-   in black & white print/PDF, matching the Differences list's own bold labels. */
-.lotrow-condensed .cond-field.cond-differs .cc{font-weight:700;color:#0c1430}
-.lotrow-condensed .cond-lot{width:55px;font-family:'Oswald';font-weight:700;
+   in black & white print/PDF. Shrink/Slide only ever render when they DO differ
+   (there's nothing to show otherwise), so they're always flagged when present;
+   Consignor/Head/Weight/Delivery are always shown and only flag when different. */
+.lotrow-condensed .cond-differs{font-weight:700;color:#0c1430}
+.lotrow-condensed .cond-lot-cell .cc{font-family:'Oswald';font-weight:700;
   font-size:1.1em;color:var(--deepblue)}
-.lotrow-condensed .cond-consignor{width:128px}
-.lotrow-condensed .cond-head{width:70px}
-.lotrow-condensed .cond-loads{width:75px}
-.lotrow-condensed .cond-sex{width:55px}
-.lotrow-condensed .cond-wt{width:70px}
-.lotrow-condensed .cond-delivery{width:150px}
-.lotrow-condensed .cond-diffs{flex:1 1 auto;min-width:0;color:#2a3354;font-size:.95em;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lotrow-condensed .cond-diffs b{font-weight:700;color:#0c1430}
-.lotrow-condensed .cond-diffs .cond-sep{margin:0 7px;color:#b3b9cc}
 .lotrow-condensed .cond-note .cc{font-style:italic}
-.lotrow-condensed .cond-add-note{flex:0 0 auto;margin-left:8px;border:1px solid #c7cee0;
+.lotrow-condensed .cond-add-note{border:1px solid #c7cee0;
   background:#fff;cursor:pointer;font-size:.9em;font-weight:600;color:#5a6488;
   padding:4px 9px;min-height:22px;border-radius:4px;white-space:nowrap}
 .lotrow-condensed .cond-add-note:hover{color:var(--deepblue);border-color:var(--deepblue);
@@ -644,6 +627,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .modal-back{position:fixed;inset:0;background:rgba(19,24,32,.55);display:none;align-items:flex-start;justify-content:center;z-index:5000;padding:40px 16px;overflow:auto}
 .modal-back.on{display:flex}
 .modal{background:#fff;color:#1a1d23;border-radius:14px;width:min(560px,100%);box-shadow:0 18px 60px rgba(0,0,0,.4);overflow:hidden}
+.modal.modal-wide{width:min(680px,100%)}
 .modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e6e0d4}
 .modal-head h3{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px;letter-spacing:.02em}
 .modal-x{background:transparent;border:0;font-size:22px;line-height:1;color:#777;cursor:pointer;padding:2px 6px}
@@ -851,7 +835,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
         <div class="field"><label>Header Text Alignment</label><select id="i-header-align"><option value="left">Left Align</option><option value="center">Center Align</option></select>
           <div class="hint">Controls the CMS/title/date text block in the printable header.</div></div>
         <div class="check-field"><input type="checkbox" id="i-show-calendar"><div><label for="i-show-calendar">Show Next Auction Badge</label><div class="hint">Turn this off to remove the top-right next auction badge and give the header more room.</div></div></div>
-        <div class="check-field"><input type="checkbox" id="i-condensed-options"><div><label for="i-condensed-options">Condensed Option Lots</label><div class="hint">Experimental. Renders additional options in an option group as short indented subrows instead of full rows. Applies only to this auction — off by default, and existing auctions keep their current layout unless you turn this on for them.</div></div></div>
+        <div class="check-field"><input type="checkbox" id="i-condensed-options"><div><label for="i-condensed-options">Condensed Option Lots</label><div class="hint">Renders additional options in an option group as compact subrows instead of full rows. Applies only to this auction — on by default for new auctions; existing auctions keep their current layout unless you turn this on for them.</div></div></div>
       </div>
       <div class="card advanced-only">
         <h3>Bold Rules</h3>
@@ -906,8 +890,8 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
             <button class="btn ghost sm" id="boldBtn" title="Bold the selected text"><b>B</b></button>
             <button class="btn ghost sm" id="scratchBtn" title="Scratch / unscratch the focused lot (auction-day strike-through)"><s>S</s></button>
             <button class="btn ghost sm" id="suppBtn" title="Toggle supplemental on the focused lot">Sup</button>
-            <button class="btn ghost sm" id="highlightBtn" title="Highlight the box your cursor is in">🖍</button>
-            <button class="btn ghost sm" id="clearHlBtn" title="Remove all highlights in this view">🖍✕</button>
+            <button class="btn ghost sm" id="highlightBtn" title="Highlight the box your cursor is in"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M17.8 3.4l2.8 2.8-9.3 9.3-3.9 1.1 1.1-3.9 9.3-9.3z" fill="#fde047" stroke="#8a6d00" stroke-width="1.3" stroke-linejoin="round"/><rect x="2" y="19.5" width="9" height="2.3" rx="1.1" fill="#fde047" stroke="#8a6d00" stroke-width="1"/></svg></button>
+            <button class="btn ghost sm" id="clearHlBtn" title="Remove all highlights in this view"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M17.8 3.4l2.8 2.8-9.3 9.3-3.9 1.1 1.1-3.9 9.3-9.3z" fill="#fde047" stroke="#8a6d00" stroke-width="1.3" stroke-linejoin="round"/><rect x="2" y="19.5" width="9" height="2.3" rx="1.1" fill="#fde047" stroke="#8a6d00" stroke-width="1"/><path d="M1.5 1.5l21 21" stroke="#c0392b" stroke-width="2"/></svg></button>
           </div>
           <span class="vr"></span>
           <div class="grp" aria-label="Catalog styling">
@@ -941,12 +925,6 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
               <span class="adj-val" id="boxVal">—</span>
               <button class="btn ghost sm adj-btn" id="boxTxtPlus">+</button>
               <button class="btn ghost sm adj-reset" id="boxTxtReset" title="Reset this box's text size to default">↺</button>
-            </div>
-            <div class="adj" title="Increase or decrease the text size of the Next Auction calendar badge.">
-              <span class="adj-lbl">Cal</span>
-              <button class="btn ghost sm adj-btn" id="calTxtMinus">−</button>
-              <span class="adj-val" id="calVal">100%</span>
-              <button class="btn ghost sm adj-btn" id="calTxtPlus">+</button>
             </div>
           </div>
           <span class="vr"></span>
@@ -1041,7 +1019,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 </div>
 
 <div class="modal-back" id="colorsModalBack">
-  <div class="modal">
+  <div class="modal modal-wide">
     <div class="modal-head"><h3>Catalog Colors</h3><button class="modal-x" data-close>×</button></div>
     <div class="modal-body">
       <p class="modal-note">These colors apply to the printed catalog itself — changes show up in the preview immediately.</p>
@@ -1101,7 +1079,7 @@ const S = {
   global:{house:'CMS Livestock Auction',phone:'(806) 355-7505',
     email:'info@cmslivestock.com',web:'www.CattleMarketingServices.com',
     addr:'6900 I40 West, Ste 135, Amarillo, TX 79106'},
-  issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:'',showCalendar:true,headerAlign:'center',optionLotLayout:'legacy'},
+  issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:'',showCalendar:true,headerAlign:'center',optionLotLayout:'condensed'},
   sections:[], zoom:.70, rowStep:14, textScale:1, calendarTextScale:1, toolsHidden:false, builderMode:'basic',
   colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff',changeHL:'#fff7cc'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows','Holstein Cows | unless: Jersey, Jers','Holstein Cow | unless: Jersey, Jers'],
@@ -1234,7 +1212,20 @@ function prefillIssue(){
 }
 
 /* ===== settings UI ===== */
+// A brand-new listing starts with S.issue.date empty; default it to today the
+// first time Settings is shown (never again afterward, since it's no longer
+// empty once set — by this default or by the user picking a different date,
+// either way "unless you change it" holds) and, since it's empty, auction
+// name has never had a chance to auto-fill either — run that exact same
+// existing prefill logic (the #i-date change handler below) once up front too.
+function defaultIssueDateIfEmpty(){
+  if(S.issue.date)return;
+  const d=new Date();
+  S.issue.date=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  if(!S.issue.name)S.issue.name=monthOf(S.issue.date)+' DairyX, Holstein and Native Auction';
+}
 function syncSettingsUI(){
+  defaultIssueDateIfEmpty();
   $('#g-house').value=S.global.house; $('#g-phone').value=S.global.phone;
   $('#g-email').value=S.global.email; $('#g-web').value=S.global.web;
   $('#g-addr').value=S.global.addr;
@@ -1428,9 +1419,12 @@ function condensedFieldDiffs(lot,first){
   if(notesV&&notesV!==notesF)diffs.push({label:'Notes',value:notesV,c:'notes'});
   return diffs;
 }
-function condField(cls,lot,c,value,firstValue,suffix){
+// One editable value for a grid cell, bolded when it differs from the master row's
+// equivalent value (pass firstValue===undefined to skip the differs check entirely,
+// e.g. for the Lot number itself, which always legitimately differs).
+function condGridVal(lot,c,value,firstValue,suffix){
   const differs=firstValue!==undefined&&value&&String(value).trim()!==String(firstValue??'').trim();
-  return `<span class="cond-field ${cls}${differs?' cond-differs':''}"><span class="cc" contenteditable data-id="${lot.id}" data-c="${c}">${value}</span>${suffix?`<span class="cond-suffix">${suffix}</span>`:''}</span>`;
+  return `<span class="cc${differs?' cond-differs':''}" contenteditable data-id="${lot.id}" data-c="${c}">${value}</span>${suffix?`<span class="cond-suffix">${suffix}</span>`:''}`;
 }
 // Where "price" sits in the active column set (11th column normally; also 11th in
 // Starting/PO mode, which appends a 12th "PO Price" column after it). Everything
@@ -1450,38 +1444,44 @@ function condensedOptionRowHTML(lot,first,li,bi,page,isLast,grid,cols){
   const headV=esc(lotEdit(lot,'head')??lot.head??''), headF=esc(lotEdit(first,'head')??first.head??'');
   const loadV=esc(lotEdit(lot,'loadCount')??lot.loadCount??''), loadF=esc(lotEdit(first,'loadCount')??first.loadCount??'');
   const loadN=parseInt(loadV)||0;
-  const sexV=flat(lotEdit(lot,'sex')??lot.sex), sexF=flat(lotEdit(first,'sex')??first.sex);
   const basewtV=esc(lotEdit(lot,'basewt')??lot.basewt??''), basewtF=esc(lotEdit(first,'basewt')??first.basewt??'');
   const deliveryV=esc(lotEdit(lot,'delivery')??lot.delivery??''), deliveryF=esc(lotEdit(first,'delivery')??first.delivery??'');
   const consignorV=esc(condSellerVal(lot)), consignorF=esc(condSellerVal(first));
-  const priceIdx=cols.indexOf('price');
-  const spanEnd=priceIdx<0?cols.length+1:priceIdx+1;
   const diffs=condensedFieldDiffs(lot,first);
+  const shrinkDiff=diffs.find(d=>d.c==='shrink'), slideDiff=diffs.find(d=>d.c==='slide'), notesDiff=diffs.find(d=>d.c==='notes');
   const noteRaw=lotEdit(lot,'condNote');
   const noteActive=noteRaw!=null;
-  const diffPieces=diffs.map(d=>`<b>${esc(d.label)}:</b> <span class="cc" contenteditable data-id="${lot.id}" data-c="${d.c}">${d.value}</span>`);
-  if(noteActive)diffPieces.push(`<span class="cond-note"><span class="cc" contenteditable data-id="${lot.id}" data-c="condNote">${noteRaw}</span></span>`);
-  const diffsHtml=diffPieces.join('<span class="cond-sep">·</span>');
-  const addNoteBtn=noteActive?'':`<button type="button" class="cond-add-note" data-id="${lot.id}" title="Add a custom note for this option">+ Note</button>`;
+  let notesCellHtml;
+  if(notesDiff)notesCellHtml=`<b>Notes:</b> <span class="cc cond-differs" contenteditable data-id="${lot.id}" data-c="notes">${notesDiff.value}</span>`;
+  else if(noteActive)notesCellHtml=`<span class="cond-note"><span class="cc" contenteditable data-id="${lot.id}" data-c="condNote">${noteRaw}</span></span>`;
+  else notesCellHtml=`<button type="button" class="cond-add-note" data-id="${lot.id}" title="Add a custom note for this option">+ Note</button>`;
+  // Every value sits in the SAME real column it belongs to (matching activeCols()),
+  // so subrow values align under the master row's own columns instead of following
+  // an independent layout. 'sex' is intentionally omitted — no cell renders for it.
+  const cellByCol={
+    lot:condGridVal(lot,'lot',esc(displayLotNumber(lot)),undefined,''),
+    seller:condGridVal(lot,'seller',consignorV,consignorF,''),
+    head:condGridVal(lot,'head',headV,headF,headV?' hd':''),
+    desc:loadV?condGridVal(lot,'loadCount',loadV,loadF,` load${loadN===1?'':'s'}`):'',
+    basewt:condGridVal(lot,'basewt',basewtV,basewtF,basewtV?'#':''),
+    delivery:condGridVal(lot,'delivery',deliveryV,deliveryF,''),
+    shrink:shrinkDiff?`<b>Shrink:</b> <span class="cc cond-differs" contenteditable data-id="${lot.id}" data-c="shrink">${shrinkDiff.value}</span>`:'',
+    slide:slideDiff?`<b>Slide:</b> <span class="cc cond-differs" contenteditable data-id="${lot.id}" data-c="slide">${slideDiff.value}</span>`:'',
+    notes:notesCellHtml
+  };
+  const bodyCells=cols.map((c,i)=>{
+    if(c==='price'||c==='poPrice')return '';
+    const content=cellByCol[c];
+    if(!content)return '';
+    return `<div class="cond-cell${c==='lot'?' cond-lot-cell':''}" style="grid-column:${i+1} / ${i+2}">${content}</div>`;
+  }).join('');
   const selOn=S.selected&&S.selected.has(lot.id);
-  return `<div class="lotrow-condensed${isLast?' cond-last':''}${selOn?' sel-on':''}" data-id="${lot.id}" data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}" style="grid-template-columns:${grid};min-height:${condensedLotHeight(lot)}px">
+  return `<div class="lotrow-condensed${isLast?' cond-last':''}${selOn?' sel-on':''}" data-id="${lot.id}" data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}" style="grid-template-columns:${grid};min-height:${condensedLotHeight(lot)+(isLast?14:0)}px">
       <div class="row-gutter row-gutter-sub">
         <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
         <button class="split-btn" data-li="${li}" title="Split the option group here — this lot and the ones below it move to the top of the next page">✂</button>
       </div>
-      <div class="cond-span" style="grid-column:1 / ${spanEnd}">
-        <div class="cond-fields">
-          ${condField('cond-lot',lot,'lot',esc(displayLotNumber(lot)),undefined,'')}
-          ${condField('cond-consignor',lot,'seller',consignorV,consignorF,'')}
-          ${condField('cond-head',lot,'head',headV,headF,headV?' hd':'')}
-          ${condField('cond-loads',lot,'loadCount',loadV,loadF,loadV?` load${loadN===1?'':'s'}`:'')}
-          ${condField('cond-sex',lot,'sex',sexV,sexF,'')}
-          ${condField('cond-wt',lot,'basewt',basewtV,basewtF,basewtV?'#':'')}
-          ${condField('cond-delivery',lot,'delivery',deliveryV,deliveryF,'')}
-          <span class="cond-diffs">${diffsHtml}</span>
-          ${addNoteBtn}
-        </div>
-      </div>
+      ${bodyCells}
       ${condensedPriceCellsHTML(lot,cols)}
     </div>`;
 }
@@ -2481,8 +2481,6 @@ $('#txtPlus').onclick=()=>{S.textScale=Math.min(1.5,+(S.textScale+.06).toFixed(2
   renderEditor();toast('Text size '+Math.round(S.textScale*100)+'%');};
 $('#txtMinus').onclick=()=>{S.textScale=Math.max(.7,+(S.textScale-.06).toFixed(2));
   renderEditor();toast('Text size '+Math.round(S.textScale*100)+'%');};
-$('#calTxtPlus').onclick=()=>{S.calendarTextScale=Math.min(1.35,+((S.calendarTextScale||1)+.05).toFixed(2));renderEditor();toast('Calendar text '+Math.round(S.calendarTextScale*100)+'%');};
-$('#calTxtMinus').onclick=()=>{S.calendarTextScale=Math.max(.75,+((S.calendarTextScale||1)-.05).toFixed(2));renderEditor();toast('Calendar text '+Math.round(S.calendarTextScale*100)+'%');};
 $('#toolsToggle').onchange=e=>{S.toolsHidden=!e.target.checked; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden); saveGlobal();};
 $('#colReset').onclick=()=>{S.colWidths={...DEFAULT_COL_WIDTHS};renderEditor();toast('Column widths reset.');};
 $('#autofit').onclick=()=>{renderEditor();autofit();saveModeLayout();renderEditor();toast('Pages re-fitted.');};
@@ -2565,8 +2563,6 @@ function updateContextualToolbar(){
   if(boxVal&&!boxVal.querySelector('input'))boxVal.textContent=hasCell?Math.round(lotCellScale(S.lots.find(l=>l.id===lastFocusCell.id),lastFocusCell.c)*100)+'%':'—';
   const txtVal=$('#txtVal');
   if(txtVal&&!txtVal.querySelector('input'))txtVal.textContent=Math.round((S.textScale||1)*100)+'%';
-  const calVal=$('#calVal');
-  if(calVal&&!calVal.querySelector('input'))calVal.textContent=Math.round((S.calendarTextScale||1)*100)+'%';
 }
 // Optional direct-value editing: click a size readout to type a precise
 // number instead of clicking -/+ repeatedly. Every commit path below calls
@@ -2623,10 +2619,6 @@ wireAdjValEdit('txtVal',{
 wireAdjValEdit('boxVal',{
   getRaw:()=>lastFocusCell&&S.lots.some(l=>l.id===lastFocusCell.id)?Math.round(lotCellScale(S.lots.find(l=>l.id===lastFocusCell.id),lastFocusCell.c)*100):null,
   commit:n=>{const lot=S.lots.find(l=>l.id===lastFocusCell.id); if(!lot)return; setLotCellScale(lot,lastFocusCell.c,Math.max(.65,Math.min(1.8,n/100))); renderEditor();}
-});
-wireAdjValEdit('calVal',{
-  getRaw:()=>Math.round((S.calendarTextScale||1)*100),
-  commit:n=>{S.calendarTextScale=Math.max(.75,Math.min(1.35,n/100)); renderEditor();}
 });
 function clearSelection(){ S.selected.clear(); renderEditor(); }
 function bulkAdjustHeight(delta){
