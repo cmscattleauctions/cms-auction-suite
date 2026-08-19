@@ -251,35 +251,47 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    .cond-group-wrap, whose own height is simply whatever its stacked .cond-subrows
    need — so the label/bracket automatically span however many sub-rows exist, one
    or many, with no manual height math anywhere.
+   Two distinct vertical strokes read as one connected group treatment: a thick
+   navy .cond-outer-bar at the very left edge (x=0), same weight/color as the
+   parent lot's own group border, so the group visually continues straight down
+   from the parent through the option area; and a thinner .cond-bracket sitting
+   right next to the OPTION label, close to the actual row content, marking where
+   the option data itself begins. Nothing left of that content column carries any
+   fill color — .lotrow-condensed itself has no background, so that whole gutter
+   area reads as plain white against the tinted content, making the indentation
+   obvious at a glance. The tint instead lives on .cond-span/.cond-price directly.
    Each sub-row keeps the same grid-template-columns the header/master row use SOLELY
    so its Price cell(s) land in the exact real Price column, same as every other
-   price on the sheet (condensedPriceCellsHTML) — everything left of Price is one
-   merged flexible span (.cond-span), not tied to the other 10 columns, since forcing
-   values through that full grid is what made this look like a miniature table row
-   instead of a compact nested line. .cond-span gets left padding to clear the
-   overlaid gutter, so content starts roughly under Seller/Location rather than
-   under Lot. Fields wrap as whole units (never mid-word) if a group needs more
-   room than one line — row height is a minimum, not fixed, so nothing truncates. */
+   price on the sheet (condensedPriceCellsHTML). Everything left of Price is one
+   merged span (.cond-span) laid out as a small purpose-built grid (NOT the real
+   per-lot column grid) — Lot/Head/Loads/BaseWt get fixed narrow tracks so values
+   line up row-to-row, Delivery gets the remaining flexible space since it's the
+   field most likely to run long, and diffs/+Note share one trailing flexible cell
+   so their variable length never disturbs the other columns' alignment. Fields
+   stay on one line each (white-space:nowrap) so wrapping, if a group ever needs
+   more room than one line, only ever happens between whole fields, never mid-word. */
 .cond-group-wrap{position:relative;display:flex;flex-shrink:0}
-.cond-gutter{position:absolute;left:0;top:0;bottom:0;width:52px;display:flex;
-  align-items:center;justify-content:center;pointer-events:none}
-.cond-bracket{position:absolute;left:34px;top:6px;bottom:6px;border-left:1.25px solid #8d97b8}
-.cond-bracket::before{content:'';position:absolute;left:0;top:0;width:7px;border-top:1.25px solid #8d97b8}
-.cond-bracket::after{content:'';position:absolute;left:0;bottom:0;width:7px;border-bottom:1.25px solid #8d97b8}
-.cond-option-label{position:absolute;left:2px;top:0;bottom:0;width:22px;
+.cond-outer-bar{position:absolute;left:0;top:0;bottom:0;width:2.4px;background:var(--deepblue)}
+.cond-gutter{position:absolute;left:0;top:0;bottom:0;width:64px;pointer-events:none}
+.cond-option-label{position:absolute;top:0;bottom:0;right:12px;width:20px;
   display:flex;align-items:center;justify-content:center}
 .cond-option-label span{display:inline-block;transform:rotate(-90deg);white-space:nowrap;
-  font-family:'Oswald';font-weight:600;font-size:8.5px;letter-spacing:1.6px;
-  color:#5a6488;text-transform:uppercase}
+  font-family:'Oswald';font-weight:800;font-size:9.5px;letter-spacing:1.3px;
+  color:var(--deepblue);text-transform:uppercase}
+.cond-bracket{position:absolute;top:6px;bottom:6px;right:6px;border-left:1.5px solid var(--deepblue)}
+.cond-bracket::before{content:'';position:absolute;left:0;top:0;width:6px;border-top:1.5px solid var(--deepblue)}
+.cond-bracket::after{content:'';position:absolute;left:0;bottom:0;width:6px;border-bottom:1.5px solid var(--deepblue)}
 .cond-subrows{flex:1;min-width:0}
 .lotrow-condensed{position:relative;display:grid;align-items:stretch;flex-shrink:0;
   min-height:34px;border-bottom:1px solid var(--line);
-  background:rgba(51,102,153,.06);font-size:calc(11px * var(--ts,1))}
+  background:none;font-size:calc(11px * var(--ts,1))}
 .lotrow-condensed.cond-last{border-bottom:6px solid var(--lot-divider,#d3d3d3)}
-.cond-span{display:flex;flex-wrap:wrap;align-items:baseline;align-content:center;
-  row-gap:2px;column-gap:14px;min-width:0;padding:5px 10px 5px 58px;color:#2a3354}
-.cond-field{white-space:nowrap;flex:0 0 auto}
-.cond-field.cond-lot{font-family:'Oswald';font-weight:700;font-size:1.1em;color:var(--deepblue)}
+.cond-span{display:grid;grid-template-columns:54px 68px 76px 58px minmax(150px,1fr) auto;
+  align-items:center;column-gap:12px;min-width:0;padding:5px 12px 5px 64px;
+  color:#2a3354;background:rgba(51,102,153,.07)}
+.cond-field{white-space:nowrap;min-width:0}
+.cond-field.cond-lot{font-family:'Oswald';font-weight:700;font-size:1.15em;color:var(--deepblue)}
+.cond-field-delivery{font-weight:600;color:#1a2444}
 /* differs-from-master flag: bolded rather than colored so it still reads correctly
    in black & white print/PDF. Shrink/Slide/Sex/Seller/Notes only ever render when
    they DO differ from the master (there's nothing to show otherwise), so they're
@@ -287,15 +299,16 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    their value is actually different. */
 .cond-differs{font-weight:700;color:#0c1430}
 .cond-field .cc{display:inline}
-.cond-field.cond-diff b{font-weight:700;color:#5a6488;margin-right:2px}
-.cond-field.cond-note .cc{font-style:italic}
+.cond-extra{display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:2px;min-width:0}
+.cond-extra .cond-diff b{font-weight:700;color:#5a6488;margin-right:2px}
+.cond-extra .cond-note .cc{font-style:italic}
 .cond-add-note{border:1px solid #c7cee0;background:#fff;cursor:pointer;font-size:.9em;
   font-weight:600;color:#5a6488;padding:3px 8px;min-height:20px;border-radius:4px;white-space:nowrap}
 .cond-add-note:hover{color:var(--deepblue);border-color:var(--deepblue);background:rgba(51,102,153,.12)}
 .hidectl .cond-add-note{display:none !important}
-.cond-price{display:flex;align-items:center;justify-content:center;
+.cond-price{display:flex;align-items:center;justify-content:center;padding-left:8px;
   border-left:1px solid var(--line);font-family:'Oswald';font-weight:700;
-  color:var(--deepblue);font-size:1.3em}
+  color:var(--deepblue);font-size:1.3em;background:rgba(51,102,153,.07)}
 .cond-price .cc{width:100%;text-align:center}
 
 /* footer */
@@ -1446,9 +1459,11 @@ function condensedFieldDiffs(lot,first){
   return diffs;
 }
 // One always-shown value, bolded when it differs from the master row's equivalent.
+// cond-field-${c} gives each field (head/loadCount/basewt/delivery) its own hook for
+// field-specific styling (e.g. Delivery reads slightly heavier — see .cond-field-delivery).
 function condVal(lot,c,value,firstValue,suffix){
   const differs=value&&String(value).trim()!==String(firstValue??'').trim();
-  return `<span class="cond-field${differs?' cond-differs':''}"><span class="cc" contenteditable data-id="${lot.id}" data-c="${c}">${value}</span>${suffix?`<span class="cond-suffix">${suffix}</span>`:''}</span>`;
+  return `<span class="cond-field cond-field-${c}${differs?' cond-differs':''}"><span class="cc" contenteditable data-id="${lot.id}" data-c="${c}">${value}</span>${suffix?`<span class="cond-suffix">${suffix}</span>`:''}</span>`;
 }
 // Where "price" sits in the active column set (11th column normally; also 11th in
 // Starting/PO mode, which appends a 12th "PO Price" column after it). Everything
@@ -1477,7 +1492,6 @@ function condensedOptionRowHTML(lot,first,li,bi,page,isLast,grid,cols){
   const noteActive=noteRaw!=null;
   const diffPieces=diffs.map(d=>`<span class="cond-field cond-diff"><b>${esc(d.label)}:</b> <span class="cc cond-differs" contenteditable data-id="${lot.id}" data-c="${d.c}">${d.value}</span></span>`);
   if(noteActive)diffPieces.push(`<span class="cond-field cond-note"><span class="cc" contenteditable data-id="${lot.id}" data-c="condNote">${noteRaw}</span></span>`);
-  const diffsHtml=diffPieces.join('');
   const addNoteBtn=noteActive?'':`<button type="button" class="cond-add-note" data-id="${lot.id}" title="Add a custom note for this option">+ Note</button>`;
   const priceIdx=cols.indexOf('price');
   const spanEnd=priceIdx<0?cols.length+1:priceIdx+1;
@@ -1495,8 +1509,7 @@ function condensedOptionRowHTML(lot,first,li,bi,page,isLast,grid,cols){
         ${condVal(lot,'loadCount',loadV,loadF,loadV?` load${loadN===1?'':'s'}`:'')}
         ${condVal(lot,'basewt',basewtV,basewtF,basewtV?'#':'')}
         ${condVal(lot,'delivery',deliveryV,deliveryF,'')}
-        ${diffsHtml}
-        ${addNoteBtn}
+        <div class="cond-extra">${diffPieces.join('')}${addNoteBtn}</div>
       </div>
       ${condensedPriceCellsHTML(lot,cols)}
     </div>`;
@@ -1504,15 +1517,19 @@ function condensedOptionRowHTML(lot,first,li,bi,page,isLast,grid,cols){
 // One shared vertical "OPTION" label + bracket, sized to the whole group's actual
 // rendered height via CSS (top:0;bottom:0 inside a position:relative wrapper whose
 // own height is just whatever its stacked sublots need) — works identically for one
-// sublot or many, nothing here assumes a specific count or lot-letter scheme.
+// sublot or many, nothing here assumes a specific count or lot-letter scheme. The
+// outer bar is a separate element from the label/bracket pairing so it can carry the
+// parent row's own navy weight/color continuously, while the label+bracket stay a
+// tighter, lighter unit right next to the actual option content.
 function condensedOptionGroupHTML(subLots,masterLot,bi,page,grid,cols){
   const rowsHtml=subLots.map((lot,i)=>
     condensedOptionRowHTML(lot,masterLot,i+1,bi,page,i===subLots.length-1,grid,cols)
   ).join('');
   return `<div class="cond-group-wrap">
+      <div class="cond-outer-bar"></div>
       <div class="cond-gutter">
-        <div class="cond-bracket"></div>
         <div class="cond-option-label"><span>Option</span></div>
+        <div class="cond-bracket"></div>
       </div>
       <div class="cond-subrows">${rowsHtml}</div>
     </div>`;
