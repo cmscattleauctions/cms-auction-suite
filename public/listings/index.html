@@ -293,9 +293,9 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .cond-span{display:grid;grid-template-columns:54px 68px 76px 58px minmax(150px,1fr) auto;
   align-items:center;column-gap:12px;min-width:0;margin-left:46px;padding:5px 12px 5px 18px;
   color:#2a3354;background:rgba(51,102,153,.12);border-bottom:1px solid var(--line)}
-.cond-last .cond-span,.cond-last .cond-price{border-bottom:0}
+.cond-last .cond-span,.cond-last .cond-price,.cond-last .cond-price-fill{border-bottom:0}
 .cond-field{white-space:nowrap;min-width:0}
-.cond-field.cond-lot{font-family:'Oswald';font-weight:700;font-size:1.15em;color:var(--deepblue)}
+.cond-field.cond-lot{font-family:'Oswald';font-weight:700;font-size:1.4em;color:var(--deepblue)}
 .cond-field-delivery{font-weight:600;color:#1a2444}
 /* differs-from-master flag: bolded rather than colored so it still reads correctly
    in black & white print/PDF. Shrink/Slide/Sex/Seller/Notes only ever render when
@@ -317,10 +317,18 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
   font-weight:600;color:#5a6488;padding:3px 8px;min-height:20px;border-radius:4px;white-space:nowrap}
 .cond-add-note:hover{color:var(--deepblue);border-color:var(--deepblue);background:rgba(51,102,153,.12)}
 .hidectl .cond-add-note{display:none !important}
-.cond-price{display:flex;align-items:center;justify-content:center;padding-left:8px;
-  border-left:1px solid var(--line);border-bottom:1px solid var(--line);font-family:'Oswald';
-  font-weight:700;color:var(--deepblue);font-size:1.3em;background:rgba(51,102,153,.12)}
+.cond-price{position:relative;display:flex;align-items:center;justify-content:center;
+  padding-left:8px;border-left:1px solid var(--line);border-bottom:1px solid var(--line);
+  font-family:'Oswald';font-weight:700;color:var(--deepblue);font-size:1.3em;
+  background:rgba(51,102,153,.12)}
 .cond-price .cc{width:100%;text-align:center;white-space:nowrap}
+/* Decorative sliver only — fills the row's fixed 10px trailing residual (see
+   condensedPriceCellsHTML) with the same tint/border so the divider and shading
+   reach the same true right edge, without widening the price cell itself (which
+   would re-center the price text off the real column position every other price
+   on the sheet aligns to). */
+.cond-price-fill{position:absolute;top:0;bottom:0;left:100%;width:10px;
+  background:rgba(51,102,153,.12);border-bottom:1px solid var(--line)}
 
 /* footer */
 .s-foot{height:34px;border-top:2px solid var(--blue);display:flex;align-items:center;
@@ -1486,10 +1494,24 @@ function condVal(lot,c,value,firstValue,suffix){
 function condensedPriceCellsHTML(lot,cols){
   const priceIdx=cols.indexOf('price');
   if(priceIdx<0)return '';
-  return cols.slice(priceIdx).map((c,i)=>{
+  const priceCols=cols.slice(priceIdx);
+  return priceCols.map((c,i)=>{
     const idx=priceIdx+i;
+    const isLast=i===priceCols.length-1;
+    // TABLE_W (the sum the real column widths always normalize to) is 998px, but
+    // the row's own rendered box is 1008px (.sheet's fixed 1056px width minus its
+    // fixed page padding) — a constant, deterministic 10px residual on every row,
+    // header included, that no real column ever covers. Normal cells never notice
+    // since nothing needs their background to reach the row's true right edge, but
+    // the strong end-of-group divider is drawn on that full row box, so without this
+    // the price shading stops 10px short of where the divider actually ends. Only
+    // the LAST price-like cell needs to fill it — via .cond-price-fill (a decorative
+    // sliver, not a wider box), so the price TEXT stays centered on the same real
+    // column position as every other price on the sheet; only the background reaches
+    // the extra 10px.
+    const fill=isLast?'<div class="cond-price-fill"></div>':'';
     const v=lotEdit(lot,c)??(lot[c]?esc(lot[c]):'');
-    return `<div class="cond-price" style="grid-column:${idx+1} / ${idx+2}"><span class="cc" contenteditable data-id="${lot.id}" data-c="${c}">${v}</span></div>`;
+    return `<div class="cond-price" style="grid-column:${idx+1} / ${idx+2}">${fill}<span class="cc" contenteditable data-id="${lot.id}" data-c="${c}">${v}</span></div>`;
   }).join('');
 }
 function condensedOptionRowHTML(lot,first,li,bi,page,isLast,grid,cols){
