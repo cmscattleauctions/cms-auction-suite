@@ -338,8 +338,13 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    condensedPriceCellsHTML) with the same tint/border so the divider and shading
    reach the same true right edge, without widening the price cell itself (which
    would re-center the price text off the real column position every other price
-   on the sheet aligns to). */
-.cond-price-fill{position:absolute;top:0;bottom:0;left:100%;width:10px;
+   on the sheet aligns to). z-index:-1 is required, not optional: a wide price
+   (e.g. 4-digit with a comma) legitimately overflows .cc's own narrow box under
+   white-space:nowrap, and since this sliver is position:absolute it would
+   otherwise paint ON TOP of that overflow (positioned elements paint after
+   non-positioned siblings regardless of DOM order) — silently erasing the tail
+   of the price. Pushing it behind lets the overflowing digits render on top of it.*/
+.cond-price-fill{position:absolute;top:0;bottom:0;left:100%;width:10px;z-index:-1;
   background:var(--option-lot-bg,#ffffff);border-bottom:1px solid var(--line)}
 
 /* footer */
@@ -527,7 +532,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
   color:#2a3354;
   line-height:1.28;
 }
-.sheet .lotrow{background:var(--main-lot-bg,#f5f6f7) !important;}
+.sheet .lotrow{background:var(--main-lot-bg,#e9ebee) !important;}
 
 .sheet .lotrow .cell.lot .cc{font-family:Arial,Helvetica,sans-serif !important;font-weight:800 !important;font-size:1.48em;letter-spacing:.02em;color:#13235e;}
 .sheet .lotrow .cell.head .cc{font-family:'Barlow',Arial,sans-serif !important;font-weight:400 !important;font-size:.9em !important;color:#1f2844 !important;line-height:1.28 !important;}
@@ -983,6 +988,12 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
               <button class="btn ghost sm adj-btn" id="boxTxtPlus">+</button>
               <button class="btn ghost sm adj-reset" id="boxTxtReset" title="Reset this box's text size to default">↺</button>
             </div>
+            <div class="adj" title="Increase or decrease the small gap after each lot group, before the next one begins. Does not affect spacing between option rows within the same group.">
+              <span class="adj-lbl">Group Gap</span>
+              <button class="btn ghost sm adj-btn" id="groupGapMinus">−</button>
+              <span class="adj-val" id="groupGapVal">6px</span>
+              <button class="btn ghost sm adj-btn" id="groupGapPlus">+</button>
+            </div>
           </div>
           <span class="vr"></span>
           <div class="grp" aria-label="Layout controls">
@@ -1139,8 +1150,8 @@ const S = {
     email:'info@cmslivestock.com',web:'www.CattleMarketingServices.com',
     addr:'6900 I40 West, Ste 135, Amarillo, TX 79106'},
   issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:'',showCalendar:true,headerAlign:'center',optionLotLayout:'condensed'},
-  sections:[], zoom:.70, rowStep:14, textScale:1, calendarTextScale:1, toolsHidden:false, builderMode:'basic',
-  colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff',changeHL:'#fff7cc',mainLotBg:'#f5f6f7',optionLotBg:'#ffffff'},
+  sections:[], zoom:.70, rowStep:14, textScale:1, calendarTextScale:1, toolsHidden:false, builderMode:'basic', rowGroupSpacing:6,
+  colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff',changeHL:'#fff7cc',mainLotBg:'#e9ebee',optionLotBg:'#ffffff'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows','Holstein Cows | unless: Jersey, Jers','Holstein Cow | unless: Jersey, Jers'],
   colWidths:{lot:52,seller:122,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:52,slide:94,notes:206,price:60},
   modeLayouts:{}, modeStates:{}, selected:new Set(), currentProjectId:null, currentProjectName:''
@@ -1296,7 +1307,7 @@ function syncSettingsUI(){
   $('#c-section-text').value=S.colors.sectionText; $('#c-table-head').value=S.colors.tableHead;
   $('#c-calendar').value=S.colors.calendar; $('#c-divider').value=S.colors.divider||'#d3d3d3'; $('#c-supp-accent').value=S.colors.suppAccent;
   $('#c-supp-bg').value=S.colors.suppBg; $('#c-change').value=S.colors.changeHL||'#fff7cc';
-  $('#c-main-lot-bg').value=S.colors.mainLotBg||'#f5f6f7'; $('#c-option-lot-bg').value=S.colors.optionLotBg||'#ffffff';
+  $('#c-main-lot-bg').value=S.colors.mainLotBg||'#e9ebee'; $('#c-option-lot-bg').value=S.colors.optionLotBg||'#ffffff';
   $('#bold-rules').value=S.boldRules.join('\n');
 }
 function readSettingsUI(){
@@ -1488,8 +1499,15 @@ function condensedFieldDiffs(lot,first){
   const diffs=[];
   const sexV=flat(lotEdit(lot,'sex')??lot.sex), sexF=flat(lotEdit(first,'sex')??first.sex);
   if(sexV&&sexV!==sexF)diffs.push({label:'Sex',value:sexV,c:'sex'});
+  // Case-insensitive on top of the existing tag/whitespace normalization in
+  // condSellerVal() — real-world data entry (manual or CSV) is inconsistent about
+  // capitalizing the same seller name the same way every time, and a same-seller
+  // option showing a "differs" badge over a pure capitalization mismatch was still
+  // a false positive worth suppressing. The badge still shows the value in its own
+  // original casing when it's used (only the comparison, not the display, is
+  // case-insensitive).
   const sellerV=esc(condSellerVal(lot)), sellerF=esc(condSellerVal(first));
-  if(sellerV&&sellerV!==sellerF)diffs.push({label:'Seller',value:sellerV,c:'seller'});
+  if(sellerV&&sellerV.toLowerCase()!==sellerF.toLowerCase())diffs.push({label:'Seller',value:sellerV,c:'seller'});
   const shrinkV=esc(lotEdit(lot,'shrink')??lot.shrink), shrinkF=esc(lotEdit(first,'shrink')??first.shrink);
   if(shrinkV&&shrinkV!==shrinkF)diffs.push({label:'Shrink',value:shrinkV,c:'shrink'});
   const slideV=flat(lotEdit(lot,'slide')??lot.slide), slideF=flat(lotEdit(first,'slide')??first.slide);
@@ -1551,7 +1569,12 @@ function condensedOptionRowHTML(lot,first,li,bi,page,isLast,grid,cols){
   const spanEnd=priceIdx<0?cols.length+1:priceIdx+1;
   const selOn=S.selected&&S.selected.has(lot.id);
   const rowH=condensedLotHeight(lot)+(isLast?14:0); // real height, not padding — box-sizing:border-box
-  // silently absorbs padding on a min-height box that doesn't already need the full height
+  // silently absorbs padding on a min-height box that doesn't already need the full height.
+  // S.rowGroupSpacing itself is NOT added here — it goes on .cond-group-wrap's own
+  // margin-bottom in condensedOptionGroupHTML instead, since adding it to this row
+  // would grow .cond-group-wrap's box (its height drives .cond-bar's bottom:0 anchor),
+  // stretching the navy bar into the blank gap rather than stopping where the group
+  // actually ends.
   return `<div class="lotrow-condensed${isLast?' cond-last':''}${selOn?' sel-on':''}" data-id="${lot.id}" data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}" style="grid-template-columns:${grid};min-height:${rowH}px">
       <div class="row-gutter row-gutter-sub">
         <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
@@ -1578,7 +1601,10 @@ function condensedOptionGroupHTML(subLots,masterLot,bi,page,grid,cols){
   const rowsHtml=subLots.map((lot,i)=>
     condensedOptionRowHTML(lot,masterLot,i+1,bi,page,i===subLots.length-1,grid,cols)
   ).join('');
-  return `<div class="cond-group-wrap">
+  // S.rowGroupSpacing lives on the wrapper's own margin-bottom, outside .cond-bar's
+  // bottom:0 anchor point — see the note in condensedOptionRowHTML for why it can't
+  // live on the last sub-row itself.
+  return `<div class="cond-group-wrap" style="margin-bottom:${S.rowGroupSpacing||0}px">
       <div class="cond-elbow"></div>
       <div class="cond-bar"></div>
       <div class="cond-subrows">${rowsHtml}</div>
@@ -1617,12 +1643,15 @@ function buildSections(){
 // getting this per-block total right is what makes that packing decision correct.
 function blockRenderedHeight(b){
   const condensed=S.issue.optionLotLayout==='condensed'&&b.grouped;
-  return b.lots.reduce((s,l,li)=>{
+  const rowsH=b.lots.reduce((s,l,li)=>{
     if(condensed&&li>0)return s+condensedLotHeight(l)+(li===b.lots.length-1?14:0); // +14 matches the
     // last-sublot divider whitespace added in condensedOptionRowHTML — must agree or autofit()
     // will pack pages as if the group were shorter than it actually renders.
     return s+lotHeight(l)+rowExtra();
   },0);
+  // S.rowGroupSpacing is applied exactly once per block (its own trailing
+  // margin-bottom — see legacyLotRowHTML/condensedOptionGroupHTML), never per row.
+  return rowsH+(S.rowGroupSpacing||0);
 }
 function autofit(){
   S.sections.forEach((sec,si)=>{
@@ -1919,9 +1948,18 @@ function updateColControls(){
 function legacyLotRowHTML(lot,li,b,bi,page,grid,cols,alt){
   const gpos=b.grouped?(li===0?'gtop':(li===b.lots.length-1?'gbot':'gmid')):'';
   const selOn=S.selected&&S.selected.has(lot.id);
+  // Lot-group spacing (S.rowGroupSpacing) lands here, not as a gap between blocks in
+  // the page layout — only the block's own true last row (li is its final index)
+  // gets it, as a real margin-bottom (outside the row's own border, after any strong
+  // divider draws) so it never appears between option/legacy-grouped rows within the
+  // same block, only after the group is actually finished. blockRenderedHeight()
+  // must add the identical amount or autofit() will pack pages as if blocks were
+  // shorter than they actually render.
+  const isBlockLast=li===b.lots.length-1;
+  const groupGap=isBlockLast?(S.rowGroupSpacing||0):0;
   let h=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lotFlag(lot,'scratched')?'scratched':''} ${lotFlag(lot,'supplemental')?'supplemental':''} ${selOn?'sel-on':''}" data-id="${lot.id}"
         data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}"
-        style="grid-template-columns:${grid};min-height:${lotHeight(lot)+rowExtra()}px">`;
+        style="grid-template-columns:${grid};min-height:${lotHeight(lot)+rowExtra()}px;margin-bottom:${groupGap}px">`;
   if(li===0){
     h+=`<div class="row-gutter">
         <input type="checkbox" class="lot-cb" data-id="${lot.id}" ${selOn?'checked':''} title="Select lot">
@@ -1975,7 +2013,7 @@ function sheetHTML(page,pageNum,totalPages){
   const I=S.issue,G=S.global;
   const ND=dateParts(I.ndate);
   const C=S.colors;
-  const sheetVars=`--ts:${S.textScale};--cat-blue:${C.blue};--section-fade:${C.sectionEnd};--section-text:${C.sectionText};--table-header-bg:${C.tableHead};--lot-divider:${C.divider||'#d3d3d3'};--calts:${S.calendarTextScale||1};--calendar-grey:${C.calendar};--supp-accent:${C.suppAccent};--supp-bg:${C.suppBg};--supp-bg-alt:${C.suppBg};--change-hl:${C.changeHL||'#fff7cc'};--main-lot-bg:${C.mainLotBg||'#f5f6f7'};--option-lot-bg:${C.optionLotBg||'#ffffff'};`;
+  const sheetVars=`--ts:${S.textScale};--cat-blue:${C.blue};--section-fade:${C.sectionEnd};--section-text:${C.sectionText};--table-header-bg:${C.tableHead};--lot-divider:${C.divider||'#d3d3d3'};--calts:${S.calendarTextScale||1};--calendar-grey:${C.calendar};--supp-accent:${C.suppAccent};--supp-bg:${C.suppBg};--supp-bg-alt:${C.suppBg};--change-hl:${C.changeHL||'#fff7cc'};--main-lot-bg:${C.mainLotBg||'#e9ebee'};--option-lot-bg:${C.optionLotBg||'#ffffff'};`;
   let h=`<div class="sheet ${I.showCalendar===false?'no-calendar':''} align-${I.headerAlign||'center'}" data-mode="${S.sheetMode}" data-pg="${pageNum}" style="${sheetVars}">`+
         `<div class="s-pad">`;
   if(hasHeader){
@@ -2139,6 +2177,7 @@ function updateActiveThumb(){
   });
   thumbs.forEach((t,i)=>t.classList.toggle('on',i===activeIdx));
 }
+let _lastCheckedCbId=null; // shift-click range-select anchor, survives across re-renders
 let _thumbScrollRaf=null;
 document.addEventListener('scroll',e=>{
   if(!e.target||e.target.id!=='canvas')return;
@@ -2226,16 +2265,35 @@ function wireSheetEvents(){
       moveBlock(+row.dataset.si,+row.dataset.pi,+row.dataset.bi,+btn.dataset.mv);
     });
   });
-  // selection checkboxes
+  // selection checkboxes — shift-click selects the whole visual range between the
+  // last checkbox clicked and this one (inclusive, in on-page DOM order), matching
+  // the common list-select convention. Listening on 'click' rather than 'change'
+  // is what makes shiftKey available; by the time this fires the checkbox's own
+  // .checked has already flipped to its new value (native pre-click activation),
+  // so a plain click still behaves exactly like the old change-based handler.
   if(!S.selected)S.selected=new Set();
+  function applyCbState(cb,checked){
+    cb.checked=checked;
+    const id=cb.dataset.id;
+    if(checked)S.selected.add(id); else S.selected.delete(id);
+    const row=cb.closest('.lotrow, .lotrow-condensed');
+    if(row)row.classList.toggle('sel-on',checked);
+  }
   $$('#zoomwrap .lot-cb').forEach(cb=>{
-    cb.addEventListener('change',e=>{
-      const id=e.target.dataset.id;
-      if(e.target.checked)S.selected.add(id); else S.selected.delete(id);
-      const row=e.target.closest('.lotrow, .lotrow-condensed');
-      if(row)row.classList.toggle('sel-on',e.target.checked);
+    cb.addEventListener('click',e=>{
+      const checked=e.target.checked;
+      const cbs=$$('#zoomwrap .lot-cb');
+      const curIdx=cbs.indexOf(e.target);
+      const lastIdx=e.shiftKey&&_lastCheckedCbId!=null?cbs.findIndex(c=>c.dataset.id===_lastCheckedCbId):-1;
+      if(lastIdx>-1&&curIdx>-1){
+        const [from,to]=lastIdx<curIdx?[lastIdx,curIdx]:[curIdx,lastIdx];
+        for(let i=from;i<=to;i++)applyCbState(cbs[i],checked);
+      }else{
+        applyCbState(e.target,checked);
+      }
+      _lastCheckedCbId=e.target.dataset.id;
       if(typeof updateSelectionUI==='function')updateSelectionUI();
-  if(typeof updateContextualToolbar==='function')updateContextualToolbar();
+      if(typeof updateContextualToolbar==='function')updateContextualToolbar();
     });
   });
   // Excel-style column resize: drag the handle on a column header's right edge.
@@ -2625,6 +2683,10 @@ $('#txtPlus').onclick=()=>{S.textScale=Math.min(1.5,+(S.textScale+.06).toFixed(2
   renderEditor();toast('Text size '+Math.round(S.textScale*100)+'%');};
 $('#txtMinus').onclick=()=>{S.textScale=Math.max(.7,+(S.textScale-.06).toFixed(2));
   renderEditor();toast('Text size '+Math.round(S.textScale*100)+'%');};
+$('#groupGapPlus').onclick=()=>{S.rowGroupSpacing=Math.min(20,(S.rowGroupSpacing||0)+2);
+  renderEditor();toast('Lot group spacing '+S.rowGroupSpacing+'px');};
+$('#groupGapMinus').onclick=()=>{S.rowGroupSpacing=Math.max(0,(S.rowGroupSpacing||0)-2);
+  renderEditor();toast('Lot group spacing '+S.rowGroupSpacing+'px');};
 $('#toolsToggle').onchange=e=>{S.toolsHidden=!e.target.checked; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden); saveGlobal();};
 $('#colReset').onclick=()=>{S.colWidths={...DEFAULT_COL_WIDTHS};renderEditor();toast('Column widths reset.');};
 $('#autofit').onclick=()=>{renderEditor();autofit();saveModeLayout();renderEditor();toast('Pages re-fitted.');};
@@ -2707,6 +2769,8 @@ function updateContextualToolbar(){
   if(boxVal&&!boxVal.querySelector('input'))boxVal.textContent=hasCell?Math.round(lotCellScale(S.lots.find(l=>l.id===lastFocusCell.id),lastFocusCell.c)*100)+'%':'—';
   const txtVal=$('#txtVal');
   if(txtVal&&!txtVal.querySelector('input'))txtVal.textContent=Math.round((S.textScale||1)*100)+'%';
+  const groupGapVal=$('#groupGapVal');
+  if(groupGapVal&&!groupGapVal.querySelector('input'))groupGapVal.textContent=Math.round(S.rowGroupSpacing||0)+'px';
 }
 // Optional direct-value editing: click a size readout to type a precise
 // number instead of clicking -/+ repeatedly. Every commit path below calls
@@ -2763,6 +2827,10 @@ wireAdjValEdit('txtVal',{
 wireAdjValEdit('boxVal',{
   getRaw:()=>lastFocusCell&&S.lots.some(l=>l.id===lastFocusCell.id)?Math.round(lotCellScale(S.lots.find(l=>l.id===lastFocusCell.id),lastFocusCell.c)*100):null,
   commit:n=>{const lot=S.lots.find(l=>l.id===lastFocusCell.id); if(!lot)return; setLotCellScale(lot,lastFocusCell.c,Math.max(.65,Math.min(1.8,n/100))); renderEditor();}
+});
+wireAdjValEdit('groupGapVal',{
+  getRaw:()=>Math.round(S.rowGroupSpacing||0),
+  commit:n=>{S.rowGroupSpacing=Math.max(0,Math.min(20,Math.round(n))); renderEditor();}
 });
 function clearSelection(){ S.selected.clear(); renderEditor(); }
 function bulkAdjustHeight(delta){
@@ -2903,6 +2971,7 @@ function serializeProject(){
     boldRules:S.boldRules,
     rowStep:S.rowStep,
     textScale:S.textScale,
+    rowGroupSpacing:S.rowGroupSpacing,
     calendarTextScale:S.calendarTextScale,
     toolsHidden:S.toolsHidden,
     builderMode:S.builderMode,
@@ -2922,6 +2991,7 @@ function applyProject(payload){
   if(Array.isArray(payload.boldRules))S.boldRules=payload.boldRules.slice();
   if(payload.rowStep)S.rowStep=payload.rowStep;
   if(payload.textScale)S.textScale=payload.textScale;
+  if(payload.rowGroupSpacing!=null)S.rowGroupSpacing=payload.rowGroupSpacing;
   if(payload.calendarTextScale)S.calendarTextScale=payload.calendarTextScale;
   if(typeof payload.toolsHidden==='boolean')S.toolsHidden=payload.toolsHidden;
   if(payload.builderMode)S.builderMode=payload.builderMode;
