@@ -214,9 +214,16 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .lotrow{border-bottom:4px solid #9aa0b4;position:relative;flex-shrink:0;
   display:grid;align-items:stretch;font-size:calc(11px * var(--ts,1))}
 .lotrow.gtop,.lotrow.gmid{border-bottom:0}
-.lotrow .cell{padding:5px 7px;border-right:1px solid var(--line);
+/* Vertical column dividers through the body are intentionally very faint — the
+   stronger, more visible var(--line) weight is reserved for the Lot column's own
+   right edge (see the :nth-child(1) rule below) and the Price column's left edge
+   (.cell.price/.cell.po-price), since those two boundaries are what actually help
+   the eye separate "identity" and "money" from the descriptive columns between
+   them; everywhere else relies on whitespace/alignment instead of a hard rule. */
+.lotrow .cell{padding:5px 7px;border-right:1px solid rgba(212,216,228,.4);
   display:flex;flex-direction:column;justify-content:center}
 .lotrow .cell:last-child{border-right:0}
+.lotrow .cell.price,.lotrow .cell.po-price{border-left:1px solid var(--line)}
 .lotrow .cc{width:100%;hyphens:none;-webkit-hyphens:none;overflow-wrap:break-word}
 .lotrow .cell.ctr{align-items:center}
 .lotrow .cell.ctr .cc{text-align:center}
@@ -236,7 +243,12 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .lotrow .cell.notes{font-size:.9em;line-height:1.3;color:#2a3354}
 .lotrow .cell.desc{font-size:1em;line-height:1.32;color:#1f2844}
 .lotrow .cell strong{font-weight:700;color:#0c1430}
-.s-thead .cell:nth-child(1),.lotrow .cell:nth-child(1){border-right:1px solid var(--line)}
+/* .lotrow .cell.lot (not :nth-child(1)) — .row-gutter is the row's actual first DOM
+   child (position:absolute, so invisible in layout but still counted for :nth-child),
+   which made the old nth-child selector silently never match the Lot cell in body
+   rows; it only ever looked correct because the generic .cell border-right used to
+   be the same var(--line) value it was trying to restate. */
+.s-thead .cell:nth-child(1),.lotrow .cell.lot{border-right:1px solid var(--line)}
 .altrow{background:#fff}
 /* manual cell highlight — color set by --change-hl (editable in Colors panel) */
 .lotrow .cell.cell-hl{background:var(--change-hl,#fff7cc)!important}
@@ -292,7 +304,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    breathing room without moving the tint's own left edge. */
 .cond-span{display:grid;grid-template-columns:54px 68px 76px 58px minmax(150px,1fr) auto;
   align-items:center;column-gap:12px;min-width:0;margin-left:46px;padding:5px 12px 5px 18px;
-  color:#2a3354;background:rgba(51,102,153,.12);border-bottom:1px solid var(--line)}
+  color:#2a3354;background:var(--option-lot-bg,#ffffff);border-bottom:1px solid var(--line)}
 .cond-last .cond-span,.cond-last .cond-price,.cond-last .cond-price-fill{border-bottom:0}
 .cond-field{white-space:nowrap;min-width:0}
 .cond-field.cond-lot{font-family:'Oswald';font-weight:700;font-size:1.4em;color:var(--deepblue)}
@@ -320,7 +332,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .cond-price{position:relative;display:flex;align-items:center;justify-content:center;
   padding-left:8px;border-left:1px solid var(--line);border-bottom:1px solid var(--line);
   font-family:'Oswald';font-weight:700;color:var(--deepblue);font-size:1.3em;
-  background:rgba(51,102,153,.12)}
+  background:var(--option-lot-bg,#ffffff)}
 .cond-price .cc{width:100%;text-align:center;white-space:nowrap}
 /* Decorative sliver only — fills the row's fixed 10px trailing residual (see
    condensedPriceCellsHTML) with the same tint/border so the divider and shading
@@ -328,7 +340,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    would re-center the price text off the real column position every other price
    on the sheet aligns to). */
 .cond-price-fill{position:absolute;top:0;bottom:0;left:100%;width:10px;
-  background:rgba(51,102,153,.12);border-bottom:1px solid var(--line)}
+  background:var(--option-lot-bg,#ffffff);border-bottom:1px solid var(--line)}
 
 /* footer */
 .s-foot{height:34px;border-top:2px solid var(--blue);display:flex;align-items:center;
@@ -515,7 +527,7 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
   color:#2a3354;
   line-height:1.28;
 }
-.sheet .lotrow.altrow{background:#fff !important;}
+.sheet .lotrow{background:var(--main-lot-bg,#f5f6f7) !important;}
 
 .sheet .lotrow .cell.lot .cc{font-family:Arial,Helvetica,sans-serif !important;font-weight:800 !important;font-size:1.48em;letter-spacing:.02em;color:#13235e;}
 .sheet .lotrow .cell.head .cc{font-family:'Barlow',Arial,sans-serif !important;font-weight:400 !important;font-size:.9em !important;color:#1f2844 !important;line-height:1.28 !important;}
@@ -1078,6 +1090,8 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
         <div class="field"><label>Supplemental Accent</label><input type="color" id="c-supp-accent"></div>
         <div class="field"><label>Supplemental Fill</label><input type="color" id="c-supp-bg"></div>
         <div class="field"><label>Highlight Color</label><input type="color" id="c-change"></div>
+        <div class="field"><label>Main Lot Background</label><input type="color" id="c-main-lot-bg"></div>
+        <div class="field"><label>Option Lot Background</label><input type="color" id="c-option-lot-bg"></div>
       </div>
     </div>
     <div class="modal-foot">
@@ -1126,7 +1140,7 @@ const S = {
     addr:'6900 I40 West, Ste 135, Amarillo, TX 79106'},
   issue:{date:'',time:'1:00PM',name:'',ndate:'',nname:'',ntag:'',showCalendar:true,headerAlign:'center',optionLotLayout:'condensed'},
   sections:[], zoom:.70, rowStep:14, textScale:1, calendarTextScale:1, toolsHidden:false, builderMode:'basic',
-  colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff',changeHL:'#fff7cc'},
+  colors:{blue:'#162145',sectionEnd:'#ffffff',sectionText:'#ffffff',tableHead:'#f2f7ff',divider:'#d3d3d3',calendar:'#3f4653',suppAccent:'#162145',suppBg:'#eaf3ff',changeHL:'#fff7cc',mainLotBg:'#f5f6f7',optionLotBg:'#ffffff'},
   boldRules:['Top Dollar Angus Verified','Top Dollar Angus Sire Verified','100% Holstein Cows','Holstein Cows | unless: Jersey, Jers','Holstein Cow | unless: Jersey, Jers'],
   colWidths:{lot:52,seller:122,head:46,desc:162,sex:74,basewt:48,delivery:82,shrink:52,slide:94,notes:206,price:60},
   modeLayouts:{}, modeStates:{}, selected:new Set(), currentProjectId:null, currentProjectName:''
@@ -1281,7 +1295,9 @@ function syncSettingsUI(){
   $('#c-blue').value=S.colors.blue; $('#c-section-end').value=S.colors.sectionEnd;
   $('#c-section-text').value=S.colors.sectionText; $('#c-table-head').value=S.colors.tableHead;
   $('#c-calendar').value=S.colors.calendar; $('#c-divider').value=S.colors.divider||'#d3d3d3'; $('#c-supp-accent').value=S.colors.suppAccent;
-  $('#c-supp-bg').value=S.colors.suppBg; $('#c-change').value=S.colors.changeHL||'#fff7cc'; $('#bold-rules').value=S.boldRules.join('\n');
+  $('#c-supp-bg').value=S.colors.suppBg; $('#c-change').value=S.colors.changeHL||'#fff7cc';
+  $('#c-main-lot-bg').value=S.colors.mainLotBg||'#f5f6f7'; $('#c-option-lot-bg').value=S.colors.optionLotBg||'#ffffff';
+  $('#bold-rules').value=S.boldRules.join('\n');
 }
 function readSettingsUI(){
   S.global={house:$('#g-house').value,phone:$('#g-phone').value,
@@ -1294,7 +1310,8 @@ function readSettingsUI(){
   $('#v-settings').classList.toggle('basic-builder',S.builderMode==='basic');
   S.colors={blue:$('#c-blue').value,sectionEnd:$('#c-section-end').value,
     sectionText:$('#c-section-text').value,tableHead:$('#c-table-head').value,
-    calendar:$('#c-calendar').value,divider:$('#c-divider').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value,changeHL:$('#c-change').value};
+    calendar:$('#c-calendar').value,divider:$('#c-divider').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value,changeHL:$('#c-change').value,
+    mainLotBg:$('#c-main-lot-bg').value,optionLotBg:$('#c-option-lot-bg').value};
   S.boldRules=$('#bold-rules').value.split(/\n/).map(x=>x.trim()).filter(Boolean);
 }
 
@@ -1461,8 +1478,12 @@ function sellerHTML(lot){
  * full row) will show that plain text instead of its previous rich formatting.
  * Sex/Shrink/Slide/Head/Loads/Weight/Delivery/Price don't have that caveat. */
 function condPlain(v){return stripTags(String(v||'')).replace(/\s+/g,' ').trim();}
-function condSellerVal(lot){const e=lotEdit(lot,'seller');return e!=null?condPlain(e):(lot.consignor||'');}
-function condNotesVal(lot){const e=lotEdit(lot,'notes');return e!=null?condPlain(e):[lot.desc1,lot.desc2].filter(Boolean).join(' ');}
+// condPlain() must run on BOTH branches here, not just the manual-edit override --
+// raw lot.consignor/desc1/desc2 can carry inconsistent whitespace or markup between
+// a master lot and its options (e.g. from CSV import) even when they visually read
+// identically, which was flagging a same-seller option as "differs" from its parent.
+function condSellerVal(lot){const e=lotEdit(lot,'seller');return condPlain(e!=null?e:(lot.consignor||''));}
+function condNotesVal(lot){const e=lotEdit(lot,'notes');return condPlain(e!=null?e:[lot.desc1,lot.desc2].filter(Boolean).join(' '));}
 function condensedFieldDiffs(lot,first){
   const diffs=[];
   const sexV=flat(lotEdit(lot,'sex')??lot.sex), sexF=flat(lotEdit(first,'sex')??first.sex);
@@ -1954,7 +1975,7 @@ function sheetHTML(page,pageNum,totalPages){
   const I=S.issue,G=S.global;
   const ND=dateParts(I.ndate);
   const C=S.colors;
-  const sheetVars=`--ts:${S.textScale};--cat-blue:${C.blue};--section-fade:${C.sectionEnd};--section-text:${C.sectionText};--table-header-bg:${C.tableHead};--lot-divider:${C.divider||'#d3d3d3'};--calts:${S.calendarTextScale||1};--calendar-grey:${C.calendar};--supp-accent:${C.suppAccent};--supp-bg:${C.suppBg};--supp-bg-alt:${C.suppBg};--change-hl:${C.changeHL||'#fff7cc'};`;
+  const sheetVars=`--ts:${S.textScale};--cat-blue:${C.blue};--section-fade:${C.sectionEnd};--section-text:${C.sectionText};--table-header-bg:${C.tableHead};--lot-divider:${C.divider||'#d3d3d3'};--calts:${S.calendarTextScale||1};--calendar-grey:${C.calendar};--supp-accent:${C.suppAccent};--supp-bg:${C.suppBg};--supp-bg-alt:${C.suppBg};--change-hl:${C.changeHL||'#fff7cc'};--main-lot-bg:${C.mainLotBg||'#f5f6f7'};--option-lot-bg:${C.optionLotBg||'#ffffff'};`;
   let h=`<div class="sheet ${I.showCalendar===false?'no-calendar':''} align-${I.headerAlign||'center'}" data-mode="${S.sheetMode}" data-pg="${pageNum}" style="${sheetVars}">`+
         `<div class="s-pad">`;
   if(hasHeader){
@@ -2543,7 +2564,8 @@ function ingestResultsCSV(file){
 function updateColorsFromEditor(){
   S.colors={blue:$('#c-blue').value,sectionEnd:$('#c-section-end').value,
     sectionText:$('#c-section-text').value,tableHead:$('#c-table-head').value,
-    calendar:$('#c-calendar').value,divider:$('#c-divider').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value,changeHL:$('#c-change').value};
+    calendar:$('#c-calendar').value,divider:$('#c-divider').value,suppAccent:$('#c-supp-accent').value,suppBg:$('#c-supp-bg').value,changeHL:$('#c-change').value,
+    mainLotBg:$('#c-main-lot-bg').value,optionLotBg:$('#c-option-lot-bg').value};
   saveGlobal();
   renderEditor();
 }
@@ -2606,7 +2628,7 @@ $('#txtMinus').onclick=()=>{S.textScale=Math.max(.7,+(S.textScale-.06).toFixed(2
 $('#toolsToggle').onchange=e=>{S.toolsHidden=!e.target.checked; document.querySelector('.ed-main').classList.toggle('tools-hidden',S.toolsHidden); saveGlobal();};
 $('#colReset').onclick=()=>{S.colWidths={...DEFAULT_COL_WIDTHS};renderEditor();toast('Column widths reset.');};
 $('#autofit').onclick=()=>{renderEditor();autofit();saveModeLayout();renderEditor();toast('Pages re-fitted.');};
-$$('#c-blue,#c-section-end,#c-section-text,#c-table-head,#c-divider,#c-calendar,#c-supp-accent,#c-supp-bg,#c-change').forEach(el=>el.addEventListener('input',updateColorsFromEditor));
+$$('#c-blue,#c-section-end,#c-section-text,#c-table-head,#c-divider,#c-calendar,#c-supp-accent,#c-supp-bg,#c-change,#c-main-lot-bg,#c-option-lot-bg').forEach(el=>el.addEventListener('input',updateColorsFromEditor));
 $$('#modeTabs .mode-tab').forEach(btn=>btn.onclick=()=>switchSheetMode(btn.dataset.mode));
 $('#uploadResultsBtn').onclick=()=>$('#resultsFileInput').click();
 $('#resultsFileInput').onchange=e=>{if(e.target.files[0])ingestResultsCSV(e.target.files[0]); e.target.value='';};
