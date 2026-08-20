@@ -35,3 +35,18 @@
     X-Frame-Options = "SAMEORIGIN"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+
+# This site is a set of single-file pages (no build-hashed asset filenames), so
+# there's no natural cache-busting when index.html changes — a browser (or an
+# intermediate CDN) holding a stale cached copy of a page's HTML has no way to
+# know a new deploy exists, and keeps serving the old JS/CSS/markup until its
+# cache happens to expire or the user manually hard-refreshes. That produced
+# several rounds in this project's history where a fix had already shipped but
+# testing against a stale cached page still showed the old (broken) behavior.
+# "no-cache" here does NOT mean "never cache" — it means the browser must
+# revalidate with the server (a fast conditional request) before using any
+# cached copy, so a normal reload always reflects the latest deploy.
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache"
