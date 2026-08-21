@@ -1667,9 +1667,12 @@ function blockRenderedHeight(b){
     return s+lotHeight(l)+rowExtra();
   },0);
   // blockEndSpacerHTML's own height (gap + its border thickness) is rendered exactly
-  // once after every block, condensed or legacy — must match its actual condensed/
-  // borderPx choice or autofit() will pack pages as if blocks were shorter than they
-  // actually render.
+  // once after every GROUPED block, condensed or legacy — a plain non-grouped lot
+  // gets no spacer at all (its own normal divider is already included in rowsH via
+  // lotHeight()+rowExtra()) — must match blockEndSpacerHTML's actual condition and
+  // borderPx choice or autofit() will pack pages as if blocks were a different size
+  // than they actually render.
+  if(!b.grouped)return rowsH;
   return rowsH+(S.rowGroupSpacing||0)+(condensed?6:4);
 }
 function autofit(){
@@ -1972,8 +1975,10 @@ function legacyLotRowHTML(lot,li,b,bi,page,grid,cols,alt){
   // both live on a dedicated spacer element rendered after the whole block instead
   // (see blockEndSpacerHTML), specifically so the gap lands BETWEEN the row's content
   // and the divider line rather than the divider touching the content directly with
-  // the gap stuck on the far side of it.
-  const isBlockLast=li===b.lots.length-1;
+  // the gap stuck on the far side of it. Only actual option groups (b.grouped) get
+  // this treatment — a plain, non-grouped lot keeps its original divider exactly as
+  // it always has, with no spacer and no added gap.
+  const isBlockLast=b.grouped&&li===b.lots.length-1;
   let h=`<div class="lotrow ${gpos} ${alt%2?'altrow':''} ${lotFlag(lot,'scratched')?'scratched':''} ${lotFlag(lot,'supplemental')?'supplemental':''} ${selOn?'sel-on':''}" data-id="${lot.id}"
         data-si="${page.si}" data-pi="${page.pi}" data-bi="${bi}"
         style="grid-template-columns:${grid};min-height:${lotHeight(lot)+rowExtra()}px${isBlockLast?';border-bottom:0 !important':''}">`;
@@ -2084,7 +2089,10 @@ function sheetHTML(page,pageNum,totalPages){
       h+=legacyLotRowHTML(lot,li,b,bi,page,grid,cols,alt);
       alt++;
     });
-    h+=blockEndSpacerHTML(false);
+    // Only a legacy-grouped block (option group, condensed toggle off) gets the
+    // spacer — a plain non-grouped lot already drew its own normal divider above,
+    // untouched, and needs nothing added after it.
+    if(b.grouped)h+=blockEndSpacerHTML(false);
   });
   h+=`</div>`; // s-tbl
   // overflow check
