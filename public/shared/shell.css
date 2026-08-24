@@ -95,6 +95,9 @@
   background: var(--sidebar-active-bg);
   color: var(--sidebar-active-fg);
   border-color: var(--sidebar-active-border);
+  font-weight: 700;
+  border-left: 2px solid var(--sidebar-active-border);
+  padding-left: calc(var(--space-3) - 2px);
 }
 
 .nav-item-icon {
