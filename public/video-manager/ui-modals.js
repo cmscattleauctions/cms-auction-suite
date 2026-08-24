@@ -230,11 +230,13 @@ function wireOverflowMenus(container) {
       const willOpen = menu.hidden;
       container.querySelectorAll('.vm-overflow-menu').forEach(m => m.hidden = true);
       menu.hidden = !willOpen;
+      // Arm the outside-click closer only while actually open, and only
+      // once per open — this function re-runs on every table repaint, so
+      // registering unconditionally would pile up stale listeners that
+      // fire on unrelated clicks later.
+      if (willOpen) setTimeout(() => document.addEventListener('click', () => { menu.hidden = true; }, { once: true }), 0);
     });
   });
-  document.addEventListener('click', () => {
-    container.querySelectorAll('.vm-overflow-menu').forEach(m => m.hidden = true);
-  }, { once: true });
 }
 
 function statusText(rec) {
@@ -461,12 +463,12 @@ export function openUploadModal(ctx) {
           </select>
         </div>
         <div class="field-row">
-          <div><label>Sex</label><select id="um-b-sex"><option value="">Select…</option>${sexes.map(s => `<option value="${s.code}">${s.label}</option>`).join('')}</select></div>
+          <div><label>Sex</label><select id="um-b-sex"><option value="">Select…</option>${sexes.map(s => `<option value="${s.code}">${s.code}- ${s.label}</option>`).join('')}</select></div>
           <div><label>Weight</label><input type="number" id="um-b-weight" placeholder="450" /></div>
         </div>
         <div class="field-row">
-          <div><label>Sire</label><select id="um-b-sire"><option value="">Select…</option>${sires.map(s => `<option value="${s.code}">${s.label}</option>`).join('')}</select></div>
-          <div><label>Dam</label><select id="um-b-dam"><option value="">Select…</option>${dams.map(s => `<option value="${s.code}">${s.label}</option>`).join('')}</select></div>
+          <div><label>Sire</label><select id="um-b-sire"><option value="">Select…</option>${sires.map(s => `<option value="${s.code}">${s.code}- ${s.label}</option>`).join('')}</select></div>
+          <div><label>Dam</label><select id="um-b-dam"><option value="">Select…</option>${dams.map(s => `<option value="${s.code}">${s.code}- ${s.label}</option>`).join('')}</select></div>
         </div>
         <div class="field"><label>Month / Year</label><input type="month" id="um-b-monthyear" /></div>
         <div class="vm-generated-id-box is-placeholder" id="um-b-preview">
@@ -874,6 +876,103 @@ export function openCsvImportModal(ctx) {
       ctx.refresh();
     });
   }
+}
+
+/* =============================================================
+ * Delete confirmation — deliberately hard to trigger by accident.
+ * Soft delete only (moves to Trash); staff must type the exact
+ * Video ID before the final button enables.
+ * ============================================================= */
+export function openDeleteConfirmModal(rec, ctx, onDeleted) {
+  const { modal, close } = mountModal(`
+    <div class="vm-modal-header"><h2>Delete Video Record</h2><button class="vm-modal-close" data-modal-close>&times;</button></div>
+    <div class="vm-modal-body">
+      <div class="vm-delete-summary">
+        <div class="vid">${escapeHtml(rec.videoId)}</div>
+        <div class="row">${escapeHtml(rec.consignorName)}</div>
+      </div>
+      <div class="vm-delete-warning">
+        <p>This moves the record to <strong>Trash</strong> — it disappears from Ready to Make / On Hold / Created immediately. Nothing is destroyed yet; it can be restored from Trash (Tools menu), or permanently deleted later.</p>
+        <p style="margin-top:8px;">This will also affect:</p>
+        <ul>
+          <li>${rec.clips.length} source clip${rec.clips.length === 1 ? '' : 's'}</li>
+          <li>${rec.youtubeUrl ? 'Publishing info — YouTube link and embed code' : 'No publishing info yet'}</li>
+          <li>${rec.usage.length} auction usage record${rec.usage.length === 1 ? '' : 's'}</li>
+          <li>${rec.previousYouTubeVideos.length} previous version${rec.previousYouTubeVideos.length === 1 ? '' : 's'}</li>
+          <li>Notes and ${rec.activity.length} activity event${rec.activity.length === 1 ? '' : 's'}</li>
+        </ul>
+      </div>
+      <div class="field" style="margin-top:14px;">
+        <label>Type the Video ID to confirm — ${escapeHtml(rec.videoId)}</label>
+        <input type="text" id="del-confirm-input" placeholder="Type the Video ID exactly" autocomplete="off" />
+      </div>
+    </div>
+    <div class="vm-modal-footer">
+      <button class="btn btn-ghost" data-modal-close>Cancel</button>
+      <button class="btn btn-danger-solid" id="del-confirm-btn" type="button" disabled>Move to Trash</button>
+    </div>
+  `);
+  const input = modal.querySelector('#del-confirm-input');
+  const btn = modal.querySelector('#del-confirm-btn');
+  input.addEventListener('input', () => { btn.disabled = input.value.trim() !== rec.videoId; });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter' && btn.disabled) e.preventDefault(); });
+  btn.addEventListener('click', async () => {
+    if (input.value.trim() !== rec.videoId) return;
+    await ctx.repo.trashVideo(rec.id, 'Staff');
+    showToast(`${rec.videoId} moved to Trash`);
+    close();
+    if (onDeleted) onDeleted();
+  });
+}
+
+/* =============================================================
+ * Trash — restore, or permanently delete (separate, deliberate
+ * two-step action: click once to arm, click again within a few
+ * seconds to actually purge).
+ * ============================================================= */
+export function openTrashModal(ctx) {
+  const { modal } = mountModal(`
+    <div class="vm-modal-header"><h2>Trash</h2><button class="vm-modal-close" data-modal-close>&times;</button></div>
+    <div class="vm-modal-body" id="trash-body"></div>
+    <div class="vm-modal-footer"><button class="btn btn-primary" data-modal-close>Done</button></div>
+  `, { wide: true });
+
+  async function paint() {
+    const body = modal.querySelector('#trash-body');
+    const trashed = await ctx.repo.getTrashedVideos();
+    if (!trashed.length) { body.innerHTML = `<p class="muted">Trash is empty.</p>`; return; }
+    body.innerHTML = trashed.map(r => `
+      <div class="vm-trash-row">
+        <div>
+          <div class="vid">${escapeHtml(r.videoId)}</div>
+          <div class="row">${escapeHtml(r.consignorName)} · Deleted ${formatDate(r.deletedAt)}${r.deletedBy ? ` by ${escapeHtml(r.deletedBy)}` : ''}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button class="btn btn-sm" data-restore="${r.id}" type="button">Restore</button>
+          <button class="btn btn-sm btn-danger" data-purge="${r.id}" type="button">Delete Permanently</button>
+        </div>
+      </div>
+    `).join('');
+
+    body.querySelectorAll('[data-restore]').forEach(btn => btn.addEventListener('click', async () => {
+      await ctx.repo.restoreVideo(btn.dataset.restore, 'Staff');
+      showToast('Restored');
+      ctx.refresh();
+      paint();
+    }));
+    body.querySelectorAll('[data-purge]').forEach(btn => btn.addEventListener('click', async () => {
+      if (btn.dataset.armed !== 'true') {
+        btn.dataset.armed = 'true';
+        btn.textContent = 'Confirm — cannot be undone';
+        setTimeout(() => { if (btn.isConnected && btn.dataset.armed === 'true') { btn.dataset.armed = 'false'; btn.textContent = 'Delete Permanently'; } }, 4000);
+        return;
+      }
+      await ctx.repo.purgeVideo(btn.dataset.purge);
+      showToast('Permanently deleted');
+      paint();
+    }));
+  }
+  paint();
 }
 
 /* =============================================================

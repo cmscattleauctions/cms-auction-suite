@@ -15,17 +15,20 @@
 import { escapeHtml, formatDateShort, formatDuration, cattleSummaryLine } from './format.js';
 import { showToast, copyToClipboard } from './toast.js';
 import { handleIdEntryLoop } from './ui-modals.js';
+import { openCompareModal } from './ui-compare.js';
 
 let addRowOpen = false;
+const MAX_COMPARE = 4;
+const compareSelection = new Map(); // id -> record snapshot, so the compare bar/modal work across tabs
 
 export function renderTable(container, records, ctx) {
   const isCreated = ctx.state.statusTab === 'created';
   const showWorkingOn = ctx.state.statusTab === 'ready';
   const headCells = isCreated
-    ? ['Video ID', 'Consignor', 'Cattle', 'Clips', 'Source', 'Usage', 'Published', 'Added', '']
+    ? ['', 'Video ID', 'Consignor', 'Cattle', 'Clips', 'Source', 'Usage', 'Published', 'Added', '']
     : showWorkingOn
-      ? ['Video ID', 'Consignor', 'Cattle', 'Clips', 'Status', 'Working On', 'Added', '']
-      : ['Video ID', 'Consignor', 'Cattle', 'Clips', 'Status', 'Added', ''];
+      ? ['', 'Video ID', 'Consignor', 'Cattle', 'Clips', 'Status', 'Working On', 'Added', '']
+      : ['', 'Video ID', 'Consignor', 'Cattle', 'Clips', 'Status', 'Added', ''];
   const colspan = headCells.length;
 
   container.innerHTML = `
@@ -42,6 +45,40 @@ export function renderTable(container, records, ctx) {
 
   wireRows(tbody, ctx);
   wireAddRow(tbody, ctx);
+  paintCompareBar(ctx);
+}
+
+/* =============================================================
+ * Compare mode — a checkbox on every row feeds a small floating
+ * bar; picking 2–4 videos opens a side-by-side/stacked/grid
+ * comparison so staff can decide which one to actually use.
+ * ============================================================= */
+function compareCheckboxCell(r) {
+  return `<input type="checkbox" class="vm-compare-check" data-compare="${r.id}" ${compareSelection.has(r.id) ? 'checked' : ''} title="Select to compare" />`;
+}
+
+function paintCompareBar(ctx) {
+  let bar = document.getElementById('vm-compare-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'vm-compare-bar';
+    bar.className = 'vm-compare-bar';
+    document.body.appendChild(bar);
+  }
+  if (compareSelection.size < 2) { bar.hidden = true; return; }
+  bar.hidden = false;
+  bar.innerHTML = `
+    <span class="vm-compare-bar-count">${compareSelection.size} selected</span>
+    <button class="btn btn-primary btn-sm" id="vm-compare-go" type="button">Compare</button>
+    <button class="btn btn-ghost btn-sm" id="vm-compare-clear" type="button">Clear</button>
+  `;
+  bar.querySelector('#vm-compare-go').addEventListener('click', () => {
+    openCompareModal([...compareSelection.values()], ctx);
+  });
+  bar.querySelector('#vm-compare-clear').addEventListener('click', () => {
+    compareSelection.clear();
+    ctx.refresh();
+  });
 }
 
 /* =============================================================
@@ -51,9 +88,41 @@ const FORMAT_BADGE_CLASS = {
   clean: 'format-clean', 'legacy-tagged': 'format-legacy', 'needs-redo': 'format-redo', unknown: 'format-unknown',
 };
 
-function videoIdCell(r) {
+/* =============================================================
+ * Exception highlighting — restrained: a small dot + tooltip on the
+ * Video ID cell and a thin left-edge accent on the row, nothing
+ * heavier. Healthy rows stay completely plain. `context` narrows
+ * which flags surface as a dot on Ready/Hold rows, since the Status
+ * column there already communicates "no clips"/"upload incomplete".
+ * ============================================================= */
+function rowExceptions(r, context) {
+  const flags = [];
+  if (r.isDuplicateId) flags.push({ label: 'Duplicate Video ID', severity: 'bad' });
+  if (r.needsReview) flags.push({ label: 'Needs Review', severity: 'warn' });
+  if (r.videoFormat === 'needs-redo') flags.push({ label: 'Needs Redo', severity: 'bad' });
+  if (context === 'created') {
+    if (!r.clips.length) flags.push({ label: 'No clips', severity: 'warn' });
+    if (!r.youtubeUrl) flags.push({ label: 'Missing YouTube link', severity: 'bad' });
+  }
+  return flags;
+}
+
+function exceptionDot(r, context) {
+  const flags = rowExceptions(r, context);
+  if (!flags.length) return '';
+  const worst = flags.some(f => f.severity === 'bad') ? 'bad' : 'warn';
+  return `<span class="vm-exception-dot is-${worst}" title="${escapeHtml(flags.map(f => f.label).join(' · '))}"></span>`;
+}
+
+function rowExceptionClass(r, context) {
+  const flags = rowExceptions(r, context);
+  if (!flags.length) return '';
+  return flags.some(f => f.severity === 'bad') ? 'has-exception is-bad-row' : 'has-exception';
+}
+
+function videoIdCell(r, context) {
   return `
-    <span class="vm-videoid-cell">${escapeHtml(r.baseVideoId)}${r.suffix ? `<span class="suffix">-${r.suffix}</span>` : ''}</span>`;
+    <span class="vm-videoid-cell">${exceptionDot(r, context)}${escapeHtml(r.baseVideoId)}${r.suffix ? `<span class="suffix">-${r.suffix}</span>` : ''}</span>`;
 }
 
 function cattleCell(r, ctx) {
@@ -99,7 +168,7 @@ function usageCell(r) {
 
 function publishedCell(r) {
   if (!r.youtubeUrl) {
-    return `<span class="vm-cell" data-editable="true" data-id="${r.id}" data-field="videoLink" tabindex="0"><span class="is-empty">Paste YouTube link…</span></span>`;
+    return `<span class="vm-cell" data-editable="true" data-id="${r.id}" data-field="videoLink" tabindex="0" title="Not published yet — paste a YouTube link"><span class="is-empty is-unpublished">Paste YouTube link…</span></span>`;
   }
   return `
     <span class="yt-actions">
@@ -131,8 +200,9 @@ function workingOnCell(r) {
  * ============================================================= */
 function readyRowHtml(r, ctx, showWorkingOn) {
   return `
-    <tr data-id="${r.id}">
-      <td>${videoIdCell(r)}</td>
+    <tr data-id="${r.id}" class="${rowExceptionClass(r, 'ready')}">
+      <td class="vm-col-check">${compareCheckboxCell(r)}</td>
+      <td>${videoIdCell(r, 'ready')}</td>
       <td>${escapeHtml(r.consignorName)}</td>
       <td>${cattleCell(r, ctx)}</td>
       <td>${clipsCell(r)}</td>
@@ -145,8 +215,9 @@ function readyRowHtml(r, ctx, showWorkingOn) {
 
 function createdRowHtml(r, ctx) {
   return `
-    <tr data-id="${r.id}">
-      <td>${videoIdCell(r)}</td>
+    <tr data-id="${r.id}" class="${rowExceptionClass(r, 'created')}">
+      <td class="vm-col-check">${compareCheckboxCell(r)}</td>
+      <td>${videoIdCell(r, 'created')}</td>
       <td>${escapeHtml(r.consignorName)}</td>
       <td>${cattleCell(r, ctx)}</td>
       <td>${clipsCell(r)}</td>
@@ -227,6 +298,25 @@ function wireAddRow(tbody, ctx) {
  * ============================================================= */
 function wireRows(tbody, ctx) {
   tbody.addEventListener('click', async e => {
+    const compareCheck = e.target.closest('[data-compare]');
+    if (compareCheck) {
+      e.stopPropagation();
+      const id = compareCheck.dataset.compare;
+      if (compareCheck.checked) {
+        if (compareSelection.size >= MAX_COMPARE) {
+          compareCheck.checked = false;
+          showToast(`Compare supports up to ${MAX_COMPARE} videos at once`);
+          return;
+        }
+        const rec = await ctx.repo.getVideoById(id);
+        compareSelection.set(id, rec);
+      } else {
+        compareSelection.delete(id);
+      }
+      paintCompareBar(ctx);
+      return;
+    }
+
     const clipsTrigger = e.target.closest('[data-clips-trigger]');
     if (clipsTrigger) {
       const rec = await ctx.repo.getVideoById(clipsTrigger.dataset.clipsTrigger);
