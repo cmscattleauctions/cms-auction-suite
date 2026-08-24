@@ -20,9 +20,12 @@ let addRowOpen = false;
 
 export function renderTable(container, records, ctx) {
   const isCreated = ctx.state.statusTab === 'created';
+  const showWorkingOn = ctx.state.statusTab === 'ready';
   const headCells = isCreated
     ? ['Video ID', 'Consignor', 'Cattle', 'Clips', 'Source', 'Usage', 'Published', 'Added', '']
-    : ['Video ID', 'Consignor', 'Cattle', 'Clips', 'Status', 'Added', ''];
+    : showWorkingOn
+      ? ['Video ID', 'Consignor', 'Cattle', 'Clips', 'Status', 'Working On', 'Added', '']
+      : ['Video ID', 'Consignor', 'Cattle', 'Clips', 'Status', 'Added', ''];
   const colspan = headCells.length;
 
   container.innerHTML = `
@@ -35,7 +38,7 @@ export function renderTable(container, records, ctx) {
   `;
 
   const tbody = container.querySelector('#vm-table-body');
-  tbody.innerHTML = records.map(r => (isCreated ? createdRowHtml(r, ctx) : readyRowHtml(r, ctx))).join('') + addRowHtml(colspan);
+  tbody.innerHTML = records.map(r => (isCreated ? createdRowHtml(r, ctx) : readyRowHtml(r, ctx, showWorkingOn))).join('') + addRowHtml(colspan);
 
   wireRows(tbody, ctx);
   wireAddRow(tbody, ctx);
@@ -50,11 +53,7 @@ const FORMAT_BADGE_CLASS = {
 
 function videoIdCell(r) {
   return `
-    <span class="vm-videoid-cell">${escapeHtml(r.baseVideoId)}${r.suffix ? `<span class="suffix">-${r.suffix}</span>` : ''}</span>
-    <span class="vm-row-flags">
-      ${r.isDraft ? '<span class="vm-row-flag draft">Draft</span>' : ''}
-      ${r.needsReview ? '<span class="vm-row-flag review">Review</span>' : ''}
-    </span>`;
+    <span class="vm-videoid-cell">${escapeHtml(r.baseVideoId)}${r.suffix ? `<span class="suffix">-${r.suffix}</span>` : ''}</span>`;
 }
 
 function cattleCell(r, ctx) {
@@ -78,8 +77,6 @@ function clipsCell(r) {
 
 function statusIssueCell(r) {
   if (r.isDraft) return `<span class="vm-status-text is-bad">Upload Incomplete</span>`;
-  if (r.needsReview) return `<span class="vm-status-text is-warn">Needs Review</span>`;
-  if (r.status === 'hold') return `<span class="vm-status-text">On Hold</span>`;
   if (!r.clips.length) return `<span class="vm-status-text is-warn">Waiting for Clips</span>`;
   return `<span class="vm-status-text is-ready">Ready to Build</span>`;
 }
@@ -122,10 +119,17 @@ function actionCell(r) {
   return `<button class="vm-row-action" data-open-drawer="${r.id}" type="button">Open ›</button>`;
 }
 
+function workingOnCell(r) {
+  if (r.workingOn) {
+    return `<button class="vm-workingon-chip is-claimed" data-workingon="${r.id}" type="button" title="Click to release">${escapeHtml(r.workingOn)}</button>`;
+  }
+  return `<button class="vm-workingon-chip" data-workingon="${r.id}" type="button">Claim</button>`;
+}
+
 /* =============================================================
  * Row rendering (two column sets)
  * ============================================================= */
-function readyRowHtml(r, ctx) {
+function readyRowHtml(r, ctx, showWorkingOn) {
   return `
     <tr data-id="${r.id}">
       <td>${videoIdCell(r)}</td>
@@ -133,6 +137,7 @@ function readyRowHtml(r, ctx) {
       <td>${cattleCell(r, ctx)}</td>
       <td>${clipsCell(r)}</td>
       <td>${statusIssueCell(r)}</td>
+      ${showWorkingOn ? `<td>${workingOnCell(r)}</td>` : ''}
       <td>${formatDateShort(r.dateAdded)}</td>
       <td>${actionCell(r)}</td>
     </tr>`;
@@ -258,6 +263,19 @@ function wireRows(tbody, ctx) {
       return;
     }
 
+    const workingOnBtn = e.target.closest('[data-workingon]');
+    if (workingOnBtn) {
+      const rec = await ctx.repo.getVideoById(workingOnBtn.dataset.workingon);
+      if (rec.workingOn) {
+        await ctx.repo.clearWorkingOn(rec.id, 'Staff');
+        showToast('Released');
+        ctx.refresh();
+      } else {
+        openStaffPopover(workingOnBtn, rec, ctx);
+      }
+      return;
+    }
+
     const openDrawerBtn = e.target.closest('[data-open-drawer]');
     if (openDrawerBtn) { ctx.openDrawer(openDrawerBtn.dataset.openDrawer); return; }
 
@@ -357,6 +375,50 @@ function openClipsPopover(anchorEl, rec, ctx) {
 
   function outsideHandler(e) { if (!pop.contains(e.target) && e.target !== anchorEl) closeClipsPopover(); }
   function escHandler(e) { if (e.key === 'Escape') closeClipsPopover(); }
+  setTimeout(() => document.addEventListener('click', outsideHandler), 0);
+  document.addEventListener('keydown', escHandler);
+  pop._cleanup = () => {
+    document.removeEventListener('click', outsideHandler);
+    document.removeEventListener('keydown', escHandler);
+  };
+}
+
+/* =============================================================
+ * Working On — staff picker popover, click "Claim" to open
+ * ============================================================= */
+function closeStaffPopover() {
+  const existing = document.getElementById('vm-active-staff-popover');
+  if (existing) {
+    if (existing._cleanup) existing._cleanup();
+    existing.remove();
+  }
+}
+
+function openStaffPopover(anchorEl, rec, ctx) {
+  closeStaffPopover();
+  const staff = ctx.ref.getStaffList();
+  const rect = anchorEl.getBoundingClientRect();
+  const pop = document.createElement('div');
+  pop.className = 'vm-popover vm-popover-narrow';
+  pop.id = 'vm-active-staff-popover';
+  const width = 180;
+  pop.style.top = `${Math.min(rect.bottom + 6, window.innerHeight - 200)}px`;
+  pop.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))}px`;
+  pop.innerHTML = `
+    <div class="vm-popover-title">Who's building this?</div>
+    ${staff.map(s => `<button class="vm-popover-staff-option" data-claim-staff="${escapeHtml(s.name)}" type="button">${escapeHtml(s.name)}</button>`).join('')}
+  `;
+  document.body.appendChild(pop);
+
+  pop.querySelectorAll('[data-claim-staff]').forEach(btn => btn.addEventListener('click', async () => {
+    await ctx.repo.setWorkingOn(rec.id, btn.dataset.claimStaff, 'Staff');
+    showToast(`${btn.dataset.claimStaff} is building this now`);
+    closeStaffPopover();
+    ctx.refresh();
+  }));
+
+  function outsideHandler(e) { if (!pop.contains(e.target) && e.target !== anchorEl) closeStaffPopover(); }
+  function escHandler(e) { if (e.key === 'Escape') closeStaffPopover(); }
   setTimeout(() => document.addEventListener('click', outsideHandler), 0);
   document.addEventListener('keydown', escHandler);
   pop._cleanup = () => {

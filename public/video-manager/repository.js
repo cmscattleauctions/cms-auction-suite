@@ -15,7 +15,7 @@
 
 import {
   SEX_TYPES, SIRE_TYPES, DAM_TYPES, CONSIGNORS, VIDEO_MAKERS, STAFF,
-  VIDEO_FORMATS, OVERLAY_MODES, PROGRAM_TAGS,
+  VIDEO_FORMATS,
   generateMockVideos, labelFor, consignorFor,
 } from './mock-data.js';
 import { buildBaseId, nextAvailableSuffix, formatMonthYear, generateInternalId } from './video-id.js';
@@ -158,23 +158,14 @@ export const ReferenceDataRepository = {
 
   getVideoMakers() { return [...VIDEO_MAKERS]; },
 
-  /* ----- Video Format / Overlay Mode / program tag library -----
+  /* ----- Video Format library -----
    * Mock/local for now. Real schema will carry over unchanged when
-   * this becomes a Firestore-backed `programTags` collection. */
+   * this becomes a Firestore-backed collection. */
   getVideoFormats() { return [...VIDEO_FORMATS]; },
   videoFormatMeta(code) { return VIDEO_FORMATS.find(f => f.code === code) || null; },
-  getOverlayModes() { return [...OVERLAY_MODES]; },
 
-  getProgramTags() { return [...PROGRAM_TAGS].sort((a, b) => a.displayOrder - b.displayOrder); },
-  addProgramTag(name) {
-    if (PROGRAM_TAGS.some(t => t.name.toLowerCase() === name.toLowerCase())) {
-      throw new Error(`"${name}" is already in the tag library`);
-    }
-    const rec = { id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name, image: null, active: true, displayOrder: PROGRAM_TAGS.length + 1 };
-    PROGRAM_TAGS.push(rec);
-    emitter.emit({ type: 'reference-changed' });
-    return rec;
-  },
+  /** Staff who can claim a video to build — reps don't build videos. */
+  getStaffList() { return STAFF.filter(s => s.role === 'staff').map(s => ({ ...s })); },
 };
 
 /* =============================================================
@@ -323,7 +314,7 @@ function searchText(v) {
     v.videoMaker, v.notes, v.youtubeUrl, v.youtubeId,
     new Date(v.dateAdded).toLocaleDateString(),
     usage,
-    ReferenceDataRepository.videoFormatMeta(v.videoFormat)?.label, v.bakedInTags.join(' '),
+    ReferenceDataRepository.videoFormatMeta(v.videoFormat)?.label, v.hasTags ? 'has tags' : '', v.workingOn,
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
@@ -422,8 +413,8 @@ export const VideoRepository = {
       // says otherwise. Historical/migrated records default to
       // Unknown instead — see mock-data.js buildRecord().
       videoFormat: fields.videoFormat || 'clean',
-      bakedInTags: [],
-      overlayMode: fields.overlayMode || 'dynamic',
+      hasTags: fields.hasTags || false,
+      workingOn: null,
       usage: [],
       activity: [{ ts: now, actor, type: 'created', message: fields.suffix
         ? `Record created as ${finalId} (Video ID collision with ${baseId})`
@@ -552,7 +543,7 @@ export const VideoRepository = {
 
     v.youtubeUrl = youtubeUrl;
     v.youtubeId = youtubeId;
-    v.embedUrl = `https://www.youtube.com/embed/${youtubeId}`;
+    v.embedUrl = `https://www.youtube.com/embed/${youtubeId}?mute=1&autoplay=1&playlist=${youtubeId}&loop=1`;
     v.embedCode = `<iframe width="560" height="315" src="${v.embedUrl}" title="CMS Auction Video" frameborder="0" allowfullscreen></iframe>`;
     logActivity(v, actor, 'youtube', isReplacement
       ? `YouTube video replaced — previous version retained in history${reason ? ` (${reason})` : ''}`
@@ -567,8 +558,6 @@ export const VideoRepository = {
     if (!v) throw new Error('Video not found');
     const meta = ReferenceDataRepository.videoFormatMeta(format);
     v.videoFormat = format;
-    // Sensible default when format changes — still independently editable after.
-    v.overlayMode = format === 'legacy-tagged' ? 'baked-in' : 'dynamic';
     logActivity(v, actor, 'format', format === 'needs-redo'
       ? 'Marked Needs Redo'
       : `Video Format changed to ${meta ? meta.label : format}`);
@@ -582,20 +571,31 @@ export const VideoRepository = {
     return VideoRepository.setVideoFormat(id, 'needs-redo', actor);
   },
 
-  async setBakedInTags(id, tags, actor = 'Staff') {
+  async setHasTags(id, checked, actor = 'Staff') {
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
-    v.bakedInTags = [...tags];
-    logActivity(v, actor, 'format', `Baked-in tags set: ${tags.length ? tags.join(', ') : '(none)'}`);
+    v.hasTags = !!checked;
+    logActivity(v, actor, 'format', v.hasTags ? 'Marked Has Tags' : 'Has Tags cleared');
     touch(v, actor);
     emitter.emit({ type: 'videos-changed' });
     return { ...v };
   },
 
-  async setOverlayMode(id, mode, actor = 'Staff') {
+  async setWorkingOn(id, name, actor = 'Staff') {
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
-    v.overlayMode = mode;
+    v.workingOn = name;
+    logActivity(v, actor, 'format', `${name} started building this video`);
+    touch(v, actor);
+    emitter.emit({ type: 'videos-changed' });
+    return { ...v };
+  },
+
+  async clearWorkingOn(id, actor = 'Staff') {
+    const v = videos.find(v => v.id === id);
+    if (!v) throw new Error('Video not found');
+    v.workingOn = null;
+    logActivity(v, actor, 'format', 'Released — no longer building this video');
     touch(v, actor);
     emitter.emit({ type: 'videos-changed' });
     return { ...v };

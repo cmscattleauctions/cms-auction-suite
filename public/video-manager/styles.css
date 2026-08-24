@@ -160,7 +160,7 @@ label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spa
 .vm-filters-wrap { position: relative; flex-shrink: 0; }
 .vm-filter-badge { margin-left: 4px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; }
 .vm-filters-panel {
-  position: absolute; top: calc(100% + 6px); right: 0; width: 320px; max-height: 480px; overflow-y: auto;
+  position: absolute; top: calc(100% + 6px); right: 0; width: 320px;
   background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg); padding: 14px; z-index: 40;
 }
@@ -229,13 +229,6 @@ td:focus, .vm-cell:focus { outline: none; }
 .vm-videoid-cell { font-family: var(--font-mono); font-weight: 700; letter-spacing: 0.01em; font-size: 12px; }
 .vm-videoid-cell .suffix { color: var(--accent); }
 .vm-videoid-input { min-width: 190px; font-family: inherit; }
-.vm-row-flags { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: middle; }
-.vm-row-flag {
-  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
-  padding: 1px 5px; border-radius: 3px;
-}
-.vm-row-flag.draft { color: var(--text-muted); background: var(--bg-muted); border: 1px dashed var(--border-strong); }
-.vm-row-flag.review { color: var(--format-legacy-fg); background: var(--format-legacy-bg); }
 
 .vm-cattle-cell {
   color: var(--text-secondary); font-size: 12px; max-width: 360px; overflow: hidden;
@@ -260,15 +253,13 @@ td:focus, .vm-cell:focus { outline: none; }
 .format-pill.format-redo { color: var(--format-redo-fg); background: var(--format-redo-bg); }
 .format-pill.format-unknown { color: var(--format-unknown-fg); background: var(--format-unknown-bg); }
 
-/* ----- baked-in tag chips (drawer) ----- */
-.tag-chip-row { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
-.tag-chip {
-  font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 5px;
-  background: var(--bg-muted); border: 1px solid var(--border-subtle); color: var(--text-secondary);
+/* ----- Has Tags checkbox (drawer) ----- */
+.vm-checkbox-row {
+  display: flex; align-items: flex-start; gap: 8px; cursor: pointer;
+  font-size: 13px; font-weight: 400; text-transform: none; letter-spacing: normal;
+  color: var(--text-secondary); line-height: 1.4;
 }
-.tag-chip:hover { border-color: var(--border-strong); }
-.tag-chip.active { background: var(--format-legacy-bg); border-color: var(--format-legacy-fg); color: var(--format-legacy-fg); }
-.tag-chip.tag-chip-add { color: var(--accent); border-style: dashed; background: transparent; }
+.vm-checkbox-row input[type="checkbox"] { margin-top: 2px; flex-shrink: 0; }
 
 /* ----- Clips: monochrome film icon + count, no per-clip colored icons ----- */
 .vm-clips-trigger {
@@ -297,6 +288,21 @@ td:focus, .vm-cell:focus { outline: none; }
 .vm-popover-play:hover { color: var(--accent); }
 .vm-popover-play svg { width: 13px; height: 13px; }
 .vm-popover-footer { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+
+.vm-popover-narrow { width: 180px; max-height: none; }
+.vm-popover-staff-option {
+  display: block; width: 100%; text-align: left; padding: 7px 8px; border-radius: 5px;
+  background: none; border: none; font-size: 13px; color: var(--text-primary); cursor: pointer;
+}
+.vm-popover-staff-option:hover { background: var(--bg-muted); }
+
+/* ----- Working On claim chip (Ready to Make table) ----- */
+.vm-workingon-chip {
+  font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; cursor: pointer;
+  background: var(--bg-muted); border: 1px solid var(--border-subtle); color: var(--text-secondary);
+}
+.vm-workingon-chip:hover { border-color: var(--border-strong); }
+.vm-workingon-chip.is-claimed { background: var(--format-clean-bg); border-color: var(--format-clean-fg); color: var(--format-clean-fg); }
 
 .yt-actions { display: inline-flex; gap: 3px; }
 .yt-actions .btn-icon { width: 24px; height: 24px; padding: 4px; }

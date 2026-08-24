@@ -102,20 +102,6 @@ export const VIDEO_FORMATS = [
   { code: 'unknown',      label: 'Unknown',       short: 'Unknown', desc: 'Not reviewed yet — the default for anything migrated without a confident classification.' },
 ];
 
-export const OVERLAY_MODES = [
-  { code: 'dynamic',  label: 'Dynamic',  desc: 'Certification/program tags applied live in OBS from the current listing data.' },
-  { code: 'baked-in', label: 'Baked In', desc: 'Tags are already burned into the footage — do not stack new tags on top.' },
-];
-
-/* Reusable, expandable — not hard-coded permanently. Staff can add more
- * via ReferenceDataRepository.addProgramTag(). No production Firestore
- * collection yet; this is mock/local reference data for the prototype. */
-export const PROGRAM_TAGS = [
-  { id: 'asv',  name: 'ASV',            image: null, active: true, displayOrder: 1 },
-  { id: 'nhtc', name: 'NHTC',           image: null, active: true, displayOrder: 2 },
-  { id: 'care', name: 'CARE Certified', image: null, active: true, displayOrder: 3 },
-  { id: 'beefcare', name: 'BeefCARE',   image: null, active: true, displayOrder: 4 },
-];
 
 export const STAFF = [
   { id: 'hayden', name: 'Hayden Hollis',            role: 'staff', watch: true  },
@@ -214,7 +200,7 @@ function buildRecord(overrides = {}) {
   const ytSlug = Math.random().toString(36).slice(2, 9);
   const youtubeId = hasYoutube ? (overrides.youtubeId || ytSlug) : null;
   const youtubeUrl = hasYoutube ? `https://youtu.be/${youtubeId}` : null;
-  const embedUrl = hasYoutube ? `https://www.youtube.com/embed/${youtubeId}` : null;
+  const embedUrl = hasYoutube ? `https://www.youtube.com/embed/${youtubeId}?mute=1&autoplay=1&playlist=${youtubeId}&loop=1` : null;
   const embedCode = hasYoutube
     ? `<iframe width="560" height="315" src="${embedUrl}" title="CMS Auction Video" frameborder="0" allowfullscreen></iframe>`
     : null;
@@ -226,10 +212,10 @@ function buildRecord(overrides = {}) {
   const videoFormat = overrides.videoFormat || (!hasYoutube ? 'unknown' : pick([
     'clean', 'clean', 'clean', 'clean', 'legacy-tagged', 'legacy-tagged', 'legacy-tagged', 'needs-redo', 'unknown',
   ]));
-  const bakedInTags = overrides.bakedInTags || (videoFormat === 'legacy-tagged'
-    ? pick([['ASV'], ['NHTC'], ['ASV', 'NHTC'], ['CARE Certified'], ['BeefCARE']])
-    : []);
-  const overlayMode = overrides.overlayMode || (videoFormat === 'legacy-tagged' ? 'baked-in' : 'dynamic');
+  // Has Tags: true for anything with baked-in program/certification graphics
+  // that need to come out before the source video is reused (matches the
+  // "Legacy Tagged" classification for the mock set's mid-migration mix).
+  const hasTags = overrides.hasTags ?? (videoFormat === 'legacy-tagged');
   const previousYouTubeVideos = overrides.previousYouTubeVideos || [];
 
   const act = overrides.activity || [
@@ -266,8 +252,8 @@ function buildRecord(overrides = {}) {
     youtubeId, youtubeUrl, embedUrl, embedCode,
     previousYouTubeVideos,
     videoFormat,             // 'clean' | 'legacy-tagged' | 'needs-redo' | 'unknown'
-    bakedInTags,              // string[] — only meaningful for 'legacy-tagged'
-    overlayMode,              // 'dynamic' | 'baked-in' — informational/mock only, does not control OBS
+    hasTags,                  // boolean — needs baked-in program/certification graphics removed before reuse
+    workingOn: overrides.workingOn || null, // staff name currently building this video, or null
     usage: overrides.usage || [],
     activity: act,
   };
@@ -290,7 +276,7 @@ function specialCases() {
     status: 'created', daysAgo: 9, videoMaker: 'Hayden Hollis',
     clipCount: 7,
     hasYoutube: true, youtubeId: 'tlh450heifers',
-    videoFormat: 'clean', overlayMode: 'dynamic',
+    videoFormat: 'clean',
     notes: 'Strong set, uniform frame. Good sale-day candidates. Shot clean per the new policy — no baked-in intro or program logos.',
     usage: [
       { auctionDate: isoDaysAgo(1).slice(0, 10), auctionName: 'August Feeder Special', lots: ['800-A', '800-B', '801'] },
@@ -346,7 +332,7 @@ function specialCases() {
     baseId: newBase, suffix: null,
     status: 'created', daysAgo: 40, videoMaker: 'Colt Reagan',
     clipCount: 5, hasYoutube: true, youtubeId: 'rhc475steers',
-    videoFormat: 'legacy-tagged', bakedInTags: ['NHTC'], overlayMode: 'baked-in',
+    videoFormat: 'legacy-tagged', hasTags: true,
     notes: 'NHTC logo is burned into the footage from the old template — fine to keep using until this consignor is featured again.',
     videoIdHistory: [{ id: oldBase, changedAt: isoDaysAgo(35), reason: 'Weight corrected from 475 to 450' }],
     activity: [
@@ -388,7 +374,7 @@ function specialCases() {
     consignor: consignorFor('33'), sexCode: '1', sireCode: '2', damCode: '2', weight: 700, monthYear: '0126',
     status: 'created', daysAgo: 210, videoMaker: 'Hayden Hollis',
     clipCount: 4, hasYoutube: true, youtubeId: 'barnone700steers',
-    videoFormat: 'legacy-tagged', bakedInTags: ['ASV'], overlayMode: 'baked-in',
+    videoFormat: 'legacy-tagged', hasTags: true,
     notes: 'Long-running video, reused every year this consignor comes back. ASV logo baked in from 2024 template.',
     usage: [
       { auctionDate: isoDaysAgo(5).slice(0, 10), auctionName: 'August Feeder Special', lots: ['612'], youtubeVersionId: 'barnone700steers' },
@@ -406,7 +392,7 @@ function specialCases() {
     consignor: consignorFor('16'), sexCode: '1', sireCode: '4', damCode: '1', weight: 815, monthYear: '0526',
     status: 'created', daysAgo: 60, videoMaker: 'Reyes Martinez',
     clipCount: 3, hasYoutube: true, youtubeId: 'silverspur815steers',
-    videoFormat: 'needs-redo', overlayMode: 'dynamic',
+    videoFormat: 'needs-redo',
     notes: 'Old CMS intro is baked in and out of date (old logo). Rebuild before this consignor is featured again.',
     activity: [
       activity(isoDaysAgo(60), 'Reyes Martinez', 'created', 'Record created'),
@@ -425,7 +411,7 @@ function specialCases() {
     consignor: consignorFor('39'), sexCode: '2', sireCode: '2', damCode: '4', weight: 540, monthYear: '0726',
     status: 'created', daysAgo: 300, videoMaker: 'Bryson Murray',
     clipCount: 6, hasYoutube: true, youtubeId: 'goldenplains540heifers-v2',
-    videoFormat: 'clean', overlayMode: 'dynamic',
+    videoFormat: 'clean',
     notes: 'Rebuilt clean in August after the old ASV/NHTC-tagged version was retired.',
     previousYouTubeVideos: [{
       id: 'goldenplains540heifers-v1',
