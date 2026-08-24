@@ -23,6 +23,7 @@ let activeId = null;
 let editingCattleField = null;
 let usageExpanded = false;
 let activityExpanded = false;
+let clipsExpanded = false;
 
 export async function openDrawer(id, ctx) {
   closeDrawer();
@@ -30,6 +31,7 @@ export async function openDrawer(id, ctx) {
   editingCattleField = null;
   usageExpanded = false;
   activityExpanded = false;
+  clipsExpanded = false;
   await paint(ctx);
 }
 
@@ -62,6 +64,7 @@ async function paint(ctx) {
           <div class="vm-drawer-badges">
             <span class="status-pill status-${rec.isDraft ? 'draft' : rec.status}">${rec.isDraft ? 'Draft' : statusLabel(rec.status)}</span>
             <span class="format-pill ${FORMAT_BADGE_CLASS[rec.videoFormat] || ''}">${escapeHtml(formatMeta ? formatMeta.short : rec.videoFormat)}</span>
+            ${rec.hasTags ? `<span class="format-pill format-legacy">Has Tags</span>` : ''}
           </div>
         </div>
         <button class="vm-drawer-close" id="vm-drawer-close">&times;</button>
@@ -72,9 +75,11 @@ async function paint(ctx) {
         ${clipsSectionHtml(rec)}
         ${publishingSectionHtml(rec)}
         ${sourceStatusSectionHtml(rec, ctx)}
+        ${rec.hasTags ? hasTagsSectionHtml(rec) : ''}
         ${usageSectionHtml(rec)}
         ${notesSectionHtml(rec)}
         ${activitySectionHtml(rec)}
+        ${!rec.hasTags ? hasTagsSectionHtml(rec) : ''}
       </div>
 
       ${footerHtml(rec)}
@@ -97,6 +102,7 @@ async function paint(ctx) {
   wireClipsSection(root, rec, ctx);
   wirePublishingSection(root, rec, ctx);
   wireSourceStatusSection(root, rec, ctx);
+  wireHasTagsSection(root, rec, ctx);
   wireUsageSection(root, ctx);
   wireNotesSection(root, rec, ctx);
   wireActivitySection(root, ctx);
@@ -295,6 +301,8 @@ function wireCattleSection(root, rec, ctx) {
  * SOURCE CLIPS
  * ============================================================= */
 function clipsSectionHtml(rec) {
+  const shown = clipsExpanded ? rec.clips : rec.clips.slice(0, 3);
+  const hiddenCount = rec.clips.length - shown.length;
   return `
     <div class="vm-drawer-section">
       <div class="vm-drawer-section-title">Source Clips
@@ -302,7 +310,7 @@ function clipsSectionHtml(rec) {
       </div>
       ${rec.clips.length ? `
         <div class="vm-clip-list">
-          ${rec.clips.map(c => `
+          ${shown.map(c => `
             <div class="vm-clip-row">
               <svg class="vm-clip-icon" viewBox="0 0 24 24" fill="none"><path d="M4 6h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6"/><path d="M17 10.5 22 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
               <div class="vm-clip-info">
@@ -314,6 +322,8 @@ function clipsSectionHtml(rec) {
             </div>
           `).join('')}
         </div>
+        ${hiddenCount > 0 ? `<button class="btn-text" id="c-clips-toggle" type="button" style="margin-top:8px;font-size:12px;">Show ${hiddenCount} more clip${hiddenCount === 1 ? '' : 's'}</button>` : ''}
+        ${clipsExpanded && rec.clips.length > 3 ? `<button class="btn-text" id="c-clips-toggle" type="button" style="margin-top:8px;font-size:12px;">Show less</button>` : ''}
         <div style="display:flex;gap:8px;margin-top:10px;">
           <button class="btn btn-sm" id="c-download-all" type="button">Download All</button>
           <button class="btn btn-sm btn-ghost" id="c-add-clips" type="button">+ Add Clips</button>
@@ -345,6 +355,9 @@ function wireClipsSection(root, rec, ctx) {
     });
     input.click();
   });
+
+  const clipsToggle = root.querySelector('#c-clips-toggle');
+  if (clipsToggle) clipsToggle.addEventListener('click', () => { clipsExpanded = !clipsExpanded; paint(ctx); });
 
   const downloadAllBtn = root.querySelector('#c-download-all');
   if (downloadAllBtn) downloadAllBtn.addEventListener('click', () => downloadClips(rec.clips));
@@ -381,6 +394,7 @@ function publishingSectionHtml(rec) {
       <div class="vm-drawer-section-title">Publishing</div>
       ${rec.youtubeUrl ? `
         <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.youtubeUrl)}" disabled /><button class="btn btn-sm" data-copy="url" type="button" title="Copy YouTube Link">Copy Link</button><button class="btn btn-sm btn-ghost" data-open-yt type="button" title="Open YouTube Video">Open</button></div>
+        ${canvaLinkRowHtml(rec)}
         <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.embedCode)}" disabled /><button class="btn btn-sm" data-copy="code" type="button" title="Copy Embed Code">Copy Code</button></div>
         <button class="btn btn-sm" id="d-change-yt" type="button" style="margin-bottom:8px;">Change YouTube Video</button>
         <div id="d-change-yt-panel"></div>
@@ -395,6 +409,7 @@ function publishingSectionHtml(rec) {
         ` : ''}
       ` : `
         <div class="vm-link-row"><input type="text" id="d-yt-input" placeholder="Paste YouTube link…" /><button class="btn btn-sm btn-primary" id="d-yt-save" type="button">Save</button></div>
+        ${canvaLinkRowHtml(rec)}
       `}
       ${rec.status === 'created' ? `
         <div class="vm-fieldrow" data-cattle-field="__none" style="cursor:default;">
@@ -406,14 +421,58 @@ function publishingSectionHtml(rec) {
     </div>`;
 }
 
+function canvaLinkRowHtml(rec) {
+  return rec.canvaLink ? `
+    <div class="vm-link-row"><input type="text" value="${escapeHtml(rec.canvaLink)}" disabled /><button class="btn btn-sm" data-copy="canva" type="button" title="Copy Canva Link">Copy Link</button><button class="btn btn-sm btn-ghost" id="d-canva-open" type="button" title="Open Canva Design">Open</button></div>
+    <button class="btn-text" id="d-canva-edit" type="button" style="margin:0 0 8px;font-size:12px;">Change Canva Link</button>
+    <div id="d-canva-edit-panel"></div>
+  ` : `
+    <div class="vm-link-row"><input type="text" id="d-canva-input" placeholder="Paste Canva design link…" /><button class="btn btn-sm btn-primary" id="d-canva-save" type="button">Save</button></div>
+  `;
+}
+
 function wirePublishingSection(root, rec, ctx) {
   root.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
-    const map = { url: rec.youtubeUrl, code: rec.embedCode };
+    const map = { url: rec.youtubeUrl, code: rec.embedCode, canva: rec.canvaLink };
     await copyToClipboard(map[btn.dataset.copy]);
     showToast('Copied');
   }));
   const openYt = root.querySelector('[data-open-yt]');
   if (openYt) openYt.addEventListener('click', () => window.open(rec.youtubeUrl, '_blank', 'noopener'));
+
+  const openCanva = root.querySelector('#d-canva-open');
+  if (openCanva) openCanva.addEventListener('click', () => window.open(rec.canvaLink, '_blank', 'noopener'));
+
+  const canvaSaveBtn = root.querySelector('#d-canva-save');
+  if (canvaSaveBtn) canvaSaveBtn.addEventListener('click', async () => {
+    const val = root.querySelector('#d-canva-input').value.trim();
+    if (!val) { showToast('Paste a Canva link first'); return; }
+    await ctx.repo.updateVideo(rec.id, { canvaLink: val }, 'Staff');
+    ctx.refresh();
+    paint(ctx);
+  });
+
+  const canvaEditBtn = root.querySelector('#d-canva-edit');
+  if (canvaEditBtn) canvaEditBtn.addEventListener('click', () => {
+    const panel = root.querySelector('#d-canva-edit-panel');
+    panel.innerHTML = `
+      <div class="vm-link-row" style="margin-top:4px;">
+        <input type="text" id="d-canva-edit-input" placeholder="New Canva link…" value="${escapeHtml(rec.canvaLink)}" />
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-sm btn-primary" id="d-canva-edit-save" type="button">Save</button>
+        <button class="btn btn-sm btn-ghost" id="d-canva-edit-cancel" type="button">Cancel</button>
+      </div>
+    `;
+    panel.querySelector('#d-canva-edit-cancel').addEventListener('click', () => panel.innerHTML = '');
+    panel.querySelector('#d-canva-edit-save').addEventListener('click', async () => {
+      const val = panel.querySelector('#d-canva-edit-input').value.trim();
+      await ctx.repo.updateVideo(rec.id, { canvaLink: val || null }, 'Staff');
+      showToast('Canva link updated');
+      ctx.refresh();
+      paint(ctx);
+    });
+  });
 
   const ytSave = root.querySelector('#d-yt-save');
   if (ytSave) ytSave.addEventListener('click', async () => {
@@ -484,7 +543,6 @@ function parseYoutubeLink(val) {
  * ============================================================= */
 function sourceStatusSectionHtml(rec, ctx) {
   const meta = ctx.ref.videoFormatMeta(rec.videoFormat);
-  const showTags = rec.videoFormat !== 'clean';
   return `
     <div class="vm-drawer-section">
       <div class="vm-drawer-section-title">Source Status</div>
@@ -496,24 +554,6 @@ function sourceStatusSectionHtml(rec, ctx) {
         ${rec.videoFormat !== 'needs-redo' ? `<button class="btn btn-sm btn-ghost" id="d-mark-redo" type="button">Mark Needs Redo</button>` : ''}
       </div>
       <p class="field-hint" id="d-videoformat-desc">${escapeHtml(meta ? meta.desc : '')}</p>
-
-      ${showTags ? `
-        <label style="display:block;margin:12px 0 6px;">Baked-In Tags</label>
-        <div class="tag-chip-row" id="d-tags-row">
-          ${ctx.ref.getProgramTags().map(t => `
-            <button type="button" class="tag-chip ${rec.bakedInTags.includes(t.name) ? 'active' : ''}" data-tag="${escapeHtml(t.name)}">${escapeHtml(t.name)}</button>
-          `).join('')}
-          <button type="button" class="tag-chip tag-chip-add" id="d-add-tag">+ Add Tag</button>
-        </div>
-      ` : ''}
-    </div>
-
-    <div class="vm-drawer-section">
-      <div class="vm-drawer-section-title">Playback</div>
-      <div class="vm-drawer-section-hint">How should overlays be handled during playback/OBS?</div>
-      <select id="d-overlaymode" style="max-width:200px;">
-        ${ctx.ref.getOverlayModes().map(m => `<option value="${m.code}" ${m.code === rec.overlayMode ? 'selected' : ''}>${m.label}</option>`).join('')}
-      </select>
     </div>`;
 }
 
@@ -523,35 +563,34 @@ function wireSourceStatusSection(root, rec, ctx) {
     ctx.refresh();
     paint(ctx);
   });
-  root.querySelector('#d-overlaymode').addEventListener('change', async e => {
-    await ctx.repo.setOverlayMode(rec.id, e.target.value, 'Staff');
-    ctx.refresh();
-  });
-  root.querySelectorAll('#d-tags-row [data-tag]').forEach(btn => btn.addEventListener('click', async () => {
-    const tag = btn.dataset.tag;
-    const tags = new Set(rec.bakedInTags);
-    tags.has(tag) ? tags.delete(tag) : tags.add(tag);
-    await ctx.repo.setBakedInTags(rec.id, [...tags], 'Staff');
-    ctx.refresh();
-    paint(ctx);
-  }));
-  const addTagBtn = root.querySelector('#d-add-tag');
-  if (addTagBtn) addTagBtn.addEventListener('click', async () => {
-    const name = prompt('New tag name (e.g. GAP4):');
-    if (!name || !name.trim()) return;
-    try {
-      const tag = ctx.ref.addProgramTag(name.trim());
-      await ctx.repo.setBakedInTags(rec.id, [...rec.bakedInTags, tag.name], 'Staff');
-      ctx.refresh();
-      paint(ctx);
-    } catch (err) {
-      showToast(err.message);
-    }
-  });
   const markRedoBtn = root.querySelector('#d-mark-redo');
   if (markRedoBtn) markRedoBtn.addEventListener('click', async () => {
     await ctx.repo.markNeedsRedo(rec.id, 'Staff');
     showToast('Marked Needs Redo');
+    ctx.refresh();
+    paint(ctx);
+  });
+}
+
+/* =============================================================
+ * HAS TAGS — single checkbox; its section sits near Source Status
+ * while checked, and relocates to the very bottom of the drawer
+ * once cleared (see paint()).
+ * ============================================================= */
+function hasTagsSectionHtml(rec) {
+  return `
+    <div class="vm-drawer-section">
+      <label class="vm-checkbox-row">
+        <input type="checkbox" id="d-hastags" ${rec.hasTags ? 'checked' : ''} />
+        <span>Has Tags — baked-in program/certification graphics need to be removed before this video is reused</span>
+      </label>
+    </div>`;
+}
+
+function wireHasTagsSection(root, rec, ctx) {
+  const cb = root.querySelector('#d-hastags');
+  if (cb) cb.addEventListener('change', async e => {
+    await ctx.repo.setHasTags(rec.id, e.target.checked, 'Staff');
     ctx.refresh();
     paint(ctx);
   });
@@ -583,35 +622,18 @@ function wireUsageSection(root, ctx) {
 }
 
 /* =============================================================
- * NOTES + Canva Link
+ * NOTES
  * ============================================================= */
 function notesSectionHtml(rec) {
   return `
     <div class="vm-drawer-section">
       <div class="vm-drawer-section-title">Notes</div>
       <textarea id="d-notes" rows="3">${escapeHtml(rec.notes)}</textarea>
-      <div class="field" style="margin-top:10px;">
-        <label>Canva Link</label>
-        <div class="vm-link-row">
-          <input type="text" id="d-canvalink" placeholder="Paste Canva design link…" value="${escapeHtml(rec.canvaLink || '')}" />
-          <button class="btn btn-sm" id="d-canva-copy" type="button" ${rec.canvaLink ? '' : 'disabled'}>Copy</button>
-        </div>
-      </div>
     </div>`;
 }
 
 function wireNotesSection(root, rec, ctx) {
   root.querySelector('#d-notes').addEventListener('blur', e => ctx.repo.updateVideo(rec.id, { notes: e.target.value.trim() }, 'Staff'));
-  root.querySelector('#d-canvalink').addEventListener('blur', e => {
-    const val = e.target.value.trim();
-    ctx.repo.updateVideo(rec.id, { canvaLink: val || null }, 'Staff');
-    root.querySelector('#d-canva-copy').disabled = !val;
-  });
-  const canvaCopyBtn = root.querySelector('#d-canva-copy');
-  if (canvaCopyBtn) canvaCopyBtn.addEventListener('click', async () => {
-    await copyToClipboard(root.querySelector('#d-canvalink').value.trim());
-    showToast('Copied');
-  });
 }
 
 /* =============================================================
