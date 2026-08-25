@@ -42,7 +42,11 @@ const COLLECTION = 'videoRecords';
 const REFERENCE_COLLECTION = 'referenceData';
 const JOBS_COLLECTION = 'clipTransferJobs';
 const BATCH_MAX = 450; // Firestore hard-caps a batch at 500 writes; leave headroom
-const TRANSFER_TIMEOUT_MS = 10 * 60 * 1000; // generous headroom over the function's own 540s cap
+// Generous: a job can now be processed either by the Cloud Function (540s cap)
+// or by the local worker script (scripts/transfer-clips.mjs) running on
+// whatever upload speed the operator's own connection has, where a single
+// large clip can legitimately take well over 10 minutes.
+const TRANSFER_TIMEOUT_MS = 60 * 60 * 1000;
 
 let db = null, auth = null;
 if (FIREBASE_CONFIGURED) {
