@@ -1,0 +1,31 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() { return request.auth != null; }
+
+    // Mirrors isApproved() in docs/firestore.rules — Storage Rules can
+    // read Firestore directly via the firestore.* functions, so approval
+    // stays defined in exactly one place (the users/{uid} doc) instead of
+    // needing a second, separately-maintained copy of who's approved.
+    function isApproved() {
+      return isSignedIn() && (
+        request.auth.token.approved == true ||
+        (firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+          && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.approved == true)
+      );
+    }
+
+    // Video Manager clip files — videoClips/{recordId}/{fileName}.
+    // Hard caps enforced here, not just in the upload UI, so a bug or a
+    // bypassed client can't accidentally write something huge: 2GB max
+    // per file, must actually be a video. This is the real backstop
+    // behind the app's own pre-flight size checks.
+    match /videoClips/{recordId}/{fileName} {
+      allow read: if isApproved();
+      allow write: if isApproved()
+                   && request.resource.size < 2 * 1024 * 1024 * 1024
+                   && request.resource.contentType.matches('video/.*');
+    }
+  }
+}

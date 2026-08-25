@@ -4,10 +4,18 @@
  * Secondary to Table view — true 16:9 video-oriented cards, not
  * decorative. Preview priority: real YouTube thumbnail (Created
  * records with a YouTube link) > a captured frame from the first
- * source clip (only possible for clips uploaded this session,
- * since seeded/mock clips have no real file behind them) > a
- * neutral placeholder. Nothing is ever fabricated — if neither is
- * available, the placeholder is what's shown.
+ * source clip's Storage file > a neutral placeholder. Nothing is
+ * ever fabricated — if neither is available, the placeholder is
+ * what's shown.
+ *
+ * The frame capture reads the clip via a cross-origin <video>, which
+ * only works for canvas capture if the Storage bucket's CORS config
+ * allows this app's origin — Firebase Storage ships with no CORS
+ * rules by default. If that's not configured, this silently falls
+ * back to the placeholder (see the catch in getClipFrame) rather
+ * than erroring; it's a progressive enhancement, not required for
+ * clips to be viewable (the drawer/table preview & download both
+ * work regardless, straight from downloadUrl).
  * ============================================================= */
 
 import { escapeHtml, cattleSummaryLine } from './format.js';
@@ -44,13 +52,11 @@ export function renderGrid(container, records, ctx) {
     }, { once: true });
   });
 
-  // Progressive enhancement: capture a frame for cards backed by a real
-  // uploaded-this-session clip and no YouTube thumbnail. Seeded/mock
-  // clips have no fileHandle, so this only ever does real work for
-  // clips a user just uploaded — never expensive, never fabricated.
+  // Progressive enhancement: capture a frame for cards with a real
+  // uploaded clip and no YouTube thumbnail yet.
   records.forEach(r => {
     if (r.youtubeId) return;
-    const clip = r.clips.find(c => c.isOriginal && c.fileHandle);
+    const clip = r.clips.find(c => c.isOriginal && c.downloadUrl);
     if (!clip) return;
     const img = container.querySelector(`[data-frame-target="${r.id}"]`);
     if (!img) return;
@@ -98,7 +104,7 @@ function previewHtml(r, originalClips) {
       </div>`;
   }
 
-  const frameClip = originalClips.find(c => c.fileHandle);
+  const frameClip = originalClips.find(c => c.downloadUrl);
   if (frameClip) {
     const cached = frameCache.get(frameClip.id);
     return `
@@ -116,15 +122,15 @@ function previewHtml(r, originalClips) {
     </div>`;
 }
 
-/** Lightweight client-side frame grab — one video load + one canvas draw, only for real File clips. */
+/** Lightweight client-side frame grab — one video load + one canvas draw, from the clip's real Storage URL. */
 function getClipFrame(clip) {
   if (frameCache.has(clip.id)) return Promise.resolve(frameCache.get(clip.id));
   return new Promise(resolve => {
     try {
-      const url = URL.createObjectURL(clip.fileHandle);
       const video = document.createElement('video');
       video.muted = true;
-      video.src = url;
+      video.crossOrigin = 'anonymous'; // needed for canvas capture; requires CORS allowed on the Storage bucket
+      video.src = clip.downloadUrl;
       video.addEventListener('loadedmetadata', () => { video.currentTime = Math.min(0.5, video.duration / 2 || 0); });
       video.addEventListener('seeked', () => {
         try {
@@ -134,10 +140,9 @@ function getClipFrame(clip) {
           const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
           frameCache.set(clip.id, dataUrl);
           resolve(dataUrl);
-        } catch { resolve(null); }
-        URL.revokeObjectURL(url);
+        } catch { resolve(null); } // tainted canvas (no CORS on the bucket) — fall back to placeholder
       });
-      video.addEventListener('error', () => { URL.revokeObjectURL(url); resolve(null); });
+      video.addEventListener('error', () => resolve(null));
     } catch { resolve(null); }
   });
 }

@@ -26,6 +26,7 @@ import { escapeHtml, formatDate, formatDateTime, formatDuration, sexShort, cattl
 import { formatMonthYear, buildBaseId, monthYearToInputValue, inputValueToMonthYear } from './video-id.js';
 import { showToast, copyToClipboard } from './toast.js';
 import { openDeleteConfirmModal } from './ui-modals.js';
+import * as StorageData from './storage-data.js';
 
 const FORMAT_BADGE_CLASS = { clean: 'format-clean', 'legacy-tagged': 'format-legacy', 'needs-redo': 'format-redo', unknown: 'format-unknown' };
 
@@ -47,7 +48,6 @@ let usageExpanded = false;
 let activityExpanded = false;
 let notesEditing = false;
 let previewClipId = null;
-let previewObjectUrl = null;
 let drawerWidth = getStoredWidth();
 
 export async function openDrawer(id, ctx) {
@@ -66,7 +66,6 @@ export function closeDrawer() {
   const root = document.getElementById('vm-drawer-root');
   if (root) root.innerHTML = '';
   activeId = null;
-  if (previewObjectUrl) { URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = null; }
 }
 
 async function paint(ctx) {
@@ -846,7 +845,7 @@ function clipPreviewHtml(rec) {
         <span>Previewing: ${escapeHtml(clip.filename)}</span>
         <button id="c-preview-close" type="button" title="Close preview">&times;</button>
       </div>
-      ${previewObjectUrl ? `<video controls autoplay src="${previewObjectUrl}"></video>` : `<div class="vm-clip-preview-empty">Preview unavailable</div>`}
+      ${clip.downloadUrl ? `<video controls autoplay src="${escapeHtml(clip.downloadUrl)}"></video>` : `<div class="vm-clip-preview-empty">Preview unavailable</div>`}
     </div>`;
 }
 
@@ -864,16 +863,14 @@ function clipRowHtml(c, isPreviewing) {
 }
 
 function setPreviewClip(rec, clipId) {
-  if (previewObjectUrl) { URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = null; }
   if (!clipId) { previewClipId = null; return; }
   const clip = rec.clips.find(c => c.id === clipId);
-  if (!clip || !clip.fileHandle) {
-    showToast('Mock data — original files aren’t wired to real storage in this prototype yet');
+  if (!clip || !clip.downloadUrl) {
+    showToast('This clip has no file to preview yet');
     previewClipId = null;
     return;
   }
   previewClipId = clipId;
-  previewObjectUrl = URL.createObjectURL(clip.fileHandle);
 }
 
 function wireClipsTab(root, rec, ctx) {
@@ -882,12 +879,23 @@ function wireClipsTab(root, rec, ctx) {
     const input = document.createElement('input');
     input.type = 'file'; input.accept = 'video/*'; input.multiple = true;
     input.addEventListener('change', async () => {
-      const clips = [...input.files].map(file => ({
-        id: 'clip_' + Math.random().toString(36).slice(2, 10),
-        filename: file.name, swatch: Math.floor(Math.random() * 8), durationSec: null,
-        sizeBytes: file.size, uploader: 'Staff', uploadedAt: new Date().toISOString(),
-        isOriginal: true, fileHandle: file,
-      }));
+      const files = [...input.files];
+      if (!files.length) return;
+      showToast(`Uploading ${files.length} clip${files.length === 1 ? '' : 's'}…`);
+      const clips = [];
+      for (const file of files) {
+        try {
+          const result = await StorageData.uploadClip(rec.id, file);
+          clips.push({
+            id: 'clip_' + Math.random().toString(36).slice(2, 10),
+            filename: file.name, swatch: Math.floor(Math.random() * 8), durationSec: null,
+            sizeBytes: file.size, uploader: 'Staff', uploadedAt: new Date().toISOString(),
+            isOriginal: true, storagePath: result.storagePath, downloadUrl: result.downloadUrl,
+          });
+        } catch (err) {
+          showToast(`Failed to upload ${file.name}: ${err.message}`);
+        }
+      }
       if (!clips.length) return;
       await ctx.repo.addClips(rec.id, clips, 'Staff');
       showToast(`${clips.length} clip(s) added`);
@@ -913,15 +921,9 @@ function wireClipsTab(root, rec, ctx) {
 }
 
 function downloadClips(clips) {
-  const real = clips.filter(c => c.fileHandle);
-  if (!real.length) { showToast('Mock data — original files aren’t wired to real storage in this prototype yet'); return; }
-  real.forEach(c => {
-    const url = URL.createObjectURL(c.fileHandle);
-    const a = document.createElement('a');
-    a.href = url; a.download = c.filename;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-  });
+  const real = clips.filter(c => c.downloadUrl);
+  if (!real.length) { showToast('No files to download yet'); return; }
+  real.forEach(c => window.open(c.downloadUrl, '_blank', 'noopener'));
 }
 
 /* =============================================================

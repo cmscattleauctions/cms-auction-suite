@@ -16,11 +16,12 @@
  * too.
  *
  * Collection shape: videoRecords/{id} — one document per video
- * record, `id` matching the record's own internal `id` field
- * (see repository.js). Clip entries never have their `fileHandle`
- * (a live browser File object) written here — see stripFileHandles()
- * — actual clip bytes need Firebase Storage, which isn't wired up
- * yet (see docs/MONDAY-MIGRATION.md).
+ * record, `id` matching the record's own internal `id` field (see
+ * repository.js). Clips carry a real Storage downloadUrl/storagePath
+ * (see storage-data.js) rather than a live browser File object —
+ * stripFileHandles() is just a defensive backstop in case a `File`
+ * ever ends up on a clip in memory (Firestore can't serialize one),
+ * not the primary mechanism.
  *
  * Also holds referenceData/{consignors|sireTypes|damTypes} — the
  * Video ID Manager's code dictionaries, small enough that each is one

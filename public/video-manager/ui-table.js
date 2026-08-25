@@ -16,6 +16,7 @@ import { escapeHtml, formatDateShort, formatDuration, cattleSummaryLine } from '
 import { showToast, copyToClipboard } from './toast.js';
 import { handleIdEntryLoop } from './ui-modals.js';
 import { openCompareModal } from './ui-compare.js';
+import * as StorageData from './storage-data.js';
 
 let addRowOpen = false;
 const compareSelection = new Map(); // id -> record snapshot, so the compare bar/modal work across tabs
@@ -507,9 +508,8 @@ function openStaffPopover(anchorEl, rec, ctx) {
 }
 
 function previewClip(clip) {
-  if (!clip || !clip.fileHandle) { showToast('Mock data — original files aren’t wired to real storage in this prototype yet'); return; }
-  const url = URL.createObjectURL(clip.fileHandle);
-  window.open(url, '_blank', 'noopener');
+  if (!clip || !clip.downloadUrl) { showToast('This clip has no file to preview yet'); return; }
+  window.open(clip.downloadUrl, '_blank', 'noopener');
 }
 
 /* =============================================================
@@ -521,17 +521,29 @@ function pickFilesForRow(id, ctx) {
   input.accept = 'video/*';
   input.multiple = true;
   input.addEventListener('change', async () => {
-    const clips = [...input.files].map(file => ({
-      id: 'clip_' + Math.random().toString(36).slice(2, 10),
-      filename: file.name,
-      swatch: Math.floor(Math.random() * 8),
-      durationSec: null,
-      sizeBytes: file.size,
-      uploader: 'Staff',
-      uploadedAt: new Date().toISOString(),
-      isOriginal: true,
-      fileHandle: file,
-    }));
+    const files = [...input.files];
+    if (!files.length) return;
+    showToast(`Uploading ${files.length} clip${files.length === 1 ? '' : 's'}…`);
+    const clips = [];
+    for (const file of files) {
+      try {
+        const result = await StorageData.uploadClip(id, file);
+        clips.push({
+          id: 'clip_' + Math.random().toString(36).slice(2, 10),
+          filename: file.name,
+          swatch: Math.floor(Math.random() * 8),
+          durationSec: null,
+          sizeBytes: file.size,
+          uploader: 'Staff',
+          uploadedAt: new Date().toISOString(),
+          isOriginal: true,
+          storagePath: result.storagePath,
+          downloadUrl: result.downloadUrl,
+        });
+      } catch (err) {
+        showToast(`Failed to upload ${file.name}: ${err.message}`);
+      }
+    }
     if (!clips.length) return;
     await ctx.repo.addClips(id, clips, 'Staff');
     showToast(`${clips.length} clip(s) added`);
@@ -542,16 +554,10 @@ function pickFilesForRow(id, ctx) {
 
 async function downloadAll(id, ctx) {
   const rec = await ctx.repo.getVideoById(id);
-  const real = rec.clips.filter(c => c.fileHandle);
+  const real = rec.clips.filter(c => c.downloadUrl);
   if (!real.length) {
-    showToast('Mock data — original files aren’t wired to real storage in this prototype yet');
+    showToast('No files to download yet');
     return;
   }
-  real.forEach(c => {
-    const url = URL.createObjectURL(c.fileHandle);
-    const a = document.createElement('a');
-    a.href = url; a.download = c.filename;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-  });
+  real.forEach(c => window.open(c.downloadUrl, '_blank', 'noopener'));
 }
