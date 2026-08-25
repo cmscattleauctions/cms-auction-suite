@@ -245,7 +245,7 @@ async function actionAssetTest(params) {
   // ("small/representative") for the actual download test.
   const assetData = await mondayQuery(
     `
-    query ($assetIds: [ID!]) {
+    query ($assetIds: [ID!]!) {
       assets (ids: $assetIds) {
         id
         name
@@ -281,7 +281,8 @@ async function actionAssetTest(params) {
 }
 
 async function tryDownload(asset) {
-  const label = `${asset.name}${asset.file_extension ? '.' + asset.file_extension : ''}`;
+  // Monday's asset `name` is already the full filename (extension included).
+  const label = asset.name || `asset-${asset.id}`;
   const CAP_BYTES = 20 * 1024 * 1024; // don't pull down anything huge for a feasibility test
   const tmpPath = join(tmpdir(), `monday-test-${randomUUID()}`);
 
