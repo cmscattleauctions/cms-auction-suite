@@ -680,19 +680,15 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 .vm-compare-bar .btn-ghost { color: #fff; border-color: rgba(255,255,255,0.3); }
 .vm-compare-bar .btn-ghost:hover { background: rgba(255,255,255,0.08); }
 
-/* ----- Compare modal ----- */
-.vm-compare-modal { max-width: 1040px; }
-.vm-compare-layout-toggle { display: flex; gap: 6px; padding: 0 20px 14px; }
-.vm-compare-layout-btn {
-  padding: 6px 12px; font-size: 12px; font-weight: 600; color: var(--text-secondary);
-  background: var(--bg-muted); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+/* ----- Compare modal — always a wrapping grid, fills most of the
+ * viewport, scrolls internally so any number of selected videos fit. ----- */
+.vm-compare-modal {
+  width: 96vw; max-width: 1600px; height: 92vh; max-height: 92vh;
+  display: flex; flex-direction: column; overflow: hidden;
 }
-.vm-compare-layout-btn.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
-.vm-compare-body { padding-top: 0; }
-.vm-compare-grid { display: grid; gap: 14px; }
-.vm-compare-grid.layout-side-by-side { grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr); overflow-x: auto; }
-.vm-compare-grid.layout-stacked { grid-template-columns: 1fr; }
-.vm-compare-grid.layout-grid { grid-template-columns: repeat(2, 1fr); }
+.vm-compare-modal .vm-modal-header { flex-shrink: 0; }
+.vm-compare-body { flex: 1; overflow-y: auto; padding-top: 16px; }
+.vm-compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
 .vm-compare-panel { border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; background: var(--bg-surface); }
 .vm-compare-media { position: relative; aspect-ratio: 16/9; background: #000; }
 .vm-compare-media iframe { width: 100%; height: 100%; border: 0; display: block; }
@@ -716,6 +712,6 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
   .vm-col-added, .vm-col-usage { display: none; }
   .vm-drawer { width: 100vw !important; }
   .vm-drawer-resize-handle { display: none; }
-  .vm-compare-grid.layout-side-by-side { grid-auto-flow: row; grid-template-columns: 1fr; }
-  .vm-compare-grid.layout-grid { grid-template-columns: 1fr; }
+  .vm-compare-modal { width: 100vw; height: 100vh; max-height: 100vh; }
+  .vm-compare-grid { grid-template-columns: 1fr; }
 }

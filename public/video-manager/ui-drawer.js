@@ -555,9 +555,10 @@ function publishingSectionHtml(rec) {
         <div class="vm-pub-row">
           <div class="vm-pub-main">
             <div class="vm-pub-label">Embed</div>
-            <div class="vm-pub-value muted">Ready for the listing page</div>
+            <div class="vm-pub-value" title="${escapeHtml(rec.embedUrl)}">${escapeHtml(truncateMiddle(rec.embedUrl))}</div>
           </div>
           <div class="vm-pub-actions">
+            <button class="btn-text" data-open-embed type="button">Open</button>
             <button class="btn-text" data-copy="code" type="button">Copy Embed Code</button>
           </div>
         </div>
@@ -621,6 +622,8 @@ function wirePublishingSection(root, rec, ctx) {
   }));
   const openYt = root.querySelector('[data-open-yt]');
   if (openYt) openYt.addEventListener('click', () => window.open(rec.youtubeUrl, '_blank', 'noopener'));
+  const openEmbed = root.querySelector('[data-open-embed]');
+  if (openEmbed) openEmbed.addEventListener('click', () => window.open(rec.embedUrl, '_blank', 'noopener'));
   root.querySelectorAll('[data-open-prev]').forEach(btn => btn.addEventListener('click', () => window.open(btn.dataset.openPrev, '_blank', 'noopener')));
 
   const openCanva = root.querySelector('#d-canva-open');
