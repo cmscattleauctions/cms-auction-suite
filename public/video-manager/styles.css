@@ -315,8 +315,10 @@ td:focus, .vm-cell:focus { outline: none; }
 .vm-workingon-chip.is-claimed { background: var(--format-clean-bg); border-color: var(--format-clean-fg); color: var(--format-clean-fg); }
 
 .yt-actions { display: inline-flex; gap: 3px; }
-.yt-actions .btn-icon { width: 24px; height: 24px; padding: 4px; }
-.yt-actions svg { width: 12px; height: 12px; }
+.yt-actions .btn-icon {
+  width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; line-height: 1;
+}
 .yt-none { color: var(--text-muted); font-size: 11px; }
 
 .vm-row-action { font-size: 12px; font-weight: 600; color: var(--accent); background: none; border: none; padding: 3px 4px; }
