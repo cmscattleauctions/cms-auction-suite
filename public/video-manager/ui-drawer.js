@@ -552,7 +552,6 @@ function publishingSectionHtml(rec) {
           </div>
         </div>
         <div id="d-change-yt-panel"></div>
-        ${canvaRowHtml(rec)}
         <div class="vm-pub-row">
           <div class="vm-pub-main">
             <div class="vm-pub-label">Embed</div>
@@ -562,6 +561,7 @@ function publishingSectionHtml(rec) {
             <button class="btn-text" data-copy="code" type="button">Copy Embed Code</button>
           </div>
         </div>
+        ${canvaRowHtml(rec)}
         ${previousVersionsHtml(rec)}
       ` : `
         <div class="vm-link-row"><input type="text" id="d-yt-input" placeholder="Paste YouTube link…" /><button class="btn btn-sm btn-primary" id="d-yt-save" type="button">Save</button></div>
@@ -571,21 +571,31 @@ function publishingSectionHtml(rec) {
 }
 
 function canvaRowHtml(rec) {
-  return `
-    <div class="vm-pub-row">
-      <div class="vm-pub-main">
-        <div class="vm-pub-label">Canva Design</div>
-        ${rec.canvaLink ? `<div class="vm-pub-value" title="${escapeHtml(rec.canvaLink)}">${escapeHtml(truncateMiddle(rec.canvaLink))}</div>` : ''}
-      </div>
-      <div class="vm-pub-actions">
-        ${rec.canvaLink ? `
+  if (rec.canvaLink) {
+    return `
+      <div class="vm-pub-row">
+        <div class="vm-pub-main">
+          <div class="vm-pub-label">Canva Design</div>
+          <div class="vm-pub-value" title="${escapeHtml(rec.canvaLink)}">${escapeHtml(truncateMiddle(rec.canvaLink))}</div>
+        </div>
+        <div class="vm-pub-actions">
           <button class="btn-text" id="d-canva-open" type="button">Open</button>
           <button class="btn-text" data-copy="canva" type="button">Copy</button>
           <button class="btn-text" id="d-canva-edit" type="button">Change</button>
-        ` : `<button class="btn-text" id="d-canva-add" type="button">+ Add Canva Link</button>`}
+        </div>
       </div>
-    </div>
-    <div id="d-canva-edit-panel"></div>`;
+      <div id="d-canva-edit-panel"></div>`;
+  }
+  // No link yet — always show an empty box (not hidden behind a click)
+  // so it's obvious at a glance that this one still needs a Canva link.
+  return `
+    <div class="field" style="margin-top:2px;">
+      <label>Canva Design</label>
+      <div class="vm-link-row">
+        <input type="text" id="d-canva-input" placeholder="Paste Canva design link…" />
+        <button class="btn btn-sm btn-primary" id="d-canva-save" type="button">Save</button>
+      </div>
+    </div>`;
 }
 
 function previousVersionsHtml(rec) {
@@ -616,23 +626,13 @@ function wirePublishingSection(root, rec, ctx) {
   const openCanva = root.querySelector('#d-canva-open');
   if (openCanva) openCanva.addEventListener('click', () => window.open(rec.canvaLink, '_blank', 'noopener'));
 
-  const canvaAddBtn = root.querySelector('#d-canva-add');
-  if (canvaAddBtn) canvaAddBtn.addEventListener('click', () => {
-    const panel = root.querySelector('#d-canva-edit-panel');
-    panel.innerHTML = `
-      <div class="vm-link-row" style="margin-top:6px;">
-        <input type="text" id="d-canva-input" placeholder="Paste Canva design link…" />
-        <button class="btn btn-sm btn-primary" id="d-canva-save" type="button">Save</button>
-      </div>`;
-    const input = panel.querySelector('#d-canva-input');
-    input.focus();
-    panel.querySelector('#d-canva-save').addEventListener('click', async () => {
-      const val = input.value.trim();
-      if (!val) { showToast('Paste a Canva link first'); return; }
-      await ctx.repo.updateVideo(rec.id, { canvaLink: val }, 'Staff');
-      ctx.refresh();
-      paint(ctx);
-    });
+  const canvaSaveBtn = root.querySelector('#d-canva-save');
+  if (canvaSaveBtn) canvaSaveBtn.addEventListener('click', async () => {
+    const val = root.querySelector('#d-canva-input').value.trim();
+    if (!val) { showToast('Paste a Canva link first'); return; }
+    await ctx.repo.updateVideo(rec.id, { canvaLink: val }, 'Staff');
+    ctx.refresh();
+    paint(ctx);
   });
 
   const canvaEditBtn = root.querySelector('#d-canva-edit');

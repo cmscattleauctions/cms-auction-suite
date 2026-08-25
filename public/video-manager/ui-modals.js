@@ -458,9 +458,10 @@ export function openUploadModal(ctx) {
       <div id="um-build-panel" style="display:none;margin-top:16px;">
         <div class="field">
           <label>Consignor <button type="button" class="btn btn-sm btn-ghost" id="um-new-consignor" style="margin-left:6px">+ Add New</button></label>
-          <select id="um-b-consignor"><option value="">Select consignor…</option>
-            ${consignors.map(c => `<option value="${c.code}">${c.name} (${c.code})${c.flaggedNew ? ' — NEW' : ''}</option>`).join('')}
-          </select>
+          <div class="vm-combo" id="um-consignor-combo" data-selected-code="">
+            <input type="text" id="um-b-consignor-input" placeholder="Search or type a consignor…" autocomplete="off" />
+            <div class="vm-combo-list" id="um-consignor-list" hidden></div>
+          </div>
         </div>
         <div class="field-row">
           <div><label>Sex</label><select id="um-b-sex"><option value="">Select…</option>${sexes.map(s => `<option value="${s.code}">${s.code}- ${s.label}</option>`).join('')}</select></div>
@@ -538,17 +539,41 @@ export function openUploadModal(ctx) {
     buildToggle.textContent = buildOpen ? '← Hide builder' : "Don't have a Video ID? Build one →";
   });
 
+  /* ----- Consignor: searchable combo, type or pick from the list ----- */
+  const consignorCombo = modal.querySelector('#um-consignor-combo');
+  const consignorInput = modal.querySelector('#um-b-consignor-input');
+  const consignorList = modal.querySelector('#um-consignor-list');
+  function renderConsignorOptions(query) {
+    const q = query.trim().toLowerCase();
+    const matches = q ? consignors.filter(c => c.name.toLowerCase().includes(q) || c.code.includes(q)) : consignors;
+    consignorList.innerHTML = matches.length
+      ? matches.slice(0, 30).map(c => `<button type="button" class="vm-combo-option" data-code="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${escapeHtml(c.code)})${c.flaggedNew ? ' — NEW' : ''}</button>`).join('')
+      : `<div class="vm-combo-empty">No match</div>`;
+    consignorList.hidden = false;
+    consignorList.querySelectorAll('[data-code]').forEach(opt => opt.addEventListener('click', () => {
+      const rec2 = consignors.find(c => c.code === opt.dataset.code);
+      consignorInput.value = rec2.name;
+      consignorCombo.dataset.selectedCode = rec2.code;
+      consignorList.hidden = true;
+      updateBuildPreview();
+    }));
+  }
+  consignorInput.addEventListener('focus', () => renderConsignorOptions(consignorInput.value));
+  consignorInput.addEventListener('input', () => { consignorCombo.dataset.selectedCode = ''; renderConsignorOptions(consignorInput.value); });
+  consignorInput.addEventListener('blur', () => setTimeout(() => { consignorList.hidden = true; }, 150));
+
   modal.querySelector('#um-new-consignor').addEventListener('click', async () => {
     const rec = await openNewConsignorModal(ctx);
     if (rec) {
-      const sel = modal.querySelector('#um-b-consignor');
-      sel.insertAdjacentHTML('beforeend', `<option value="${rec.code}">${rec.name} (${rec.code}) — NEW</option>`);
-      sel.value = rec.code;
+      consignors.push(rec);
+      consignorInput.value = rec.name;
+      consignorCombo.dataset.selectedCode = rec.code;
+      updateBuildPreview();
     }
   });
 
   function updateBuildPreview() {
-    const consignorCode = modal.querySelector('#um-b-consignor').value;
+    const consignorCode = consignorCombo.dataset.selectedCode;
     const sexCode = modal.querySelector('#um-b-sex').value;
     const sireCode = modal.querySelector('#um-b-sire').value;
     const damCode = modal.querySelector('#um-b-dam').value;

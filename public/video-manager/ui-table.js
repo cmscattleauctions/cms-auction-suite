@@ -25,7 +25,7 @@ export function renderTable(container, records, ctx) {
   const isCreated = ctx.state.statusTab === 'created';
   const showWorkingOn = ctx.state.statusTab === 'ready';
   const headCells = isCreated
-    ? ['', 'Video ID', 'Consignor', 'Cattle', 'Clips', 'Source', 'Usage', 'Published', 'Added', '']
+    ? ['', 'Video ID', 'Consignor', 'Cattle', 'Clips', 'Tags', 'Usage', 'Published', 'Added', '']
     : showWorkingOn
       ? ['', 'Video ID', 'Consignor', 'Cattle', 'Clips', 'Status', 'Working On', 'Added', '']
       : ['', 'Video ID', 'Consignor', 'Cattle', 'Clips', 'Status', 'Added', ''];
@@ -84,9 +84,6 @@ function paintCompareBar(ctx) {
 /* =============================================================
  * Shared cell pieces
  * ============================================================= */
-const FORMAT_BADGE_CLASS = {
-  clean: 'format-clean', 'legacy-tagged': 'format-legacy', 'needs-redo': 'format-redo', unknown: 'format-unknown',
-};
 
 /* =============================================================
  * Exception highlighting — restrained: a small dot + tooltip on the
@@ -150,11 +147,9 @@ function statusIssueCell(r) {
   return `<span class="vm-status-text is-ready">Ready to Build</span>`;
 }
 
-function sourceCell(r, ctx) {
-  const meta = ctx.ref.videoFormatMeta(r.videoFormat);
-  const short = meta ? meta.short : r.videoFormat;
-  const full = meta ? meta.desc : '';
-  return `<span class="format-pill ${FORMAT_BADGE_CLASS[r.videoFormat] || ''}" title="${escapeHtml(full)}">${escapeHtml(short)}</span>`;
+function hasTagsCell(r) {
+  if (!r.hasTags) return '';
+  return `<span class="format-pill format-legacy">Has Tags</span>`;
 }
 
 function usageCell(r) {
@@ -172,9 +167,9 @@ function publishedCell(r) {
   }
   return `
     <span class="yt-actions">
-      <button class="btn btn-icon" data-open-yt="${r.id}" title="Open YouTube Video"><svg viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 1 5 5" stroke="currentColor" stroke-width="1.3"/><path d="M9 3h3v3M12 2 7.5 6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
-      <button class="btn btn-icon" data-copy-link="${r.id}" title="Copy YouTube Link"><svg viewBox="0 0 14 14" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 9.5V2.5A1 1 0 0 1 3.5 1.5h7" stroke="currentColor" stroke-width="1.3"/></svg></button>
-      <button class="btn btn-icon" data-copy-embed="${r.id}" title="Copy Embed Code"><svg viewBox="0 0 14 14" fill="none"><path d="M5 4 2 7l3 3M9 4l3 3-3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn btn-icon" data-open-yt="${r.id}" title="Open YouTube Video">▶</button>
+      <button class="btn btn-icon" data-copy-link="${r.id}" title="Copy YouTube Link">⿻</button>
+      <button class="btn btn-icon" data-copy-embed="${r.id}" title="Copy Embed Code">&lt;/&gt;</button>
     </span>`;
 }
 
@@ -221,7 +216,7 @@ function createdRowHtml(r, ctx) {
       <td>${escapeHtml(r.consignorName)}</td>
       <td>${cattleCell(r, ctx)}</td>
       <td>${clipsCell(r)}</td>
-      <td>${sourceCell(r, ctx)}</td>
+      <td>${hasTagsCell(r)}</td>
       <td>${usageCell(r)}</td>
       <td>${publishedCell(r)}</td>
       <td>${formatDateShort(r.dateAdded)}</td>
