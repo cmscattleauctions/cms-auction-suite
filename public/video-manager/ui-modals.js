@@ -307,12 +307,12 @@ function renderConsignorsTab(container, ctx) {
 
     list.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => { editingCode = btn.dataset.edit; paint(); }));
     list.querySelectorAll('[data-cancel-edit]').forEach(btn => btn.addEventListener('click', () => { editingCode = null; paint(); }));
-    list.querySelectorAll('[data-save]').forEach(btn => btn.addEventListener('click', () => {
+    list.querySelectorAll('[data-save]').forEach(btn => btn.addEventListener('click', async () => {
       const code = btn.dataset.save;
       const input = list.querySelector(`tr[data-code="${CSS.escape(code)}"] .idmgr-name-input`);
       const name = input.value.trim();
       if (!name) { showToast('Name cannot be empty'); return; }
-      try { ctx.ref.renameConsignor(code, name); showToast(`Updated ${name}`); ctx.refresh(); editingCode = null; paint(); } catch (err) { showToast(err.message); }
+      try { await ctx.ref.renameConsignor(code, name); showToast(`Updated ${name}`); ctx.refresh(); editingCode = null; paint(); } catch (err) { showToast(err.message); }
     }));
     list.querySelectorAll('[data-review]').forEach(btn => btn.addEventListener('click', () => {
       ctx.ref.clearConsignorFlag(btn.dataset.review); ctx.refresh(); paint();

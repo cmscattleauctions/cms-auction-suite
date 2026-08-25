@@ -8,5 +8,8 @@ netlify/functions/.env
 # Netlify CLI local state
 .netlify/
 
+# Firebase CLI debug log
+firebase-debug.log
+
 # OS/editor noise
 .DS_Store

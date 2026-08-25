@@ -33,6 +33,23 @@
   .status { font-size: 11.5px; margin-top: 6px; }
   .status.ok { color: #1a7f37; }
   .status.err { color: #c0392b; }
+  section.import { border-color: #2563eb; }
+  .import h2 { color: #1d4ed8; }
+  .auth-pill { display: inline-block; font-size: 11.5px; padding: 3px 9px; border-radius: 999px; margin-bottom: 10px; }
+  .auth-pill.in { background: #e7f6ec; color: #1a7f37; }
+  .auth-pill.out { background: #fdeaea; color: #c0392b; }
+  .import-stats { display: flex; gap: 18px; flex-wrap: wrap; margin: 10px 0; }
+  .import-stat { font-size: 12px; }
+  .import-stat b { display: block; font-size: 20px; color: #131820; }
+  .import-progress { height: 8px; border-radius: 4px; background: #e3e1da; overflow: hidden; margin: 8px 0; }
+  .import-progress > div { height: 100%; background: #2563eb; width: 0%; transition: width .2s; }
+  .confirm-box { background: #fff4e0; border: 1px solid #e0b563; border-radius: 6px; padding: 10px 12px; margin-top: 10px; }
+  .confirm-box input { min-width: 220px; }
+  details.skip-list summary { cursor: pointer; font-size: 12px; color: #6b7078; }
+  button.danger { background: #c0392b; border-color: #c0392b; }
+  button.danger:hover { background: #a53125; }
+  button.secondary { background: #fff; color: #2563eb; }
+  button.secondary:hover { background: #eef3ff; }
 </style>
 </head>
 <body>
@@ -69,7 +86,7 @@
     <p class="desc">Groups + full column list (with real column ids) for one board. Copy a board id from step 2.</p>
     <div class="row">
       <label>Board ID</label>
-      <input type="text" id="in-schema-boardid" placeholder="1234567890" />
+      <input type="text" id="in-schema-boardid" value="5462086473" />
       <button data-run="board-schema">Run</button>
     </div>
     <div class="status" data-status-for="board-schema"></div>
@@ -81,7 +98,7 @@
     <p class="desc">~15 items with every column's raw value + displayed text, across groups.</p>
     <div class="row">
       <label>Board ID</label>
-      <input type="text" id="in-items-boardid" placeholder="1234567890" />
+      <input type="text" id="in-items-boardid" value="5462086473" />
       <label>Limit</label>
       <input type="number" id="in-items-limit" value="15" style="min-width:70px;" />
       <button data-run="sample-items">Run</button>
@@ -95,7 +112,7 @@
     <p class="desc">Scans items for attached files, reports full asset metadata, and actually downloads the smallest one server-side (to a temp file, verified, then deleted — never persisted).</p>
     <div class="row">
       <label>Board ID</label>
-      <input type="text" id="in-asset-boardid" placeholder="1234567890" />
+      <input type="text" id="in-asset-boardid" value="5462086473" />
       <label>Items to scan</label>
       <input type="number" id="in-asset-scan" value="25" style="min-width:70px;" />
       <button data-run="asset-test">Run</button>
@@ -109,7 +126,7 @@
     <p class="desc">Walks a few pages of cursor pagination and reports the board's total item count, so we can estimate a full migration's request count.</p>
     <div class="row">
       <label>Board ID</label>
-      <input type="text" id="in-page-boardid" placeholder="1234567890" />
+      <input type="text" id="in-page-boardid" value="5462086473" />
       <label>Page size</label>
       <input type="number" id="in-page-size" value="100" style="min-width:70px;" />
       <label>Pages to walk</label>
@@ -125,13 +142,59 @@
     <p class="desc">Only works once COLUMN_MAP in <code>netlify/functions/monday-migration-test.mjs</code> has real column ids filled in from step 3. Until then this reports that clearly instead of guessing.</p>
     <div class="row">
       <label>Board ID</label>
-      <input type="text" id="in-dry-boardid" placeholder="1234567890" />
+      <input type="text" id="in-dry-boardid" value="5462086473" />
       <label>Items to scan</label>
       <input type="number" id="in-dry-scan" value="100" style="min-width:70px;" />
       <button data-run="dry-run-preview">Run</button>
     </div>
     <div class="status" data-status-for="dry-run-preview"></div>
     <pre data-out-for="dry-run-preview" hidden></pre>
+  </section>
+
+  <section id="s-import" class="import">
+    <h2>8. Real import — Monday → Firestore</h2>
+    <p class="desc">
+      This actually writes to Firestore's <code>videoRecords</code> collection. Everything above this
+      section is read-only diagnostics; this is the one part of the page that isn't. Metadata only —
+      clips (the video clip files themselves) are not pulled in this pass, see
+      <code>docs/MONDAY-MIGRATION.md</code>. Every imported record is marked <b>Has Tags</b> and tagged
+      <code>migratedFrom: "monday"</code> so it's easy to find later. Re-running this is safe — each
+      record's id is derived from its Monday item id, so importing twice overwrites, not duplicates.
+    </p>
+    <div id="import-auth-pill" class="auth-pill out">Checking sign-in…</div>
+    <div class="row">
+      <label>Board ID</label>
+      <input type="text" id="in-import-boardid" value="5462086473" />
+      <button id="import-fetch-btn" data-import-fetch type="button">1. Fetch from Monday</button>
+    </div>
+    <div class="status" id="import-fetch-status"></div>
+    <div class="import-progress" id="import-fetch-progress" hidden><div></div></div>
+
+    <div id="import-summary" hidden>
+      <div class="import-stats">
+        <div class="import-stat"><b id="stat-total">0</b>fetched from Monday</div>
+        <div class="import-stat"><b id="stat-ready">0</b>ready to import</div>
+        <div class="import-stat"><b id="stat-skip">0</b>skipped — need manual review</div>
+        <div class="import-stat"><b id="stat-dupe">0</b>duplicate Video IDs (auto-suffixed)</div>
+      </div>
+      <details class="skip-list" id="skip-details" hidden>
+        <summary>Show skipped items (couldn't resolve a Video ID)</summary>
+        <pre id="skip-list-out"></pre>
+      </details>
+
+      <div class="confirm-box">
+        <p style="margin:0 0 8px;font-size:12.5px;">
+          Type <code>IMPORT</code> below, then click Import to write the ready records into Firestore.
+          This is a real, live write — not a preview.
+        </p>
+        <div class="row" style="margin-bottom:0;">
+          <input type="text" id="import-confirm-input" placeholder="Type IMPORT" />
+          <button id="import-commit-btn" class="danger" data-import-commit type="button" disabled>2. Import into Firestore</button>
+        </div>
+      </div>
+      <div class="status" id="import-commit-status"></div>
+      <div class="import-progress" id="import-commit-progress" hidden><div></div></div>
+    </div>
   </section>
 
 </main>
@@ -179,6 +242,219 @@
         btn.disabled = false;
       }
     });
+  });
+</script>
+
+<script type="module">
+  // Real import flow. Uses the exact same repository.js the live Video
+  // Manager app uses, so writes go through the same Firestore rules and
+  // the same in-memory cache as everything else — no separate write path.
+  import { VideoRepository, ReferenceDataRepository } from './video-manager/repository.js';
+  import { isSignedIn, currentUserEmail, configured as firebaseConfigured } from './video-manager/firestore-data.js';
+
+  const authPill = document.getElementById('import-auth-pill');
+  function refreshAuthPill() {
+    if (!firebaseConfigured) {
+      authPill.textContent = 'Firebase is not configured on this deploy — import unavailable.';
+      authPill.className = 'auth-pill out';
+      return false;
+    }
+    if (isSignedIn()) {
+      authPill.textContent = `Signed in as ${currentUserEmail()} — ready to import.`;
+      authPill.className = 'auth-pill in';
+      return true;
+    }
+    authPill.textContent = 'Not signed in. Open the main Auction Suite app in another tab, sign in there, then reload this page.';
+    authPill.className = 'auth-pill out';
+    return false;
+  }
+  refreshAuthPill();
+  // Firebase Auth resolves the existing session asynchronously — a
+  // same-origin login can take a moment to attach, so re-check a couple
+  // times after load instead of trusting only the very first check.
+  setTimeout(refreshAuthPill, 800);
+  setTimeout(refreshAuthPill, 2000);
+
+  function extractYoutubeId(link) {
+    if (!link) return null;
+    const m = link.match(/(?:youtu\.be\/|v=|embed\/)([a-zA-Z0-9_-]{5,})/);
+    if (m) return m[1];
+    if (/^[a-zA-Z0-9_-]{5,}$/.test(link)) return link;
+    return null;
+  }
+
+  let readyRecords = [];
+
+  async function fetchAllFromMonday(boardId, statusEl) {
+    const all = [];
+    let cursor = null;
+    let page = 0;
+    do {
+      const params = new URLSearchParams({ action: 'export-records', boardId, pageSize: '200' });
+      if (cursor) params.set('cursor', cursor);
+      const res = await fetch(`/api/monday-migration?${params.toString()}`);
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'export-records failed');
+      all.push(...json.records);
+      cursor = json.cursor;
+      page++;
+      statusEl.textContent = `Fetched ${all.length} so far (page ${page})…`;
+    } while (cursor);
+    return all;
+  }
+
+  /** Same grouping + creation-date suffix rule as the server's dry-run-preview, run here because it needs to see every page combined, not just one. */
+  function assignSuffixes(records) {
+    const byBase = new Map();
+    records.forEach(r => {
+      if (!r.baseVideoId) return;
+      if (!byBase.has(r.baseVideoId)) byBase.set(r.baseVideoId, []);
+      byBase.get(r.baseVideoId).push(r);
+    });
+    let dupeGroups = 0;
+    byBase.forEach(group => {
+      if (group.length < 2) {
+        group[0].assignedSuffix = null;
+        group[0].assignedVideoId = group[0].baseVideoId;
+        return;
+      }
+      dupeGroups++;
+      group.sort((a, b) => (a.mondayCreatedAt || '').localeCompare(b.mondayCreatedAt || ''));
+      group.forEach((r, i) => {
+        r.assignedSuffix = i === 0 ? null : i + 1;
+        r.assignedVideoId = i === 0 ? r.baseVideoId : `${r.baseVideoId}-${i + 1}`;
+      });
+    });
+    return dupeGroups;
+  }
+
+  function buildRecord(r) {
+    const now = new Date().toISOString();
+    const consignor = ReferenceDataRepository.findConsignor(r.consignorCode);
+    const youtubeId = extractYoutubeId(r.previewLink);
+    const youtubeUrl = r.previewLink || null;
+    const embedUrl = youtubeId ? `https://www.youtube.com/embed/${youtubeId}?mute=1&autoplay=1&playlist=${youtubeId}&loop=1` : null;
+    const embedCode = embedUrl ? `<iframe width="560" height="315" src="${embedUrl}" title="CMS Auction Video" frameborder="0" allowfullscreen></iframe>` : null;
+    return {
+      id: `monday-${r.mondayItemId}`,
+      videoId: r.assignedVideoId,
+      baseVideoId: r.baseVideoId,
+      suffix: r.assignedSuffix,
+      videoIdHistory: [],
+      consignorCode: r.consignorCode,
+      consignorName: consignor ? consignor.name : (r.consignorLabel || r.consignorCode),
+      sexCode: r.sexCode,
+      sireCode: r.sireCode,
+      damCode: r.damCode,
+      weight: r.weight,
+      monthYear: r.monthYear,
+      status: r.status || 'created',
+      isDraft: false,
+      // Flags for review if the consignor code parsed out of the Video ID
+      // doesn't match anyone in the real consignor list — same signal the
+      // live app already uses for brand-new consignors.
+      needsReview: !consignor,
+      videoMaker: r.videoMaker || null,
+      createdBy: 'Monday Import',
+      dateAdded: r.mondayCreatedAt || now,
+      lastUpdated: now,
+      notes: r.extractedNote || '',
+      canvaLink: null,
+      clips: [],
+      listingImageUrl: null,
+      youtubeId, youtubeUrl, embedUrl, embedCode,
+      previousYouTubeVideos: [],
+      videoFormat: 'unknown',
+      hasTags: true,
+      workingOn: null,
+      usage: [],
+      activity: [{ ts: now, actor: 'Monday Import', type: 'created', message: `Imported from Monday (item ${r.mondayItemId})` }],
+      migratedFrom: 'monday',
+      migratedAt: now,
+      mondayItemId: r.mondayItemId,
+    };
+  }
+
+  document.getElementById('import-fetch-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('import-fetch-btn');
+    const statusEl = document.getElementById('import-fetch-status');
+    const progressWrap = document.getElementById('import-fetch-progress');
+    const boardId = document.getElementById('in-import-boardid').value.trim();
+    if (!boardId) { statusEl.textContent = 'Board ID is required.'; statusEl.className = 'status err'; return; }
+
+    btn.disabled = true;
+    progressWrap.hidden = false;
+    progressWrap.querySelector('div').style.width = '10%';
+    statusEl.textContent = 'Fetching…';
+    statusEl.className = 'status';
+    document.getElementById('import-confirm-input').value = '';
+    document.getElementById('import-commit-btn').disabled = true;
+    document.getElementById('import-commit-status').textContent = '';
+
+    try {
+      const raw = await fetchAllFromMonday(boardId, statusEl);
+      const dupeGroups = assignSuffixes(raw);
+      const resolved = raw.filter(r => r.videoIdResolved);
+      const skipped = raw.filter(r => !r.videoIdResolved);
+      readyRecords = resolved.map(buildRecord);
+
+      document.getElementById('stat-total').textContent = raw.length;
+      document.getElementById('stat-ready').textContent = readyRecords.length;
+      document.getElementById('stat-skip').textContent = skipped.length;
+      document.getElementById('stat-dupe').textContent = dupeGroups;
+      document.getElementById('import-summary').hidden = false;
+
+      const skipDetails = document.getElementById('skip-details');
+      if (skipped.length) {
+        skipDetails.hidden = false;
+        document.getElementById('skip-list-out').textContent = skipped
+          .map(r => `${r.mondayItemId}  "${r.mondayItemName}"  — ${r.videoIdError || 'unresolved'}`)
+          .join('\n');
+      } else {
+        skipDetails.hidden = true;
+      }
+
+      progressWrap.querySelector('div').style.width = '100%';
+      statusEl.textContent = `Done — ${raw.length} fetched, ${readyRecords.length} ready to import, ${skipped.length} need manual review.`;
+      statusEl.className = 'status ok';
+    } catch (err) {
+      statusEl.textContent = 'Fetch failed: ' + err.message;
+      statusEl.className = 'status err';
+    } finally {
+      btn.disabled = false;
+      setTimeout(() => { progressWrap.hidden = true; }, 600);
+    }
+  });
+
+  document.getElementById('import-confirm-input').addEventListener('input', e => {
+    document.getElementById('import-commit-btn').disabled = e.target.value.trim() !== 'IMPORT' || !readyRecords.length;
+  });
+
+  document.getElementById('import-commit-btn').addEventListener('click', async () => {
+    const statusEl = document.getElementById('import-commit-status');
+    if (!refreshAuthPill()) {
+      statusEl.textContent = 'You must be signed in (same-origin session) to write to Firestore.';
+      statusEl.className = 'status err';
+      return;
+    }
+    const btn = document.getElementById('import-commit-btn');
+    const progressWrap = document.getElementById('import-commit-progress');
+    btn.disabled = true;
+    progressWrap.hidden = false;
+    statusEl.textContent = 'Writing to Firestore…';
+    statusEl.className = 'status';
+    try {
+      await VideoRepository.importRecords(readyRecords, (written, total) => {
+        progressWrap.querySelector('div').style.width = `${Math.round((written / total) * 100)}%`;
+        statusEl.textContent = `Writing… ${written} / ${total}`;
+      });
+      statusEl.textContent = `Done — ${readyRecords.length} records imported into Video Manager.`;
+      statusEl.className = 'status ok';
+    } catch (err) {
+      statusEl.textContent = 'Import failed: ' + err.message;
+      statusEl.className = 'status err';
+      btn.disabled = false;
+    }
   });
 </script>
 </body>

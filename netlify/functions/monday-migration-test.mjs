@@ -21,6 +21,11 @@
  *   asset-test        Phase 3 — file/asset metadata + one real download test
  *   pagination-probe  Phase 4 — items_page/cursor behavior + item count
  *   dry-run-preview   Phase 5-7 — real mapping, confirmed against the actual board (see COLUMN_MAP below)
+ *   export-records    Migration — one page of fully-resolved items for the real
+ *                      import UI to consume (public/monday-migration-test.html).
+ *                      Same field-resolution logic as dry-run-preview, paginated
+ *                      via `cursor`, but does NOT assign duplicate suffixes —
+ *                      that happens client-side once every page is combined.
  *
  * Auth: reads MONDAY_API_TOKEN from the environment (never hardcoded,
  * never logged — see netlify/functions/lib/monday-client.mjs and
@@ -619,6 +624,123 @@ async function actionDryRunPreview(params) {
 }
 
 /* =============================================================
+ * export-records — one page of fully-resolved items, shaped for
+ * the real import. Deliberately does NOT assign final duplicate
+ * suffixes here: that needs to see every record across the whole
+ * board first, which a single page can't guarantee. The import
+ * page (monday-migration-test.html) calls this in a cursor loop to
+ * pull every page, then does duplicate-grouping + creation-date
+ * suffix assignment once across the complete combined set — same
+ * algorithm as dry-run-preview's, just run client-side once
+ * everything is in hand. Still entirely read-only against Monday;
+ * nothing is written to Firestore from here.
+ * ============================================================= */
+async function actionExportRecords(params) {
+  const boardId = requireParam(params, 'boardId');
+  const cursor = params.get('cursor') || null;
+  const pageSize = clampInt(params.get('pageSize'), 100, 10, 500);
+  const neededColumnIds = Object.values(COLUMN_MAP);
+
+  // Column labels (needed to resolve status-type columns) are fetched
+  // alongside items on every page, not just the first — `next_items_page`
+  // and `boards` are independent root fields, so both fit in one request.
+  // This keeps each page self-contained instead of relying on the client
+  // to carry state from page 1 forward, which would break if a caller
+  // ever fetched pages out of order or resumed a partial import.
+  const query = cursor
+    ? `query ($boardIds: [ID!], $cursor: String!, $limit: Int!) {
+         boards (ids: $boardIds) { columns { id settings_str } }
+         next_items_page (cursor: $cursor, limit: $limit) {
+           cursor
+           items {
+             id
+             name
+             created_at
+             group { id title }
+             column_values (ids: ${JSON.stringify(neededColumnIds)}) { id text value }
+             assets { id }
+           }
+         }
+       }`
+    : `query ($boardIds: [ID!], $limit: Int!) {
+         boards (ids: $boardIds) {
+           columns { id settings_str }
+           items_page (limit: $limit) {
+             cursor
+             items {
+               id
+               name
+               created_at
+               group { id title }
+               column_values (ids: ${JSON.stringify(neededColumnIds)}) { id text value }
+               assets { id }
+             }
+           }
+         }
+       }`;
+  const variables = cursor
+    ? { boardIds: [boardId], cursor, limit: pageSize }
+    : { boardIds: [boardId], limit: pageSize };
+  const data = await mondayQuery(query, variables);
+
+  const columns = (data.boards || [])[0]?.columns || [];
+  let items, nextCursor;
+  if (cursor) {
+    items = data.next_items_page?.items || [];
+    nextCursor = data.next_items_page?.cursor || null;
+  } else {
+    const board = (data.boards || [])[0];
+    items = board?.items_page?.items || [];
+    nextCursor = board?.items_page?.cursor || null;
+  }
+
+  const labelsByColumn = {};
+  columns.forEach(c => { labelsByColumn[c.id] = parseStatusLabels(c.settings_str); });
+
+  const records = items.map(item => {
+    const cvById = {};
+    item.column_values.forEach(cv => { cvById[cv.id] = cv; });
+    const getText = key => cvById[COLUMN_MAP[key]]?.text || null;
+    const getStatus = key => resolveStatusValue(cvById[COLUMN_MAP[key]], labelsByColumn[COLUMN_MAP[key]] || {});
+
+    const resolution = extractVideoIdAndNotes(item.name);
+    const parsedBase = resolution.baseId ? parseVideoId(resolution.baseId) : null;
+
+    return {
+      mondayItemId: item.id,
+      mondayItemName: item.name,
+      mondayCreatedAt: item.created_at,
+      status: item.group ? (GROUP_STATUS_MAP[item.group.id] || null) : null,
+      videoIdResolved: !!resolution.baseId,
+      videoIdStrategy: resolution.strategy,
+      videoIdError: resolution.error || null,
+      baseVideoId: resolution.baseId,
+      extractedNote: resolution.notes,
+      consignorCode: parsedBase ? parsedBase.consignorCode : null,
+      consignorLabel: getStatus('consignor') || getText('otherConsignor'),
+      sexCode: parsedBase ? parsedBase.sexCode : null,
+      sexLabel: getStatus('sex'),
+      sireCode: parsedBase ? parsedBase.sireCode : null,
+      sireLabel: getStatus('sireBreed'),
+      damCode: parsedBase ? parsedBase.damCode : null,
+      damLabel: getStatus('damBreed'),
+      weight: parsedBase ? Number(parsedBase.weight) : null,
+      monthYear: parsedBase ? parsedBase.monthYear : null,
+      videoMaker: getText('videoMaker'),
+      previewLink: getText('previewLink'),
+      clipCount: (item.assets || []).length,
+    };
+  });
+
+  return jsonResponse({
+    ok: true,
+    returned: records.length,
+    cursor: nextCursor,
+    records,
+  });
+}
+
+/* =============================================================
  * Plumbing
  * ============================================================= */
 function requireParam(params, name) {
@@ -641,6 +763,7 @@ const actions = {
   'asset-test': actionAssetTest,
   'pagination-probe': actionPaginationProbe,
   'dry-run-preview': actionDryRunPreview,
+  'export-records': actionExportRecords,
 };
 
 export default async (req) => {
