@@ -124,8 +124,8 @@ function renderShell(root, user) {
   wireSignOut();
 
   const hashTab = location.hash.replace(/^#/, '');
-  const initial = TABS.some(t => t.id === hashTab) ? hashTab : DEFAULT_TAB;
-  selectTab(initial);
+  const initialTab = TABS.some(t => t.id === hashTab) ? hashTab : DEFAULT_TAB;
+  selectTab(initialTab);
 
   window.addEventListener('hashchange', () => {
     const hashTab = location.hash.replace(/^#/, '');
