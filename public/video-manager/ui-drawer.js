@@ -23,7 +23,7 @@
  * editing section in the Details tab.
  * ============================================================= */
 
-import { escapeHtml, formatDate, formatDateTime, formatDuration, formatBytes, sexShort, cattleSummaryLine } from './format.js';
+import { escapeHtml, formatDate, formatDateTime, formatDuration, formatBytes, sexShort, cattleSummaryLine, cleanYoutubeUrl } from './format.js';
 import { formatMonthYear, buildBaseId, monthYearToInputValue, inputValueToMonthYear } from './video-id.js';
 import { showToast, copyToClipboard } from './toast.js';
 import { openDeleteConfirmModal } from './ui-modals.js';
@@ -98,7 +98,15 @@ async function paint(ctx) {
             ${rec.isDuplicateId ? `<span class="format-pill format-redo">Duplicate ID</span>` : ''}
           </div>
         </div>
-        <button class="vm-drawer-close" id="vm-drawer-close">&times;</button>
+        <div class="vm-drawer-header-actions">
+          <button class="vm-drawer-nav-btn" id="vm-drawer-prev" type="button" title="Previous record" ${navState(ctx).hasPrev ? '' : 'disabled'}>
+            <svg viewBox="0 0 12 12" fill="none"><path d="M7.5 2.5 3.5 6l4 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="vm-drawer-nav-btn" id="vm-drawer-next" type="button" title="Next record" ${navState(ctx).hasNext ? '' : 'disabled'}>
+            <svg viewBox="0 0 12 12" fill="none"><path d="M4.5 2.5 8.5 6l-4 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="vm-drawer-close" id="vm-drawer-close">&times;</button>
+        </div>
       </div>
 
       <div class="vm-drawer-tabs">
@@ -119,6 +127,8 @@ async function paint(ctx) {
 
   root.querySelector('#vm-drawer-close').addEventListener('click', closeDrawer);
   root.querySelector('#vm-drawer-backdrop').addEventListener('click', closeDrawer);
+  root.querySelector('#vm-drawer-prev')?.addEventListener('click', () => navigateDrawer(-1, ctx));
+  root.querySelector('#vm-drawer-next')?.addEventListener('click', () => navigateDrawer(1, ctx));
   root.querySelectorAll('[data-move]').forEach(btn => btn.addEventListener('click', async () => {
     await ctx.repo.setStatus(rec.id, btn.dataset.move, 'Staff');
     showToast('Status updated');
@@ -151,6 +161,19 @@ async function paint(ctx) {
 }
 
 function statusLabel(s) { return s === 'ready' ? 'Ready to Make' : s === 'hold' ? 'On Hold' : 'Created'; }
+
+/** Where the currently-open record sits in the table's own filtered/sorted list — so Previous/Next step through what's actually on screen. */
+function navState(ctx) {
+  const list = ctx.getCurrentList ? ctx.getCurrentList() : [];
+  const idx = list.findIndex(r => r.id === activeId);
+  return { list, idx, hasPrev: idx > 0, hasNext: idx >= 0 && idx < list.length - 1 };
+}
+
+function navigateDrawer(delta, ctx) {
+  const { list, idx } = navState(ctx);
+  const next = list[idx + delta];
+  if (next) ctx.openDrawer(next.id);
+}
 
 /* =============================================================
  * Resize — drag handle on the left edge, clamped, persisted for
@@ -470,10 +493,16 @@ function wireCattleSection(root, rec, ctx) {
 function hasTagsSectionHtml(rec) {
   return `
     <div class="vm-drawer-section">
-      <label class="vm-checkbox-row">
-        <input type="checkbox" id="d-hastags" ${rec.hasTags ? 'checked' : ''} />
-        <span>Has Tags — baked-in program/certification graphics need to be removed before this video is reused</span>
-      </label>
+      <div class="vm-hastags-panel">
+        <div class="vm-hastags-icon">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 9.5 9.5 3H16a1 1 0 0 1 1 1v6.5l-6.5 6.5a1 1 0 0 1-1.4 0L3 10.9a1 1 0 0 1 0-1.4Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="12.5" cy="7.5" r="1" fill="currentColor"/></svg>
+        </div>
+        <div class="vm-hastags-text">
+          <div class="vm-hastags-title">Has Tags</div>
+          <div class="vm-hastags-desc">Baked-in program/certification graphics should be removed before this video is reused.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="d-hastags" ${rec.hasTags ? 'checked' : ''} /><span class="track"></span></label>
+      </div>
     </div>`;
 }
 
@@ -498,6 +527,7 @@ function truncateMiddle(str, max = 44) {
 }
 
 function publishingSectionHtml(rec) {
+  const ytUrl = cleanYoutubeUrl(rec);
   return `
     <div class="vm-drawer-section">
       <div class="vm-drawer-section-title">Publishing</div>
@@ -505,7 +535,7 @@ function publishingSectionHtml(rec) {
         <div class="vm-pub-row">
           <div class="vm-pub-main">
             <div class="vm-pub-label">YouTube</div>
-            <div class="vm-pub-value" title="${escapeHtml(rec.youtubeUrl)}">${escapeHtml(truncateMiddle(rec.youtubeUrl))}</div>
+            <div class="vm-pub-value" title="${escapeHtml(ytUrl)}">${escapeHtml(truncateMiddle(ytUrl))}</div>
           </div>
           <div class="vm-pub-actions">
             <button class="btn-text" data-open-yt type="button">Open</button>
@@ -578,12 +608,12 @@ function previousVersionsHtml(rec) {
 
 function wirePublishingSection(root, rec, ctx) {
   root.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
-    const map = { url: rec.youtubeUrl, code: rec.embedCode, canva: rec.canvaLink };
+    const map = { url: cleanYoutubeUrl(rec), code: rec.embedCode, canva: rec.canvaLink };
     await copyToClipboard(map[btn.dataset.copy]);
     showToast('Copied');
   }));
   const openYt = root.querySelector('[data-open-yt]');
-  if (openYt) openYt.addEventListener('click', () => window.open(rec.youtubeUrl, '_blank', 'noopener'));
+  if (openYt) openYt.addEventListener('click', () => window.open(cleanYoutubeUrl(rec), '_blank', 'noopener'));
   const openEmbed = root.querySelector('[data-open-embed]');
   if (openEmbed) openEmbed.addEventListener('click', () => window.open(rec.embedUrl, '_blank', 'noopener'));
   root.querySelectorAll('[data-open-prev]').forEach(btn => btn.addEventListener('click', () => window.open(btn.dataset.openPrev, '_blank', 'noopener')));
@@ -666,9 +696,12 @@ function parseYoutubeLink(val) {
  * ============================================================= */
 function usageRowHtml(u) {
   return `
-    <div class="vm-usage-row2">
-      <div class="vm-usage-sale">${escapeHtml(u.auctionName)}</div>
-      <div class="vm-usage-meta">${formatDate(u.auctionDate)} · <strong>Lot${u.lots.length > 1 ? 's' : ''} ${u.lots.map(escapeHtml).join(', ')}</strong></div>
+    <div class="vm-usage-card">
+      <div class="vm-usage-card-top">
+        <span class="vm-usage-card-sale">${escapeHtml(u.auctionName)}</span>
+        <span class="vm-usage-card-date">${formatDate(u.auctionDate)}</span>
+      </div>
+      <div class="vm-usage-card-lot">Lot${u.lots.length > 1 ? 's' : ''} ${u.lots.map(escapeHtml).join(', ')}</div>
     </div>`;
 }
 
@@ -689,7 +722,7 @@ function usageSectionHtml(rec) {
       ${history.length ? `
         <div class="vm-drawer-subsection-title" style="margin-top:${current.length ? '12px' : '0'};">Usage History</div>
         ${shownHistory.map(usageRowHtml).join('')}
-        ${history.length > 3 ? `<button class="btn-text" id="d-usage-toggle" type="button" style="margin-top:6px;font-size:12px;">${usageExpanded ? 'Show less' : `View all ${history.length} uses`}</button>` : ''}
+        ${history.length > 3 ? `<button class="btn-text" id="d-usage-toggle" type="button" style="margin-top:6px;font-size:12px;">${usageExpanded ? 'Show less' : `View all usage (${history.length})`}</button>` : ''}
       ` : ''}
     </div>`;
 }

@@ -6,6 +6,20 @@ export function escapeHtml(str) {
   }[c]));
 }
 
+/**
+ * A clean, display-safe YouTube link — derived from youtubeId rather than
+ * trusting rec.youtubeUrl verbatim. Some records migrated from Monday have
+ * extra instructional text mixed into that field alongside the real link
+ * (Monday let staff type notes into what was supposed to be a plain URL
+ * field), so showing rec.youtubeUrl directly could show that text instead
+ * of an actual link. Falls back to the stored value only if there's no id
+ * to rebuild from.
+ */
+export function cleanYoutubeUrl(rec) {
+  if (rec?.youtubeId) return `https://youtu.be/${rec.youtubeId}`;
+  return rec?.youtubeUrl || null;
+}
+
 export function formatDate(iso) {
   if (!iso) return '—';
   const d = new Date(iso);

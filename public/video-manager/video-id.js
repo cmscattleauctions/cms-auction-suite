@@ -89,7 +89,8 @@ export function parseVideoId(raw) {
 
 /** Build a base Video ID (no suffix) from discrete fields. */
 export function buildBaseId({ consignorCode, sexCode, sireCode, damCode, weight, monthYear }) {
-  return [consignorCode, sexCode, sireCode, damCode, weight, monthYear].join('.');
+  const weightToken = Number(weight) === 0 ? '000' : weight;
+  return [consignorCode, sexCode, sireCode, damCode, weightToken, monthYear].join('.');
 }
 
 /**
