@@ -409,11 +409,71 @@ async function actionPaginationProbe(params) {
   });
 }
 
+/**
+ * Some Monday item names are the clean Video ID; others have extra
+ * human-written notes tacked on (pen numbers, a stray group letter) that
+ * break strict parsing. Recovers the underlying id in the two patterns
+ * actually observed on the real board, and returns whatever's left over
+ * as a note — never silently drops information, and never guesses past
+ * these two specific, confirmed patterns (anything else stays flagged
+ * for manual review rather than being force-fit).
+ *
+ *  1. "6.1.2.3.000.1223 (3-1,2,3)"   -> id + trailing free text
+ *  2. "56.2.0.0.750.G.0126"          -> id with one stray dot-segment
+ */
+function extractVideoIdAndNotes(rawName) {
+  const trimmed = String(rawName || '').trim();
+  const exact = parseVideoId(trimmed);
+  if (exact.valid) {
+    return { baseId: exact.baseId, notes: null, strategy: 'exact' };
+  }
+
+  // Pattern 1: a valid id followed by whitespace + anything else.
+  const wsIdx = trimmed.search(/\s/);
+  if (wsIdx > 0) {
+    const lead = parseVideoId(trimmed.slice(0, wsIdx));
+    if (lead.valid) {
+      const extra = trimmed.slice(wsIdx).trim();
+      return {
+        baseId: lead.baseId,
+        notes: `Imported from Monday — original item name was "${trimmed}".`,
+        strategy: 'trailing-text',
+        extra,
+      };
+    }
+  }
+
+  // Pattern 2: exactly one extra dot-segment inserted somewhere.
+  const segs = trimmed.split('.');
+  if (segs.length === 7) {
+    for (let i = 0; i < segs.length; i++) {
+      const candidate = segs.slice(0, i).concat(segs.slice(i + 1)).join('.');
+      const p = parseVideoId(candidate);
+      if (p.valid) {
+        return {
+          baseId: p.baseId,
+          notes: `Imported from Monday — original item name was "${trimmed}".`,
+          strategy: 'extra-segment',
+          extra: segs[i],
+        };
+      }
+    }
+  }
+
+  return { baseId: null, notes: null, strategy: 'unresolved', error: exact.error };
+}
+
 /* =============================================================
  * Phase 5-7 — dry-run preview against the real, confirmed mapping.
  * Still entirely read-only: nothing is written to Firebase or
- * Monday. Video ID comes from the item name (not a column) via the
- * app's own parseVideoId(); Status comes from the item's group.
+ * Monday. Video ID comes from the item name (not a column) via
+ * extractVideoIdAndNotes() above; Status comes from the item's group.
+ *
+ * Duplicate Video IDs (including new ones created by stripping notes
+ * off two records that turn out to share a base id) get a suffix
+ * auto-assigned by Monday creation date — earliest keeps the bare id,
+ * each later one gets -2, -3, etc., matching the app's existing
+ * suffix convention (see repository.js's nextAvailableSuffix usage).
  * ============================================================= */
 async function actionDryRunPreview(params) {
   const boardId = requireParam(params, 'boardId');
@@ -430,6 +490,7 @@ async function actionDryRunPreview(params) {
           items {
             id
             name
+            created_at
             group { id title }
             column_values (ids: $columnIds) { id text value }
             assets { id }
@@ -453,29 +514,35 @@ async function actionDryRunPreview(params) {
     const getText = key => cvById[COLUMN_MAP[key]]?.text || null;
     const getStatus = key => resolveStatusValue(cvById[COLUMN_MAP[key]], labelsByColumn[COLUMN_MAP[key]] || {});
 
-    const parsed = parseVideoId(item.name);
+    const resolution = extractVideoIdAndNotes(item.name);
+    const parsedBase = resolution.baseId ? parseVideoId(resolution.baseId) : null;
     const clipCount = (item.assets || []).length;
 
     return {
       mondayItemId: item.id,
       mondayItemName: item.name,
+      mondayCreatedAt: item.created_at,
       group: item.group ? item.group.title : null,
       status: item.group ? (GROUP_STATUS_MAP[item.group.id] || null) : null,
-      videoIdValid: parsed.valid,
-      videoIdError: parsed.valid ? null : parsed.error,
-      baseVideoId: parsed.valid ? parsed.baseId : null,
-      suffix: parsed.suffix,
-      finalVideoId: parsed.valid ? parsed.finalId : null,
-      consignorCode: parsed.valid ? parsed.consignorCode : null,
+      videoIdResolved: !!resolution.baseId,
+      videoIdStrategy: resolution.strategy,
+      videoIdError: resolution.error || null,
+      baseVideoId: resolution.baseId,
+      extractedNote: resolution.notes,
+      extractedExtra: resolution.extra || null,
+      // Filled in below, once duplicates within this batch are grouped.
+      assignedSuffix: null,
+      assignedVideoId: null,
+      consignorCode: parsedBase ? parsedBase.consignorCode : null,
       consignorLabel: getStatus('consignor') || getText('otherConsignor'),
-      sexCode: parsed.valid ? parsed.sexCode : null,
+      sexCode: parsedBase ? parsedBase.sexCode : null,
       sexLabel: getStatus('sex'),
-      sireCode: parsed.valid ? parsed.sireCode : null,
+      sireCode: parsedBase ? parsedBase.sireCode : null,
       sireLabel: getStatus('sireBreed'),
-      damCode: parsed.valid ? parsed.damCode : null,
+      damCode: parsedBase ? parsedBase.damCode : null,
       damLabel: getStatus('damBreed'),
-      weight: parsed.valid ? Number(parsed.weight) : null,
-      monthYear: parsed.valid ? parsed.monthYear : null,
+      weight: parsedBase ? Number(parsedBase.weight) : null,
+      monthYear: parsedBase ? parsedBase.monthYear : null,
       videoMaker: getText('videoMaker'),
       previewLink: getText('previewLink'),
       embedLink: getText('embedLink'),
@@ -485,10 +552,35 @@ async function actionDryRunPreview(params) {
     };
   });
 
-  const invalidVideoId = rows.filter(r => !r.videoIdValid);
-  const idCounts = new Map();
-  rows.forEach(r => { if (r.finalVideoId) idCounts.set(r.finalVideoId, (idCounts.get(r.finalVideoId) || 0) + 1); });
-  const duplicateVideoIds = [...idCounts.entries()].filter(([, n]) => n > 1).map(([id]) => id);
+  // Group by resolved base id (post notes-stripping) and assign suffixes
+  // in Monday creation-date order.
+  const byBaseId = new Map();
+  rows.forEach(r => {
+    if (!r.baseVideoId) return;
+    if (!byBaseId.has(r.baseVideoId)) byBaseId.set(r.baseVideoId, []);
+    byBaseId.get(r.baseVideoId).push(r);
+  });
+  const duplicateGroups = [];
+  byBaseId.forEach((group, baseId) => {
+    if (group.length < 2) {
+      group[0].assignedSuffix = null;
+      group[0].assignedVideoId = baseId;
+      return;
+    }
+    group.sort((a, b) => (a.mondayCreatedAt || '').localeCompare(b.mondayCreatedAt || ''));
+    group.forEach((r, i) => {
+      r.assignedSuffix = i === 0 ? null : i + 1; // 1st keeps base id, 2nd -> -2, 3rd -> -3, ...
+      r.assignedVideoId = i === 0 ? baseId : `${baseId}-${i + 1}`;
+    });
+    duplicateGroups.push({
+      baseVideoId: baseId,
+      count: group.length,
+      resolution: group.map(r => ({ mondayItemId: r.mondayItemId, mondayCreatedAt: r.mondayCreatedAt, assignedVideoId: r.assignedVideoId })),
+    });
+  });
+
+  const unresolved = rows.filter(r => !r.videoIdResolved);
+  const recoveredViaNotes = rows.filter(r => r.videoIdResolved && r.videoIdStrategy !== 'exact');
   const noClips = rows.filter(r => !r.hasClips);
   // Only "Created" records are expected to have a YouTube link already —
   // Ready/On Hold legitimately won't yet, so flagging those would just be noise.
@@ -499,9 +591,11 @@ async function actionDryRunPreview(params) {
     scanned: rows.length,
     hasMoreBeyondThisScan: !!page.cursor,
     summary: {
-      validVideoId: rows.length - invalidVideoId.length,
-      invalidVideoId: invalidVideoId.length,
-      duplicateVideoIds: duplicateVideoIds.length,
+      videoIdResolvedExactly: rows.length - recoveredViaNotes.length - unresolved.length,
+      videoIdRecoveredViaNotesStripping: recoveredViaNotes.length,
+      videoIdUnresolved: unresolved.length,
+      duplicateGroups: duplicateGroups.length,
+      duplicateRecordsNeedingASuffix: duplicateGroups.reduce((sum, g) => sum + (g.count - 1), 0),
       withClips: rows.length - noClips.length,
       withoutClips: noClips.length,
       createdWithoutYoutube: createdWithoutYoutube.length,
@@ -513,8 +607,9 @@ async function actionDryRunPreview(params) {
       },
     },
     exceptions: {
-      invalidVideoId: invalidVideoId.slice(0, 25).map(r => ({ mondayItemId: r.mondayItemId, name: r.mondayItemName, error: r.videoIdError })),
-      duplicateVideoIds,
+      unresolvedVideoId: unresolved.slice(0, 25).map(r => ({ mondayItemId: r.mondayItemId, name: r.mondayItemName, error: r.videoIdError })),
+      recoveredViaNotesStripping: recoveredViaNotes.slice(0, 25).map(r => ({ mondayItemId: r.mondayItemId, originalName: r.mondayItemName, recoveredBaseId: r.baseVideoId, strategy: r.videoIdStrategy, notesFieldWillContain: r.extractedNote })),
+      duplicateGroups: duplicateGroups.slice(0, 25),
       noClips: noClips.slice(0, 25).map(r => ({ mondayItemId: r.mondayItemId, name: r.mondayItemName, status: r.status })),
       createdWithoutYoutube: createdWithoutYoutube.slice(0, 25).map(r => ({ mondayItemId: r.mondayItemId, name: r.mondayItemName })),
     },
