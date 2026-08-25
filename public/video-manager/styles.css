@@ -121,62 +121,64 @@ label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spa
 .vm-dropdown-divider { height: 1px; background: var(--border-subtle); margin: 4px 2px; }
 
 /* =============================================================
- * Summary line + status tabs
+ * Status tabs — the primary way staff move between workflow states,
+ * so they're sized to be the clear focal point at the top of the page.
  * ============================================================= */
-.vm-summary-row {
-  display: flex; align-items: center; justify-content: space-between; padding: 6px 24px;
-  background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
-}
-.vm-summary-line { font-size: 12px; color: var(--text-secondary); }
-.vm-summary-line strong { color: var(--text-primary); font-weight: 700; }
-
-.vm-tabs { display: flex; gap: 2px; padding: 0 24px; background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
+.vm-tabs { display: flex; gap: 4px; padding: 0 24px; background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
 .vm-tab {
-  display: flex; align-items: center; gap: 7px; padding: 7px 12px; margin-bottom: -1px;
-  background: none; border: none; border-bottom: 2px solid transparent;
-  color: var(--text-secondary); font-size: 12.5px; font-weight: 600; letter-spacing: 0.01em;
+  display: flex; align-items: center; gap: 9px; padding: 14px 16px; margin-bottom: -1px;
+  background: none; border: none; border-bottom: 3px solid transparent;
+  color: var(--text-secondary); font-size: 15px; font-weight: 600; letter-spacing: 0.01em;
 }
 .vm-tab:hover { color: var(--text-primary); }
-.vm-tab.active { color: var(--text-primary); border-bottom-color: var(--accent); border-bottom-width: 2px; }
+.vm-tab.active { color: var(--text-primary); border-bottom-color: var(--accent); border-bottom-width: 3px; }
 .vm-tab-count {
-  font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px;
   background: var(--bg-muted); color: var(--text-secondary);
 }
 .vm-tab[data-tab="ready"] .vm-tab-count { background: var(--accent-bg); color: var(--accent); }
 .vm-tab[data-tab="hold"] .vm-tab-count { background: var(--format-legacy-bg); color: var(--format-legacy-fg); }
 .vm-tab[data-tab="created"] .vm-tab-count { background: var(--format-clean-bg); color: var(--format-clean-fg); }
-.vm-tab-draft-toggle {
-  margin-left: auto; align-self: center;
-  display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-secondary);
-}
-.vm-tab-draft-toggle input { width: auto; }
 
 /* =============================================================
- * Toolbar: search + filters + view toggle
+ * Toolbar: search + filters + sort + view toggle — every control
+ * shares the same height and border weight so the row reads as one
+ * cohesive unit rather than a scattering of mismatched widgets.
  * ============================================================= */
-.vm-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 24px 0; flex-shrink: 0; }
+.vm-toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 24px; flex-shrink: 0; border-bottom: 1px solid var(--border-subtle); }
 .vm-search { position: relative; flex: 1; min-width: 0; max-width: 480px; }
-.vm-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 13px; height: 13px; color: var(--text-muted); pointer-events: none; }
-.vm-search input { padding: 6px 10px 6px 30px; font-size: 12.5px; }
+.vm-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-muted); pointer-events: none; }
+.vm-search input {
+  padding: 8px 12px 8px 34px; font-size: 13px; height: 34px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); transition: border-color 120ms;
+}
+.vm-search input:focus { border-color: var(--accent); outline: none; }
 
 .vm-filters-wrap { position: relative; flex-shrink: 0; }
+.vm-filters-btn { height: 34px; display: inline-flex; align-items: center; }
 .vm-filter-badge { margin-left: 4px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; }
 .vm-filters-panel {
-  position: absolute; top: calc(100% + 6px); right: 0; width: 320px;
+  position: absolute; top: calc(100% + 6px); right: 0; width: 320px; max-width: calc(100vw - 32px);
   background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg); padding: 14px; z-index: 40;
+  box-shadow: var(--shadow-lg); padding: 14px; z-index: 40; overflow-x: hidden;
 }
+/* Selects/inputs default to content-width otherwise — a long consignor
+   name could stretch its <select> past the panel's own edge. */
+.vm-filters-panel select, .vm-filters-panel input { width: 100%; max-width: 100%; }
 .vm-filters-panel-row { margin-bottom: 10px; }
 .vm-filters-panel-footer { display: flex; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
 .vm-filter-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 12px; }
 .vm-filter-toggle-row .switch-label { color: var(--text-secondary); }
 
-.vm-sort-wrap { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.vm-sort-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
-.vm-sort-select { font-size: 12px; padding: 5px 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-primary); }
+.vm-sort-wrap { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+.vm-sort-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.vm-sort-select {
+  font-size: 12.5px; padding: 0 10px; height: 34px; border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-primary);
+}
 
-.vm-view-toggle { display: flex; background: var(--bg-muted); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 2px; flex-shrink: 0; }
-.vm-view-btn { padding: 5px 13px; font-size: 11.5px; font-weight: 600; background: none; border: none; border-radius: 5px; color: var(--text-secondary); }
+.vm-view-toggle { display: flex; background: var(--bg-muted); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 3px; height: 34px; flex-shrink: 0; }
+.vm-view-btn { padding: 0 14px; font-size: 12px; font-weight: 600; background: none; border: none; border-radius: 5px; color: var(--text-secondary); }
 .vm-view-btn.active { background: var(--bg-surface); color: var(--text-primary); box-shadow: var(--shadow-xs); }
 
 .vm-active-filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 24px 0; }
@@ -205,28 +207,35 @@ label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spa
 }
 
 /* =============================================================
- * TABLE VIEW — target ~32px rows, 12–13px type, dense scan
+ * TABLE VIEW — dense operational table. Light slate header (not a
+ * heavy dark bar) so it reads as structure, not decoration; strong
+ * type hierarchy inside each cell instead. Selected row (the one
+ * whose drawer is open) gets a light wash + a thin blue left
+ * indicator, matching the drawer's own accent, so it's obvious at a
+ * glance which record you're looking at even after scrolling.
  * ============================================================= */
 .vm-table-wrap { border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow-x: auto; background: var(--bg-surface); box-shadow: var(--shadow-xs); }
 table.vm-table { width: 100%; min-width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .vm-table thead th {
-  position: sticky; top: 0; z-index: 5; text-align: left; padding: 8px 10px; background: var(--sidebar-bg);
-  border-bottom: 1px solid var(--sidebar-bg); font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
-  text-transform: uppercase; color: rgba(255,255,255,0.85); white-space: nowrap;
+  position: sticky; top: 0; z-index: 5; text-align: left; padding: 9px 10px; background: var(--bg-muted);
+  border-bottom: 1px solid var(--border-subtle); font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--text-muted); white-space: nowrap;
 }
-.vm-table tbody tr { border-bottom: 1px solid var(--border-subtle); height: 32px; cursor: pointer; border-left: 3px solid transparent; }
+.vm-table tbody tr { border-bottom: 1px solid var(--border-subtle); height: 52px; cursor: pointer; border-left: 3px solid transparent; }
 .vm-table tbody tr:hover { background: var(--bg-surface-hover); }
 .vm-table tbody tr.has-exception { border-left-color: var(--format-legacy-fg); }
 .vm-table tbody tr.has-exception.is-bad-row { border-left-color: var(--format-redo-fg); }
+.vm-table tbody tr.is-selected { background: var(--accent-bg); border-left-color: var(--accent); }
+.vm-table tbody tr.is-selected:hover { background: var(--accent-bg); }
 .vm-exception-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; vertical-align: middle; flex-shrink: 0; }
 .vm-exception-dot.is-warn { background: var(--format-legacy-fg); }
 .vm-exception-dot.is-bad { background: var(--format-redo-fg); }
-.vm-table td { padding: 4px 9px; vertical-align: middle; white-space: nowrap; }
-.vm-table th:nth-child(2), .vm-table td:nth-child(2) { width: 240px; }
+.vm-table td { padding: 6px 9px; vertical-align: middle; white-space: nowrap; }
+.vm-table th:nth-child(2), .vm-table td:nth-child(2) { width: 280px; }
 .vm-table th:nth-child(3), .vm-table td:nth-child(3) { min-width: 190px; }
 .vm-col-check { width: 28px; }
 .vm-compare-check { width: 14px; height: 14px; margin: 0; cursor: pointer; }
-.vm-table tbody tr.vm-addrow-row { cursor: default; }
+.vm-table tbody tr.vm-addrow-row { height: auto; cursor: default; }
 .vm-table tbody tr.vm-addrow-row:hover { background: none; }
 
 .vm-cell {
@@ -242,8 +251,20 @@ td:focus, .vm-cell:focus { outline: none; }
 
 .vm-videoid-input { min-width: 190px; font-family: inherit; }
 
-/* Merged identity cell — consignor primary, Video ID secondary underneath. */
-.vm-identity-cell { padding: 2px 0; line-height: 1.35; max-width: 260px; }
+/* Merged identity cell — a real thumbnail, then consignor primary, Video
+   ID secondary underneath, then a Has Tags badge when it applies. */
+.vm-identity-cell { display: flex; align-items: center; gap: 10px; padding: 4px 0; max-width: 280px; }
+.vm-identity-thumb {
+  position: relative; width: 56px; height: 40px; flex-shrink: 0; border-radius: 5px; overflow: hidden;
+  background: var(--sidebar-bg); display: grid; place-items: center; color: rgba(255,255,255,0.35);
+}
+.vm-identity-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vm-identity-thumb.is-placeholder svg { width: 18px; height: 18px; }
+.vm-thumb-dur {
+  position: absolute; right: 3px; bottom: 3px; background: rgba(0,0,0,0.72); color: #fff;
+  font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px; font-variant-numeric: tabular-nums;
+}
+.vm-identity-text { min-width: 0; line-height: 1.35; }
 .vm-identity-primary {
   font-weight: 600; font-size: 12.5px; color: var(--text-primary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center;
@@ -253,17 +274,52 @@ td:focus, .vm-cell:focus { outline: none; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .vm-identity-secondary .suffix { color: var(--accent); }
-
-.vm-cattle-cell {
-  color: var(--text-secondary); font-size: 12px; max-width: 220px; line-height: 1.35; padding: 2px 0;
+.vm-tag-badge {
+  display: inline-block; margin-top: 2px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.02em;
+  color: var(--format-legacy-fg); background: var(--format-legacy-bg); border-radius: 4px; padding: 1px 5px;
 }
-.vm-cattle-line1 { color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Cattle cell — sex/breed (line 1) is the whole point of this column, so
+   it carries real weight; weight/date (line 2) is supporting detail. */
+.vm-cattle-cell {
+  color: var(--text-secondary); font-size: 12px; max-width: 220px; line-height: 1.4; padding: 2px 0;
+}
+.vm-cattle-line1 { color: var(--text-primary); font-weight: 700; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vm-cattle-line2 { color: var(--text-muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .vm-status-text { font-size: 12px; color: var(--text-secondary); }
 .vm-status-text.is-ready { color: var(--text-primary); }
 .vm-status-text.is-warn { color: var(--format-legacy-fg); font-weight: 600; }
 .vm-status-text.is-bad { color: var(--format-redo-fg); font-weight: 600; }
+
+/* Clips — compact "N clips" + last-added date; empty state is a plain
+   dash + one small "Add clips" action, not a repeated sentence per row. */
+.vm-clips-cell { display: flex; align-items: center; gap: 8px; }
+.vm-clips-empty { color: var(--text-muted); }
+.vm-clips-addlink { background: none; border: none; color: var(--accent); font-size: 11.5px; font-weight: 600; padding: 0; cursor: pointer; }
+.vm-clips-trigger { background: none; border: none; text-align: left; padding: 0; cursor: pointer; line-height: 1.35; }
+.vm-clips-count { font-size: 12px; color: var(--text-primary); font-weight: 600; }
+.vm-clips-last { font-size: 11px; color: var(--text-muted); }
+
+/* Usage — a small icon + count reads faster than a sentence, and doesn't
+   go blank for the (common) zero-usage case the way the old text did. */
+.vm-usage-cell { display: flex; align-items: center; gap: 5px; color: var(--text-secondary); }
+.vm-usage-icon { width: 13px; height: 13px; flex-shrink: 0; opacity: 0.7; }
+.vm-usage-count { font-size: 12.5px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.vm-usage-label { font-size: 11.5px; color: var(--text-muted); }
+
+/* Published — subtle square icon buttons instead of a loose icon row. */
+.yt-actions { display: flex; gap: 4px; }
+.btn-icon-square {
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-subtle); border-radius: 6px; background: var(--bg-surface);
+  color: var(--text-secondary); font-size: 10px; font-weight: 700; cursor: pointer;
+}
+.btn-icon-square svg { width: 13px; height: 13px; }
+.btn-icon-square:hover { background: var(--bg-muted); color: var(--text-primary); border-color: var(--border-strong); }
+
+.vm-added-cell { line-height: 1.35; font-size: 12px; color: var(--text-primary); }
+.vm-added-by { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
 
 .status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
 .status-pill.status-ready { color: var(--text-secondary); background: var(--bg-muted); }
@@ -329,14 +385,6 @@ td:focus, .vm-cell:focus { outline: none; }
 .vm-workingon-chip:hover { border-color: var(--border-strong); }
 .vm-workingon-chip.is-claimed { background: var(--format-clean-bg); border-color: var(--format-clean-fg); color: var(--format-clean-fg); }
 
-.yt-actions { display: inline-flex; gap: 3px; }
-.yt-actions .btn-icon {
-  width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700; line-height: 1;
-}
-.yt-none { color: var(--text-muted); font-size: 11px; }
-
-.vm-row-action { font-size: 12px; font-weight: 600; color: var(--accent); background: none; border: none; padding: 3px 4px; }
 .vm-row-action:hover { text-decoration: underline; }
 
 .vm-addrow-row td { padding: 8px 10px; background: var(--bg-muted); }
@@ -405,7 +453,15 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 .vm-drawer-sub-editing .vm-combo { flex: 1; max-width: 240px; }
 .vm-drawer-cattleline { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
 .vm-drawer-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.vm-drawer-close { background: none; border: none; color: var(--text-secondary); font-size: 18px; line-height: 1; padding: 4px; flex-shrink: 0; }
+.vm-drawer-header-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.vm-drawer-nav-btn {
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid transparent; border-radius: 6px; color: var(--text-secondary);
+}
+.vm-drawer-nav-btn svg { width: 11px; height: 11px; }
+.vm-drawer-nav-btn:hover:not(:disabled) { background: var(--bg-muted); color: var(--text-primary); }
+.vm-drawer-nav-btn:disabled { opacity: 0.3; cursor: default; }
+.vm-drawer-close { background: none; border: none; color: var(--text-secondary); font-size: 18px; line-height: 1; padding: 4px; flex-shrink: 0; margin-left: 4px; }
 .vm-drawer-close:hover { color: var(--text-primary); }
 
 /* ----- Tabs ----- */
@@ -427,13 +483,25 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 .vm-drawer-section-hint { font-size: 11px; color: var(--text-muted); margin-top: -6px; margin-bottom: 10px; }
 .vm-drawer-subsection-title { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 6px; }
 
-/* ----- Video Maker banner (Created videos) ----- */
+/* ----- Video Maker — subtle inline metadata, not a boxed callout ----- */
 .vm-videomaker-banner {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; margin-bottom: 14px;
-  background: var(--accent-bg); border: 1px solid var(--accent); border-radius: var(--radius-md); cursor: pointer;
+  display: flex; align-items: baseline; gap: 6px; padding-bottom: 10px; margin-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle); cursor: pointer; font-size: 12px;
 }
-.vm-videomaker-banner .k { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); }
-.vm-videomaker-banner .v { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.vm-videomaker-banner .k { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.vm-videomaker-banner .v { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+
+/* ----- Has Tags: amber alert panel with toggle ----- */
+.vm-hastags-panel {
+  display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+  background: var(--format-legacy-bg); border: 1px solid var(--format-legacy-fg); border-radius: var(--radius-md);
+}
+.vm-hastags-icon { flex-shrink: 0; width: 16px; height: 16px; margin-top: 1px; color: var(--format-legacy-fg); }
+.vm-hastags-icon svg { width: 100%; height: 100%; }
+.vm-hastags-text { flex: 1; min-width: 0; }
+.vm-hastags-title { font-size: 12.5px; font-weight: 700; color: var(--format-legacy-fg); }
+.vm-hastags-desc { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; line-height: 1.4; }
+.vm-hastags-panel .switch { margin-top: 1px; }
 
 /* ----- Cattle Information: compact 2-column grid, click-to-edit ----- */
 .vm-cattle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 14px; }
@@ -500,6 +568,16 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 .vm-usage-sale { font-weight: 700; }
 .vm-usage-meta { color: var(--text-secondary); margin-top: 1px; font-size: 12px; }
 .vm-usage-meta strong { color: var(--text-primary); }
+
+.vm-usage-card {
+  padding: 9px 11px; margin-bottom: 8px; background: var(--bg-muted);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+}
+.vm-usage-card:last-child { margin-bottom: 0; }
+.vm-usage-card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.vm-usage-card-sale { font-size: 12.5px; font-weight: 700; color: var(--text-primary); }
+.vm-usage-card-date { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+.vm-usage-card-lot { font-size: 11.5px; color: var(--text-secondary); margin-top: 3px; }
 
 /* ----- Notes: read-first ----- */
 .vm-notes-text { font-size: 13px; color: var(--text-primary); line-height: 1.5; white-space: pre-wrap; margin-bottom: 8px; }

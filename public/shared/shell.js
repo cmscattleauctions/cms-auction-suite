@@ -28,7 +28,7 @@ const TABS = [
   { id: 'banners',      label: 'Banners',      src: './banners/index.html',                 ready: true, section: 'Auction Management' },
   { id: 'pre-auction',  label: 'Pre Auction',  src: './post-auction/index.html?mode=pre',   ready: true, section: 'Auction Management' },
   { id: 'post-auction', label: 'Post Auction', src: './post-auction/index.html?mode=post',  ready: true, section: 'Auction Management' },
-  { id: 'country-market', label: 'Country Market', src: './country-market/index.html',        ready: true, section: 'Country Market Management' },
+  { id: 'country-market', label: 'Country Market', src: './country-market/index.html',        ready: true, section: 'Country Market' },
   { id: 'video-manager', label: 'Video Manager', src: './video-manager/index.html',          ready: true, section: 'Video Management' },
 ];
 
@@ -55,7 +55,7 @@ async function boot() {
     });
   } else {
     // 'approved' or 'demo'
-    renderShell(root);
+    renderShell(root, result.user);
   }
 }
 
@@ -75,7 +75,9 @@ function showLogin(root) {
  * Shell rendering
  * ============================================================= */
 
-function renderShell(root) {
+function renderShell(root, user) {
+  const email = user?.email || '';
+  const initial = email ? email[0].toUpperCase() : '?';
   const demoBanner = FIREBASE_CONFIGURED ? '' : `
     <div class="demo-banner no-print">
       Demo mode — Firebase not configured. Set values in
@@ -107,8 +109,8 @@ function renderShell(root) {
 
         <div class="sidebar-user">
           <div class="user-pill">
-            <span class="user-dot" aria-hidden="true"></span>
-            <span>Signed in</span>
+            <span class="user-avatar" aria-hidden="true">${initial}</span>
+            <span class="user-email" title="${email}">${email || 'Signed in'}</span>
           </div>
           <button class="signout-btn" type="button" data-signout>Sign out</button>
         </div>

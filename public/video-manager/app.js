@@ -13,13 +13,19 @@ import { openDrawer, closeDrawer } from './ui-drawer.js';
 import { openUploadModal, openCsvImportModal, openNotificationsModal, openVideoIdManagerModal, openTrashModal } from './ui-modals.js';
 
 const state = {
-  statusTab: 'ready',
+  statusTab: 'created', // "Completed" — the default view staff actually want first
   view: 'table',
   search: '',
   filters: {},
   draftsOnly: false,
   sort: 'updated-desc',
+  selectedId: null,
 };
+
+// The exact list currently on screen, in its current filtered/sorted order —
+// so the drawer's Previous/Next can step through what the user is actually
+// looking at rather than some other ordering.
+let currentList = [];
 
 const STATUS_TABS = [
   { id: 'ready', label: 'Ready to Make' },
@@ -66,9 +72,17 @@ export const ctx = {
   usage: UsageRepository,
   notifications: NotificationRepository,
   refresh,
-  openDrawer: id => openDrawer(id, ctx),
-  closeDrawer,
+  getCurrentList: () => currentList,
+  openDrawer: id => { state.selectedId = id; paintSelectedRow(); openDrawer(id, ctx); },
+  closeDrawer: () => { state.selectedId = null; paintSelectedRow(); closeDrawer(); },
 };
+
+/** Cheap DOM-only highlight update — avoids a full refresh() (and losing scroll position) just to show which row's drawer is open. */
+function paintSelectedRow() {
+  document.querySelectorAll('tr[data-id]').forEach(tr => {
+    tr.classList.toggle('is-selected', tr.dataset.id === state.selectedId);
+  });
+}
 
 /* =============================================================
  * Boot
@@ -95,8 +109,6 @@ async function boot() {
 async function refresh() {
   const counts = await VideoRepository.getCounts();
   paintTabCounts(counts);
-  document.getElementById('vm-summary-line').innerHTML =
-    `<strong>${counts.total}</strong> Videos · <strong>${counts.ready}</strong> Ready · <strong>${counts.hold}</strong> On Hold · <strong>${counts.created}</strong> Created`;
 
   const filters = { ...state.filters };
   if (state.draftsOnly) filters.isDraft = true;
@@ -118,6 +130,8 @@ async function refresh() {
     ? `${list.length} of ${totalInTab} record${totalInTab === 1 ? '' : 's'}`
     : `${list.length} record${list.length === 1 ? '' : 's'}`;
 
+  currentList = list;
+
   const content = document.getElementById('vm-content');
   if (!list.length) {
     content.innerHTML = `
@@ -136,6 +150,7 @@ async function refresh() {
     renderGrid(content, list, ctx);
   }
 
+  paintSelectedRow();
   renderActiveFilterChips();
 }
 
@@ -149,23 +164,13 @@ function renderTabsShell() {
       <span>${t.label}</span>
       <span class="vm-tab-count" data-count="${t.id}">0</span>
     </button>
-  `).join('') + `
-    <label class="vm-tab-draft-toggle">
-      <input type="checkbox" id="vm-drafts-toggle" />
-      Drafts only <span class="vm-tab-count" data-count="draft">0</span>
-    </label>
-  `;
+  `).join('');
 
   nav.addEventListener('click', e => {
     const btn = e.target.closest('.vm-tab');
     if (!btn) return;
     state.statusTab = btn.dataset.tab;
     paintActiveTab();
-    refresh();
-  });
-
-  document.getElementById('vm-drafts-toggle').addEventListener('change', e => {
-    state.draftsOnly = e.target.checked;
     refresh();
   });
 
@@ -326,11 +331,9 @@ function renderFiltersPanel() {
       <span class="switch-label">Has auction usage</span>
       <select id="f-usage" style="width:auto"><option value="">Any</option><option value="yes">Used</option><option value="no">Never used</option></select>
     </div>
-    <div class="vm-filters-panel-row">
-      <label>Source Status</label>
-      <select id="f-format"><option value="">All</option>
-        ${ReferenceDataRepository.getVideoFormats().map(f => `<option value="${f.code}">${f.label}</option>`).join('')}
-      </select>
+    <div class="vm-filter-toggle-row">
+      <span class="switch-label">Drafts only <span class="vm-tab-count" data-count="draft">0</span></span>
+      <label class="switch"><input type="checkbox" id="f-drafts-only" /><span class="track"></span></label>
     </div>
     <div class="vm-filters-panel-footer">
       <button class="btn btn-ghost btn-block" id="f-clear" type="button">Clear all</button>
@@ -342,6 +345,7 @@ function renderFiltersPanel() {
     panel.querySelectorAll('select').forEach(s => s.value = '');
     panel.querySelectorAll('input').forEach(i => i.type === 'checkbox' ? i.checked = false : i.value = '');
     state.filters = {};
+    state.draftsOnly = false;
     updateFilterBadge();
     refresh();
   });
@@ -360,11 +364,11 @@ function renderFiltersPanel() {
     const yt = panel.querySelector('#f-has-youtube').value; if (yt) filters.hasYoutube = yt === 'yes';
     const review = panel.querySelector('#f-needs-review').checked; if (review) filters.needsReview = true;
     const usage = panel.querySelector('#f-usage').value; if (usage) filters.hasUsage = usage === 'yes';
-    const format = panel.querySelector('#f-format').value; if (format) filters.videoFormat = format;
     const monthYear = panel.querySelector('#f-monthyear').value.trim(); if (monthYear) filters.monthYear = monthYear;
     const hasClips = panel.querySelector('#f-has-clips').value; if (hasClips) filters.hasClips = hasClips === 'yes';
 
     state.filters = filters;
+    state.draftsOnly = panel.querySelector('#f-drafts-only').checked;
     updateFilterBadge();
     panel.hidden = true;
     refresh();
@@ -401,7 +405,6 @@ const FILTER_LABELS = {
   hasYoutube: v => v ? 'Has YouTube' : 'No YouTube',
   needsReview: () => 'Needs review',
   hasUsage: v => v ? 'Used in auctions' : 'Never used',
-  videoFormat: code => `Source: ${ReferenceDataRepository.videoFormatMeta(code)?.label || code}`,
   monthYear: v => `Month: ${v}`,
   hasClips: v => v ? 'Has clips' : 'No clips',
 };

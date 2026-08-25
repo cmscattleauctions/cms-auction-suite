@@ -386,7 +386,13 @@
     const now = new Date().toISOString();
     const consignor = ReferenceDataRepository.findConsignor(r.consignorCode);
     const youtubeId = extractYoutubeId(r.previewLink);
-    const youtubeUrl = r.previewLink || null;
+    // Derived from the extracted id, not r.previewLink verbatim — some Monday
+    // items have instructional text mixed into that column alongside the real
+    // link (e.g. "To convert YouTube embed link, paste in the original link...
+    // youtu.be/xxx"), and extractYoutubeId() finds the real id buried in there
+    // fine, but using the raw text as the display URL would show that
+    // surrounding text as if it were the link itself.
+    const youtubeUrl = youtubeId ? `https://youtu.be/${youtubeId}` : null;
     const embedUrl = youtubeId ? `https://www.youtube.com/embed/${youtubeId}?mute=1&autoplay=1&playlist=${youtubeId}&loop=1` : null;
     const embedCode = embedUrl ? `<iframe width="560" height="315" src="${embedUrl}" title="CMS Auction Video" frameborder="0" allowfullscreen></iframe>` : null;
     return {

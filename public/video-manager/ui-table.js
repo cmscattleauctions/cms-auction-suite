@@ -12,7 +12,7 @@
  * ui-drawer.js's Cattle Information section).
  * ============================================================= */
 
-import { escapeHtml, formatDateShort, formatDuration, cattleSummaryTwoLine } from './format.js';
+import { escapeHtml, formatDateShort, formatDuration, cattleSummaryTwoLine, cleanYoutubeUrl } from './format.js';
 import { showToast, copyToClipboard } from './toast.js';
 import { handleIdEntryLoop } from './ui-modals.js';
 import { openCompareModal } from './ui-compare.js';
@@ -24,11 +24,12 @@ const compareSelection = new Map(); // id -> record snapshot, so the compare bar
 export function renderTable(container, records, ctx) {
   const isCreated = ctx.state.statusTab === 'created';
   const showWorkingOn = ctx.state.statusTab === 'ready';
+  // No dedicated Open/action column — the row itself opens the drawer.
   const headCells = isCreated
-    ? ['', 'Video', 'Cattle', 'Clips', 'Tags', 'Usage', 'Published', 'Added', '']
+    ? ['', 'Video', 'Cattle', 'Clips', 'Usage', 'Published', 'Added']
     : showWorkingOn
-      ? ['', 'Video', 'Cattle', 'Clips', 'Status', 'Working On', 'Added', '']
-      : ['', 'Video', 'Cattle', 'Clips', 'Status', 'Added', ''];
+      ? ['', 'Video', 'Cattle', 'Clips', 'Status', 'Working On', 'Added']
+      : ['', 'Video', 'Cattle', 'Clips', 'Status', 'Added'];
   const colspan = headCells.length;
 
   container.innerHTML = `
@@ -43,9 +44,32 @@ export function renderTable(container, records, ctx) {
   const tbody = container.querySelector('#vm-table-body');
   tbody.innerHTML = records.map(r => (isCreated ? createdRowHtml(r, ctx) : readyRowHtml(r, ctx, showWorkingOn))).join('') + addRowHtml(colspan);
 
+  wireThumbnailFallbacks(tbody);
   wireRows(tbody, ctx);
   wireAddRow(tbody, ctx);
   paintCompareBar(ctx);
+}
+
+/**
+ * YouTube's thumbnail CDN doesn't 404 for a nonexistent video id — it
+ * serves a generic "unavailable" placeholder (always exactly 120x90, vs a
+ * real thumbnail's larger real dimensions) with an HTTP 200. Swap those
+ * out for our own neutral icon instead of showing YouTube's broken-looking
+ * gray box. Cheap: these are plain lazy-loaded <img> tags, no video
+ * elements, safe at 600+ rows.
+ */
+function wireThumbnailFallbacks(tbody) {
+  tbody.querySelectorAll('[data-yt-thumb]').forEach(img => {
+    const swap = () => {
+      const wrap = img.closest('.vm-identity-thumb');
+      if (wrap) wrap.classList.add('is-placeholder');
+      img.remove();
+    };
+    img.addEventListener('error', swap, { once: true });
+    img.addEventListener('load', () => {
+      if (img.naturalWidth === 120 && img.naturalHeight === 90) swap();
+    }, { once: true });
+  });
 }
 
 /* =============================================================
@@ -117,17 +141,45 @@ function rowExceptionClass(r, context) {
   return flags.some(f => f.severity === 'bad') ? 'has-exception is-bad-row' : 'has-exception';
 }
 
+const PLACEHOLDER_THUMB_ICON = `<svg viewBox="0 0 24 24" fill="none"><path d="M4 6h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.4"/><path d="M17 10.5 22 8v8l-5-2.5" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+
+/** A small landscape thumbnail — the real YouTube one when published, a neutral placeholder otherwise. Static <img>, lazy-loaded, never a <video> element: cheap at 600+ rows. */
+function thumbnailHtml(r) {
+  const dur = r.clips[0]?.durationSec;
+  const durBadge = dur != null ? `<span class="vm-thumb-dur">${formatDuration(dur)}</span>` : '';
+  if (r.youtubeId) {
+    return `
+      <div class="vm-identity-thumb">
+        <img src="https://img.youtube.com/vi/${encodeURIComponent(r.youtubeId)}/mqdefault.jpg" loading="lazy" alt="" data-yt-thumb />
+        ${durBadge}
+      </div>`;
+  }
+  return `<div class="vm-identity-thumb is-placeholder">${PLACEHOLDER_THUMB_ICON}${durBadge}</div>`;
+}
+
+/** "Bryson Murray" -> "BM" — never hardcoded, always derived from whatever staff name is actually on the record. */
+function initialsFor(name) {
+  if (!name) return '';
+  return String(name).trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+}
+
 /**
  * Merged identity cell — consignor name is the primary/scannable text,
  * Video ID is secondary underneath. Consignor is what staff actually
  * recognize a record by; the ID matters for lookups/copying but
- * shouldn't be the loudest thing in the row.
+ * shouldn't be the loudest thing in the row. Has Tags surfaces here as a
+ * small badge rather than its own column — it's a flag on the record, not
+ * a dimension worth a whole column of mostly-blank cells.
  */
 function identityCell(r, context) {
   return `
     <div class="vm-identity-cell">
-      <div class="vm-identity-primary">${exceptionDot(r, context)}${escapeHtml(r.consignorName)}</div>
-      <div class="vm-identity-secondary">${escapeHtml(r.baseVideoId)}${r.suffix ? `<span class="suffix">-${r.suffix}</span>` : ''}</div>
+      ${thumbnailHtml(r)}
+      <div class="vm-identity-text">
+        <div class="vm-identity-primary">${exceptionDot(r, context)}${escapeHtml(r.consignorName)}</div>
+        <div class="vm-identity-secondary">${escapeHtml(r.baseVideoId)}${r.suffix ? `<span class="suffix">-${r.suffix}</span>` : ''}</div>
+        ${r.hasTags ? `<span class="vm-tag-badge">Has Tags</span>` : ''}
+      </div>
     </div>`;
 }
 
@@ -145,12 +197,13 @@ function cattleCell(r, ctx) {
 
 function clipsCell(r) {
   if (!r.clips.length) {
-    return `<span class="vm-clips-none">No clips</span><button class="vm-clips-addlink" data-add-files="${r.id}" type="button">+ Add</button>`;
+    return `<div class="vm-clips-cell"><span class="vm-clips-empty">—</span><button class="vm-clips-addlink" data-add-files="${r.id}" type="button">Add clips</button></div>`;
   }
+  const lastDate = r.clips.map(c => c.uploadedAt).filter(Boolean).sort().slice(-1)[0];
   return `
     <button class="vm-clips-trigger" data-clips-trigger="${r.id}" type="button" title="View clips">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6"/><path d="M17 10.5 22 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-      ${r.clips.length} clip${r.clips.length === 1 ? '' : 's'}
+      <div class="vm-clips-count">${r.clips.length} clip${r.clips.length === 1 ? '' : 's'}</div>
+      ${lastDate ? `<div class="vm-clips-last">Last: ${formatDateShort(lastDate)}</div>` : ''}
     </button>`;
 }
 
@@ -160,18 +213,14 @@ function statusIssueCell(r) {
   return `<span class="vm-status-text is-ready">Ready to Build</span>`;
 }
 
-function hasTagsCell(r) {
-  if (!r.hasTags) return '';
-  return `<span class="format-pill format-legacy">Has Tags</span>`;
-}
-
 function usageCell(r) {
-  if (!r.usage.length) return `<span class="vm-status-text">—</span>`;
-  const sorted = [...r.usage].sort((a, b) => b.auctionDate.localeCompare(a.auctionDate));
-  const latest = sorted[0];
-  const lotLabel = latest.lots[0] + (latest.lots.length > 1 ? ` +${latest.lots.length - 1}` : '');
-  const moreUses = r.usage.length > 1 ? ` +${r.usage.length - 1}` : '';
-  return `<span class="vm-status-text">Lot ${escapeHtml(lotLabel)} · ${formatDateShort(latest.auctionDate)}${moreUses}</span>`;
+  const n = r.usage.length;
+  return `
+    <div class="vm-usage-cell" title="${n} auction usage record${n === 1 ? '' : 's'}">
+      <svg viewBox="0 0 16 16" fill="none" class="vm-usage-icon" aria-hidden="true"><path d="M2 6.5 8 2l6 4.5M3 6v7h10V6" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.5 13V9h3v4" stroke="currentColor" stroke-width="1.2"/></svg>
+      <span class="vm-usage-count">${n}</span>
+      <span class="vm-usage-label">Auction${n === 1 ? '' : 's'}</span>
+    </div>`;
 }
 
 function publishedCell(r) {
@@ -180,20 +229,29 @@ function publishedCell(r) {
   }
   return `
     <span class="yt-actions">
-      <button class="btn btn-icon" data-open-yt="${r.id}" title="Open YouTube Video">▶</button>
-      <button class="btn btn-icon" data-copy-link="${r.id}" title="Copy YouTube Link">⿻</button>
-      <button class="btn btn-icon" data-copy-embed="${r.id}" title="Copy Embed Code">&lt;/&gt;</button>
+      <button class="btn-icon-square" data-open-yt="${r.id}" title="Open YouTube Video">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.6 7.2s-.2-1.5-.8-2.2c-.8-.9-1.7-.9-2.1-1C15.9 3.8 12 3.8 12 3.8h0s-3.9 0-6.7.2c-.4 0-1.3.1-2.1 1-.6.7-.8 2.2-.8 2.2S2.2 9 2.2 10.7v1.6c0 1.8.2 3.5.2 3.5s.2 1.5.8 2.2c.8.9 1.9.9 2.4 1 1.7.2 7.4.2 7.4.2s3.9 0 6.7-.2c.4 0 1.3-.1 2.1-1 .6-.7.8-2.2.8-2.2s.2-1.8.2-3.5v-1.6c0-1.8-.2-3.5-.2-3.5ZM9.9 14.6V8.4l5.4 3.1-5.4 3.1Z"/></svg>
+      </button>
+      <button class="btn-icon-square" data-copy-embed="${r.id}" title="Copy Embed Code">&lt;/&gt;</button>
+      <button class="btn-icon-square" data-copy-link="${r.id}" title="Copy YouTube Link">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M3 10.5H2.5A1.5 1.5 0 0 1 1 9V2.5A1.5 1.5 0 0 1 2.5 1H9A1.5 1.5 0 0 1 10.5 2.5V3" stroke="currentColor" stroke-width="1.3"/></svg>
+      </button>
     </span>`;
+}
+
+function addedCell(r) {
+  const initials = initialsFor(r.createdBy || r.videoMaker);
+  return `
+    <div class="vm-added-cell">
+      <div>${formatDateShort(r.dateAdded)}</div>
+      ${initials ? `<div class="vm-added-by">by ${escapeHtml(initials)}</div>` : ''}
+    </div>`;
 }
 
 function editableCell(r, field, display, isEmpty = false) {
   return `<span class="vm-cell" data-editable="true" data-id="${r.id}" data-field="${field}" tabindex="0">${
     isEmpty ? '<span class="is-empty">—</span>' : (display || '<span class="is-empty">—</span>')
   }</span>`;
-}
-
-function actionCell(r) {
-  return `<button class="vm-row-action" data-open-drawer="${r.id}" type="button">Open ›</button>`;
 }
 
 function workingOnCell(r) {
@@ -204,34 +262,35 @@ function workingOnCell(r) {
 }
 
 /* =============================================================
- * Row rendering (two column sets)
+ * Row rendering (two column sets) — no dedicated action column;
+ * clicking anywhere on the row opens the drawer (see wireRows), and
+ * the currently-open record stays visibly selected via .is-selected
+ * (applied by app.js's paintSelectedRow(), not here, since which
+ * record is selected can change without the table re-rendering).
  * ============================================================= */
 function readyRowHtml(r, ctx, showWorkingOn) {
   return `
-    <tr data-id="${r.id}" class="${rowExceptionClass(r, 'ready')}">
+    <tr data-id="${r.id}" class="${rowExceptionClass(r, 'ready')} ${ctx.state.selectedId === r.id ? 'is-selected' : ''}">
       <td class="vm-col-check">${compareCheckboxCell(r)}</td>
       <td>${identityCell(r, 'ready')}</td>
       <td>${cattleCell(r, ctx)}</td>
       <td>${clipsCell(r)}</td>
       <td>${statusIssueCell(r)}</td>
       ${showWorkingOn ? `<td>${workingOnCell(r)}</td>` : ''}
-      <td>${formatDateShort(r.dateAdded)}</td>
-      <td>${actionCell(r)}</td>
+      <td>${addedCell(r)}</td>
     </tr>`;
 }
 
 function createdRowHtml(r, ctx) {
   return `
-    <tr data-id="${r.id}" class="${rowExceptionClass(r, 'created')}">
+    <tr data-id="${r.id}" class="${rowExceptionClass(r, 'created')} ${ctx.state.selectedId === r.id ? 'is-selected' : ''}">
       <td class="vm-col-check">${compareCheckboxCell(r)}</td>
       <td>${identityCell(r, 'created')}</td>
       <td>${cattleCell(r, ctx)}</td>
       <td>${clipsCell(r)}</td>
-      <td>${hasTagsCell(r)}</td>
       <td>${usageCell(r)}</td>
       <td>${publishedCell(r)}</td>
-      <td>${formatDateShort(r.dateAdded)}</td>
-      <td>${actionCell(r)}</td>
+      <td>${addedCell(r)}</td>
     </tr>`;
 }
 
@@ -334,7 +393,7 @@ function wireRows(tbody, ctx) {
     const copyLinkBtn = e.target.closest('[data-copy-link]');
     if (copyLinkBtn) {
       const rec = await ctx.repo.getVideoById(copyLinkBtn.dataset.copyLink);
-      await copyToClipboard(rec.youtubeUrl);
+      await copyToClipboard(cleanYoutubeUrl(rec));
       showToast('Copied');
       return;
     }
@@ -350,7 +409,7 @@ function wireRows(tbody, ctx) {
     const openYtBtn = e.target.closest('[data-open-yt]');
     if (openYtBtn) {
       const rec = await ctx.repo.getVideoById(openYtBtn.dataset.openYt);
-      window.open(rec.youtubeUrl, '_blank', 'noopener');
+      window.open(cleanYoutubeUrl(rec), '_blank', 'noopener');
       return;
     }
 
@@ -367,10 +426,9 @@ function wireRows(tbody, ctx) {
       return;
     }
 
-    const openDrawerBtn = e.target.closest('[data-open-drawer]');
-    if (openDrawerBtn) { ctx.openDrawer(openDrawerBtn.dataset.openDrawer); return; }
-
-    // Fallback: click anywhere else on a data row opens the drawer.
+    // No dedicated "Open" button — clicking anywhere else on a data row
+    // (that isn't one of the interactive controls handled above) opens
+    // the drawer directly.
     const tr = e.target.closest('tr[data-id]');
     if (tr) ctx.openDrawer(tr.dataset.id);
   });
