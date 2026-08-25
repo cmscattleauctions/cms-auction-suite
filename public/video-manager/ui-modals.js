@@ -461,6 +461,7 @@ export function openUploadModal(ctx) {
           <label>Consignor <button type="button" class="btn btn-sm btn-ghost" id="um-new-consignor" style="margin-left:6px">+ Add New</button></label>
           <div class="vm-combo" id="um-consignor-combo" data-selected-code="">
             <input type="text" id="um-b-consignor-input" placeholder="Search or type a consignor…" autocomplete="off" />
+            <span class="vm-combo-code-badge" id="um-consignor-code-badge" hidden></span>
             <div class="vm-combo-list" id="um-consignor-list" hidden></div>
           </div>
         </div>
@@ -544,6 +545,12 @@ export function openUploadModal(ctx) {
   const consignorCombo = modal.querySelector('#um-consignor-combo');
   const consignorInput = modal.querySelector('#um-b-consignor-input');
   const consignorList = modal.querySelector('#um-consignor-list');
+  const consignorCodeBadge = modal.querySelector('#um-consignor-code-badge');
+  function updateConsignorCodeBadge() {
+    const code = consignorCombo.dataset.selectedCode;
+    consignorCodeBadge.hidden = !code;
+    consignorCodeBadge.textContent = code ? `#${code}` : '';
+  }
   function renderConsignorOptions(query) {
     const q = query.trim().toLowerCase();
     const matches = q ? consignors.filter(c => c.name.toLowerCase().includes(q) || c.code.includes(q)) : consignors;
@@ -556,11 +563,12 @@ export function openUploadModal(ctx) {
       consignorInput.value = rec2.name;
       consignorCombo.dataset.selectedCode = rec2.code;
       consignorList.hidden = true;
+      updateConsignorCodeBadge();
       updateBuildPreview();
     }));
   }
   consignorInput.addEventListener('focus', () => renderConsignorOptions(consignorInput.value));
-  consignorInput.addEventListener('input', () => { consignorCombo.dataset.selectedCode = ''; renderConsignorOptions(consignorInput.value); });
+  consignorInput.addEventListener('input', () => { consignorCombo.dataset.selectedCode = ''; updateConsignorCodeBadge(); renderConsignorOptions(consignorInput.value); });
   consignorInput.addEventListener('blur', () => setTimeout(() => { consignorList.hidden = true; }, 150));
 
   modal.querySelector('#um-new-consignor').addEventListener('click', async () => {
@@ -569,6 +577,7 @@ export function openUploadModal(ctx) {
       consignors.push(rec);
       consignorInput.value = rec.name;
       consignorCombo.dataset.selectedCode = rec.code;
+      updateConsignorCodeBadge();
       updateBuildPreview();
     }
   });

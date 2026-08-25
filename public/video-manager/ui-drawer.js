@@ -15,14 +15,15 @@
  * explicit opt-in "Update Video ID to match" action instead of
  * quietly reassigning an ID that may already be in use elsewhere.
  *
- * Note on scope: an earlier round of feedback explicitly asked for
- * the old "Playback" (overlay-mode) section to be removed outright,
- * so "Video Configuration" below only groups Source Quality — there
- * is no second subsection to merge it with. If overlay-mode ever
- * comes back, it belongs here.
+ * Note on scope: the old "Playback" (overlay-mode) section and, later,
+ * the "Video Configuration / Source Quality" section were both removed
+ * outright per feedback — videoFormat is still a real field (still
+ * editable via the footer's Mark Needs Redo action and shown as a
+ * small pill in the header summary), just without its own dedicated
+ * editing section in the Details tab.
  * ============================================================= */
 
-import { escapeHtml, formatDate, formatDateTime, formatDuration, sexShort, cattleSummaryLine } from './format.js';
+import { escapeHtml, formatDate, formatDateTime, formatDuration, formatBytes, sexShort, cattleSummaryLine } from './format.js';
 import { formatMonthYear, buildBaseId, monthYearToInputValue, inputValueToMonthYear } from './video-id.js';
 import { showToast, copyToClipboard } from './toast.js';
 import { openDeleteConfirmModal } from './ui-modals.js';
@@ -140,7 +141,6 @@ async function paint(ctx) {
     wireDuplicateBanner(root, rec, ctx);
     wireVideoMakerBanner(root, rec, ctx);
     wirePublishingSection(root, rec, ctx);
-    wireSourceStatusSection(root, rec, ctx);
     wireHasTagsSection(root, rec, ctx);
     wireUsageSection(root, ctx);
     wireNotesSection(root, rec, ctx);
@@ -189,12 +189,12 @@ function detailsTabHtml(rec, ctx, sexLabel, sireLabel, damLabel) {
     ${rec.isDuplicateId ? duplicateBannerHtml(rec) : ''}
     ${rec.status === 'created' ? videoMakerBannerHtml(rec) : ''}
     ${cattleSectionHtml(rec, ctx, sexLabel, sireLabel, damLabel)}
-    ${videoConfigSectionHtml(rec, ctx)}
     ${rec.hasTags ? hasTagsSectionHtml(rec) : ''}
     ${publishingSectionHtml(rec)}
     ${usageSectionHtml(rec)}
     ${notesSectionHtml(rec)}
     ${activitySectionHtml(rec)}
+    ${recordInfoSectionHtml(rec)}
     ${!rec.hasTags ? hasTagsSectionHtml(rec) : ''}
   `;
 }
@@ -457,43 +457,6 @@ function wireCattleSection(root, rec, ctx) {
       return;
     }
     showToast('Video ID updated');
-    ctx.refresh();
-    paint(ctx);
-  });
-}
-
-/* =============================================================
- * VIDEO CONFIGURATION (Source Quality) — a UI grouping only, not
- * a schema change. See file header re: Playback removal.
- * ============================================================= */
-function videoConfigSectionHtml(rec, ctx) {
-  const meta = ctx.ref.videoFormatMeta(rec.videoFormat);
-  return `
-    <div class="vm-drawer-section">
-      <div class="vm-drawer-section-title">Video Configuration</div>
-      <div class="vm-drawer-subsection-title">Source Quality</div>
-      <div class="vm-drawer-section-hint">Is this underlying source video reusable?</div>
-      <div class="vm-source-select-row">
-        <select id="d-videoformat">
-          ${ctx.ref.getVideoFormats().map(f => `<option value="${f.code}" ${f.code === rec.videoFormat ? 'selected' : ''}>${f.label}</option>`).join('')}
-        </select>
-        ${rec.videoFormat !== 'needs-redo' ? `<button class="btn btn-sm btn-ghost" id="d-mark-redo" type="button">Mark Needs Redo</button>` : ''}
-      </div>
-      <p class="field-hint" id="d-videoformat-desc">${escapeHtml(meta ? meta.desc : '')}</p>
-    </div>`;
-}
-
-function wireSourceStatusSection(root, rec, ctx) {
-  const sel = root.querySelector('#d-videoformat');
-  if (sel) sel.addEventListener('change', async e => {
-    await ctx.repo.setVideoFormat(rec.id, e.target.value, 'Staff');
-    ctx.refresh();
-    paint(ctx);
-  });
-  const markRedoBtn = root.querySelector('#d-mark-redo');
-  if (markRedoBtn) markRedoBtn.addEventListener('click', async () => {
-    await ctx.repo.markNeedsRedo(rec.id, 'Staff');
-    showToast('Marked Needs Redo');
     ctx.refresh();
     paint(ctx);
   });
@@ -813,21 +776,34 @@ function wireActivitySection(root, ctx) {
   if (toggle) toggle.addEventListener('click', () => { activityExpanded = !activityExpanded; paint(ctx); });
 }
 
+/** Plain record metadata — no edit affordance, just the two dates staff sometimes need to check. */
+function recordInfoSectionHtml(rec) {
+  return `
+    <div class="vm-drawer-section vm-record-info">
+      <span>Added ${formatDate(rec.dateAdded)}</span>
+      <span>Last Updated ${formatDateTime(rec.lastUpdated)}</span>
+    </div>`;
+}
+
 /* =============================================================
- * CLIPS TAB — dedicated media-management view + inline preview.
+ * CLIPS TAB — each clip is its own card with a real video thumbnail
+ * (a browser shows a video element's first frame automatically once
+ * metadata loads, so no canvas capture is needed) and a centered
+ * play button that expands that one card to an inline player.
+ * Download All is the primary action here per the workflow this tab
+ * is actually used for: pulling files, not editing them.
  * ============================================================= */
 function clipsTabHtml(rec) {
   return `
     <div class="vm-drawer-section" style="border-bottom:none;">
       <div class="vm-drawer-section-title">Source Clips <span>${rec.clips.length}</span></div>
-      ${previewClipId ? clipPreviewHtml(rec) : ''}
       ${rec.clips.length ? `
-        <div class="vm-clip-list2">
-          ${rec.clips.map(c => clipRowHtml(c, c.id === previewClipId)).join('')}
-        </div>
         <div class="vm-clips-tab-actions">
-          <button class="btn btn-sm" id="c-download-all" type="button">Download All</button>
+          <button class="btn btn-primary btn-sm" id="c-download-all" type="button">Download All</button>
           <button class="btn btn-sm btn-ghost" id="c-add-clips" type="button">+ Add Clips</button>
+        </div>
+        <div class="vm-clip-list2">
+          ${rec.clips.map((c, i) => clipCardHtml(c, i, c.id === previewClipId)).join('')}
         </div>
       ` : `
         <p class="muted">No clips uploaded yet.</p>
@@ -836,34 +812,38 @@ function clipsTabHtml(rec) {
     </div>`;
 }
 
-function clipPreviewHtml(rec) {
-  const clip = rec.clips.find(c => c.id === previewClipId);
-  if (!clip) return '';
+function clipCardHtml(c, index, isPlaying) {
   return `
-    <div class="vm-clip-preview">
-      <div class="vm-clip-preview-head">
-        <span>Previewing: ${escapeHtml(clip.filename)}</span>
-        <button id="c-preview-close" type="button" title="Close preview">&times;</button>
+    <div class="vm-clip-card2 ${isPlaying ? 'is-playing' : ''}" data-clip-id="${c.id}">
+      <div class="vm-clip-card2-label">Clip ${index + 1}</div>
+      <div class="vm-clip-thumb">
+        ${c.downloadUrl
+          ? `<video preload="metadata" muted playsinline ${isPlaying ? 'controls autoplay' : ''} src="${escapeHtml(c.downloadUrl)}#t=0.5"></video>`
+          : `<div class="vm-clip-thumb-empty">No file yet</div>`}
+        ${c.downloadUrl && !isPlaying ? `
+          <button class="vm-clip-play-btn" data-play-clip2="${c.id}" type="button" title="Play">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>
+          </button>` : ''}
       </div>
-      ${clip.downloadUrl ? `<video controls autoplay src="${escapeHtml(clip.downloadUrl)}"></video>` : `<div class="vm-clip-preview-empty">Preview unavailable</div>`}
-    </div>`;
-}
-
-function clipRowHtml(c, isPreviewing) {
-  return `
-    <div class="vm-clip-row2 ${isPreviewing ? 'is-previewing' : ''}">
-      <svg class="vm-clip-icon" viewBox="0 0 24 24" fill="none"><path d="M4 6h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6"/><path d="M17 10.5 22 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-      <div class="vm-clip-info">
-        <div class="vm-clip-name">${escapeHtml(c.filename)}</div>
-        <div class="vm-clip-details">${formatDuration(c.durationSec)} · ${escapeHtml(c.uploader)} · ${formatDate(c.uploadedAt)}</div>
+      <div class="vm-clip-meta-row">
+        <span>${formatDuration(c.durationSec)}</span>
+        <span>${formatDate(c.uploadedAt)}</span>
+        <span>${formatBytes(c.sizeBytes)}</span>
       </div>
-      <button class="btn btn-icon" data-preview-clip2="${c.id}" type="button" title="Preview"><svg viewBox="0 0 12 12" fill="currentColor"><path d="M3 2l7 4-7 4V2z"/></svg></button>
-      <button class="btn btn-icon" data-download-clip2="${c.id}" type="button" title="Download"><svg viewBox="0 0 14 14" fill="none"><path d="M7 2v7M4 6l3 3 3-3M2.5 11.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div class="vm-clip-card2-actions">
+        <button class="btn btn-sm btn-ghost" data-download-clip2="${c.id}" type="button">Download</button>
+        <span class="vm-overflow">
+          <button class="vm-overflow-btn" data-clip-more="${c.id}" type="button" title="More">⋯</button>
+          <div class="vm-overflow-menu" id="clip-menu-${escapeHtml(c.id)}" hidden>
+            <button data-play-clip2="${c.id}" type="button">${isPlaying ? 'Stop preview' : 'Preview'}</button>
+          </div>
+        </span>
+      </div>
     </div>`;
 }
 
 function setPreviewClip(rec, clipId) {
-  if (!clipId) { previewClipId = null; return; }
+  if (!clipId || clipId === previewClipId) { previewClipId = null; return; }
   const clip = rec.clips.find(c => c.id === clipId);
   if (!clip || !clip.downloadUrl) {
     showToast('This clip has no file to preview yet');
@@ -912,12 +892,19 @@ function wireClipsTab(root, rec, ctx) {
     const clip = rec.clips.find(c => c.id === btn.dataset.downloadClip2);
     downloadClips(clip ? [clip] : []);
   }));
-  root.querySelectorAll('[data-preview-clip2]').forEach(btn => btn.addEventListener('click', () => {
-    setPreviewClip(rec, btn.dataset.previewClip2);
+  root.querySelectorAll('[data-play-clip2]').forEach(btn => btn.addEventListener('click', () => {
+    setPreviewClip(rec, btn.dataset.playClip2);
     paint(ctx);
   }));
-  const closePreview = root.querySelector('#c-preview-close');
-  if (closePreview) closePreview.addEventListener('click', () => { setPreviewClip(rec, null); paint(ctx); });
+  root.querySelectorAll('[data-clip-more]').forEach(btn => btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const menu = root.querySelector(`#clip-menu-${btn.dataset.clipMore}`);
+    if (!menu) return;
+    const opening = menu.hidden;
+    root.querySelectorAll('.vm-overflow-menu').forEach(m => m.hidden = true);
+    menu.hidden = !opening;
+    if (opening) setTimeout(() => document.addEventListener('click', () => { menu.hidden = true; }, { once: true }), 0);
+  }));
 }
 
 function downloadClips(clips) {

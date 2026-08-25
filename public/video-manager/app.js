@@ -18,13 +18,46 @@ const state = {
   search: '',
   filters: {},
   draftsOnly: false,
+  sort: 'updated-desc',
 };
 
 const STATUS_TABS = [
   { id: 'ready', label: 'Ready to Make' },
   { id: 'hold', label: 'On Hold' },
-  { id: 'created', label: 'Created' },
+  { id: 'created', label: 'Completed' },
 ];
+
+/** MMYY -> YYMM, so delivery-date sort compares chronologically instead of by month digit first. */
+function deliveryDateSortKey(monthYear) {
+  if (!monthYear || monthYear.length !== 4) return '';
+  return monthYear.slice(2) + monthYear.slice(0, 2);
+}
+
+const SORT_OPTIONS = [
+  { id: 'updated-desc',    label: 'Updated — Newest' },
+  { id: 'updated-asc',     label: 'Updated — Oldest' },
+  { id: 'added-desc',      label: 'Added — Newest' },
+  { id: 'added-asc',       label: 'Added — Oldest' },
+  { id: 'consignor-asc',   label: 'Consignor — A to Z' },
+  { id: 'consignor-desc',  label: 'Consignor — Z to A' },
+  { id: 'video-id',        label: 'Video ID' },
+  { id: 'delivery-date',   label: 'Delivery Date' },
+  { id: 'clips-desc',      label: 'Clip Count — High to Low' },
+  { id: 'clips-asc',       label: 'Clip Count — Low to High' },
+];
+
+const SORT_COMPARATORS = {
+  'updated-desc':   (a, b) => (b.lastUpdated || '').localeCompare(a.lastUpdated || ''),
+  'updated-asc':    (a, b) => (a.lastUpdated || '').localeCompare(b.lastUpdated || ''),
+  'added-desc':     (a, b) => (b.dateAdded || '').localeCompare(a.dateAdded || ''),
+  'added-asc':      (a, b) => (a.dateAdded || '').localeCompare(b.dateAdded || ''),
+  'consignor-asc':  (a, b) => (a.consignorName || '').localeCompare(b.consignorName || ''),
+  'consignor-desc': (a, b) => (b.consignorName || '').localeCompare(a.consignorName || ''),
+  'video-id':       (a, b) => (a.videoId || '').localeCompare(b.videoId || '', undefined, { numeric: true }),
+  'delivery-date':  (a, b) => deliveryDateSortKey(a.monthYear).localeCompare(deliveryDateSortKey(b.monthYear)),
+  'clips-desc':     (a, b) => (b.clips?.length || 0) - (a.clips?.length || 0),
+  'clips-asc':      (a, b) => (a.clips?.length || 0) - (b.clips?.length || 0),
+};
 
 export const ctx = {
   state,
@@ -72,6 +105,7 @@ async function refresh() {
     status: state.statusTab,
     search: state.search,
     filters,
+    sort: SORT_COMPARATORS[state.sort] || SORT_COMPARATORS['updated-desc'],
   });
 
   const totalInTab = state.statusTab === 'ready' ? counts.ready
@@ -155,6 +189,11 @@ function paintTabCounts(counts) {
  * Toolbar: search, filters, view toggle, top actions
  * ============================================================= */
 function wireToolbar() {
+  const sortSelect = document.getElementById('vm-sort-select');
+  sortSelect.innerHTML = SORT_OPTIONS.map(o => `<option value="${o.id}">${o.label}</option>`).join('');
+  sortSelect.value = state.sort;
+  sortSelect.addEventListener('change', e => { state.sort = e.target.value; refresh(); });
+
   const searchInput = document.getElementById('vm-search-input');
   let debounce;
   searchInput.addEventListener('input', e => {
