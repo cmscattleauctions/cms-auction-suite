@@ -1,24 +1,33 @@
 /* =============================================================
  * CMS Video Manager — Data-service layer
  * -------------------------------------------------------------
- * This is the ONLY place that touches the "database" (mock, for
- * now). UI code must never read mock-data.js directly and must
+ * This is the ONLY place that touches the database. UI code must
+ * never read mock-data.js or firestore-data.js directly and must
  * never scatter its own arrays — everything goes through these
  * repositories.
  *
- * When Firebase is wired in later, each Mock*Repository below
- * gets a Firebase*Repository sibling with the exact same method
- * signatures (all already return Promises so the swap is a
- * drop-in). UI code calls e.g. `videoService.getVideos(...)` and
- * never needs to change.
+ * Video records are real and Firestore-backed (see firestore-data.js
+ * for the `videoRecords` collection). Reference dictionaries
+ * (consignors, sex/sire/dam types, staff, video formats) are still
+ * the static lists in mock-data.js — those change rarely enough,
+ * and are edited by few enough people, that moving them to Firestore
+ * wasn't part of this pass; see the note on ReferenceDataRepository
+ * below if that's ever needed.
+ *
+ * All video records load once into an in-memory cache on first use
+ * (629 documents is trivial for a single Firestore read) and every
+ * write updates both Firestore and the cache before emitting
+ * 'videos-changed', so the UI layer's existing subscribe()-based
+ * refresh keeps working completely unchanged.
  * ============================================================= */
 
 import {
   SEX_TYPES, SIRE_TYPES, DAM_TYPES, CONSIGNORS, VIDEO_MAKERS, STAFF,
   VIDEO_FORMATS,
-  generateMockVideos, labelFor, consignorFor,
+  labelFor, consignorFor,
 } from './mock-data.js';
 import { buildBaseId, nextAvailableSuffix, formatMonthYear, generateInternalId } from './video-id.js';
+import * as FirestoreData from './firestore-data.js';
 
 /* =============================================================
  * Tiny pub/sub so views can re-render when the store changes,
@@ -33,10 +42,27 @@ function createEmitter() {
 }
 
 /* =============================================================
- * In-memory store
+ * Video record cache — loaded once from Firestore, kept in sync
+ * with every write this tab makes. Doesn't pick up writes from
+ * OTHER tabs/users automatically (no realtime listener — matches
+ * the manual-refresh pattern already used by shared/cms-data.js
+ * elsewhere in this suite); reloading the page picks those up.
  * ============================================================= */
-const videos = generateMockVideos();
+let videos = [];
+let loadPromise = null;
 const emitter = createEmitter();
+
+function ensureLoaded() {
+  if (!loadPromise) {
+    loadPromise = FirestoreData.fetchAllVideos().then(list => { videos = list; return videos; });
+  }
+  return loadPromise;
+}
+
+async function persist(record) {
+  await FirestoreData.saveVideo(record);
+  emitter.emit({ type: 'videos-changed' });
+}
 
 function touch(record, actor) {
   record.lastUpdated = new Date().toISOString();
@@ -51,7 +77,8 @@ function logActivity(record, actor, type, message) {
  * -------------------------------------------------------------
  * Consignors + sex/sire/dam code dictionaries. Staff can add
  * missing codes inline without leaving the workflow; new
- * consignors are flagged NEW — NEEDS REVIEW.
+ * consignors are flagged NEW — NEEDS REVIEW. Still in-memory/
+ * mock-data.js-backed, not Firestore — see file header.
  * ============================================================= */
 export const ReferenceDataRepository = {
   getSexTypes()  { return [...SEX_TYPES].sort((a, b) => Number(a.code) - Number(b.code)); },
@@ -60,6 +87,13 @@ export const ReferenceDataRepository = {
   // Numeric order by code, per staff request — matches how the ID system
   // itself is organized, and how it reads on the printed code sheet.
   getConsignors() { return [...CONSIGNORS].sort((a, b) => Number(a.code) - Number(b.code)); },
+
+  // Synchronous — relies on the video cache already being populated,
+  // which is always true by the time a user can reach the Video ID
+  // Manager (it's opened from the Tools menu, which only renders after
+  // app.js's boot() has already awaited a full getVideos()/getCounts()
+  // pass). If that assumption ever stops holding, make this async and
+  // await ensureLoaded() like everything below does.
   countVideosForConsignor(code) { return videos.filter(v => v.consignorCode === String(code)).length; },
 
   findConsignor(code) { return consignorFor(code); },
@@ -84,11 +118,15 @@ export const ReferenceDataRepository = {
     return rec;
   },
 
-  renameConsignor(code, name) {
+  /** Renames the consignor AND every video record that references it — see the same sync caveat as countVideosForConsignor above. */
+  async renameConsignor(code, name) {
     const rec = CONSIGNORS.find(c => c.code === String(code));
     if (!rec) throw new Error('Consignor not found');
     rec.name = name;
-    videos.forEach(v => { if (v.consignorCode === String(code)) v.consignorName = name; });
+    await ensureLoaded();
+    const affected = videos.filter(v => v.consignorCode === String(code));
+    affected.forEach(v => { v.consignorName = name; });
+    if (affected.length) await FirestoreData.importVideosBatch(affected);
     emitter.emit({ type: 'reference-changed' });
     emitter.emit({ type: 'videos-changed' });
     return rec;
@@ -187,19 +225,20 @@ export const NotificationRepository = {
 let importHistory = [];
 
 export const UsageRepository = {
-  getUsage(videoRecordId) {
+  async getUsage(videoRecordId) {
+    await ensureLoaded();
     const v = videos.find(v => v.id === videoRecordId);
     return v ? [...v.usage].sort((a, b) => b.auctionDate.localeCompare(a.auctionDate)) : [];
   },
 
   /**
-   * Parse raw CSV text into a preview classification. Real matching
-   * would key off YouTube URL/ID against Firestore; here we match
-   * against the mock video set's youtubeUrl/youtubeId.
+   * Parse raw CSV text into a preview classification, matched against
+   * the real Firestore-backed video set's youtubeUrl/youtubeId.
    * Expected columns (case-insensitive): Auction Date, Lot Number,
    * YouTube Link, [Auction Name], [Consignor]
    */
-  previewCsv(rawText) {
+  async previewCsv(rawText) {
+    await ensureLoaded();
     const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     if (!lines.length) return { matched: [], repeated: [], unmatched: [], ambiguous: [], rows: [] };
 
@@ -248,7 +287,7 @@ export const UsageRepository = {
     return { rows, matched, repeated, unmatched, ambiguous };
   },
 
-  confirmImport(preview) {
+  async confirmImport(preview) {
     const applied = [...preview.matched, ...preview.repeated];
     const touched = new Map();
     applied.forEach(r => {
@@ -261,6 +300,7 @@ export const UsageRepository = {
 
     const importId = 'import_' + Date.now();
     const snapshot = [];
+    const changedRecords = [];
     touched.forEach((byDate, videoId) => {
       const v = videos.find(v => v.id === videoId);
       byDate.forEach(entry => {
@@ -269,23 +309,28 @@ export const UsageRepository = {
       });
       const lotList = [...byDate.values()].flatMap(e => e.lots).join(', ');
       logActivity(v, 'Usage Import', 'usage', `Usage CSV associated Lots ${lotList}`);
+      changedRecords.push(v);
     });
 
+    if (changedRecords.length) await FirestoreData.importVideosBatch(changedRecords);
     importHistory.push({ id: importId, at: new Date().toISOString(), snapshot });
     emitter.emit({ type: 'videos-changed' });
     return { importId, videosAffected: touched.size, usesAdded: applied.length };
   },
 
-  undoImport(importId) {
+  async undoImport(importId) {
     const record = importHistory.find(i => i.id === importId);
     if (!record) return false;
+    const changedRecords = [];
     record.snapshot.forEach(({ videoId, entry }) => {
       const v = videos.find(v => v.id === videoId);
       if (!v) return;
       const idx = v.usage.indexOf(entry);
       if (idx >= 0) v.usage.splice(idx, 1);
       logActivity(v, 'Usage Import', 'usage', `Undid usage import (Lots ${entry.lots.join(', ')})`);
+      changedRecords.push(v);
     });
+    if (changedRecords.length) await FirestoreData.importVideosBatch(changedRecords);
     importHistory = importHistory.filter(i => i.id !== importId);
     emitter.emit({ type: 'videos-changed' });
     return true;
@@ -366,6 +411,7 @@ function duplicateIdSet() {
 export const VideoRepository = {
   /** Full query: status tab + search + filters + sort. Always resolves ALL matches — no pagination. */
   async getVideos({ status = null, search = '', filters = {}, sort = null } = {}) {
+    await ensureLoaded();
     const dupes = duplicateIdSet();
     let list = videos.filter(v => !v.deletedAt && (status ? v.status === status : true));
     list = list.filter(v => matchesSearch(v, search) && matchesFilters(v, filters));
@@ -374,6 +420,7 @@ export const VideoRepository = {
   },
 
   async getCounts() {
+    await ensureLoaded();
     const active = videos.filter(v => !v.deletedAt);
     return {
       ready: active.filter(v => v.status === 'ready').length,
@@ -385,23 +432,27 @@ export const VideoRepository = {
   },
 
   async getVideoById(id) {
+    await ensureLoaded();
     const v = videos.find(v => v.id === id);
     return v ? { ...v, isDuplicateId: duplicateIdSet().has(v.videoId) } : null;
   },
 
   /** Exact-match lookup against the CURRENT active id of any record. */
   async findByFinalId(finalId) {
+    await ensureLoaded();
     const v = videos.find(v => v.videoId === finalId);
     return v ? { ...v } : null;
   },
 
   /** Suggest the next unique suffix for a base id that's already taken. */
   async nextSuffixFor(baseId) {
+    await ensureLoaded();
     const active = new Set(videos.map(v => v.videoId));
     return nextAvailableSuffix(baseId, active);
   },
 
   async createVideo(fields, actor = 'Staff') {
+    await ensureLoaded();
     const baseId = fields.baseId || buildBaseId(fields);
     const finalId = fields.suffix ? `${baseId}-${fields.suffix}` : baseId;
     const now = new Date().toISOString();
@@ -421,6 +472,7 @@ export const VideoRepository = {
       createdBy: actor,
       dateAdded: now, lastUpdated: now,
       notes: fields.notes || '',
+      canvaLink: fields.canvaLink || null,
       clips: fields.clips || [],
       listingImageUrl: fields.listingImageUrl || null,
       youtubeId: null, youtubeUrl: null, embedUrl: null, embedCode: null,
@@ -428,7 +480,8 @@ export const VideoRepository = {
       // New-video policy: everything created from here forward is
       // assumed Clean (no baked-in intro/program logos) until staff
       // says otherwise. Historical/migrated records default to
-      // Unknown instead — see mock-data.js buildRecord().
+      // Unknown instead (or hasTags:true from Monday — see the
+      // migration import flow in monday-migration-test.html).
       videoFormat: fields.videoFormat || 'clean',
       hasTags: fields.hasTags || false,
       workingOn: null,
@@ -438,11 +491,12 @@ export const VideoRepository = {
         : 'Record created' }],
     };
     videos.unshift(record);
-    emitter.emit({ type: 'videos-changed' });
+    await persist(record);
     return { ...record };
   },
 
   async updateVideo(id, patch, actor = 'Staff') {
+    await ensureLoaded();
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
 
@@ -453,7 +507,7 @@ export const VideoRepository = {
       v[key] = val;
     });
     touch(v, actor);
-    emitter.emit({ type: 'videos-changed' });
+    await persist(v);
     return { ...v };
   },
 
@@ -468,6 +522,7 @@ export const VideoRepository = {
    * explicit opt-in path to setVideoIdFields() when the two diverge.
    */
   async updateCattleFields(id, fields, actor = 'Staff') {
+    await ensureLoaded();
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
 
@@ -486,7 +541,7 @@ export const VideoRepository = {
     });
     Object.assign(v, patch);
     touch(v, actor);
-    emitter.emit({ type: 'videos-changed' });
+    await persist(v);
     return { ...v };
   },
 
@@ -497,6 +552,7 @@ export const VideoRepository = {
    * null unless the new id is already taken by ANOTHER record.
    */
   async setVideoIdFields(id, fields, actor = 'Staff', { forceSuffix = null } = {}) {
+    await ensureLoaded();
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
     const newBase = buildBaseId(fields);
@@ -513,21 +569,23 @@ export const VideoRepository = {
     Object.assign(v, fields, { baseVideoId: newBase, videoId: newFinal, suffix: forceSuffix || null });
     logActivity(v, actor, 'id', `Video ID changed: ${oldId} → ${newFinal}`);
     touch(v, actor);
-    emitter.emit({ type: 'videos-changed' });
+    await persist(v);
     return { record: { ...v }, collision: null };
   },
 
   async addClips(id, clips, actor = 'Staff') {
+    await ensureLoaded();
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
     v.clips.push(...clips);
     logActivity(v, actor, 'clips', `${clips.length} more clip${clips.length === 1 ? '' : 's'} added`);
     touch(v, actor);
-    emitter.emit({ type: 'videos-changed' });
+    await persist(v);
     return { ...v };
   },
 
   async setStatus(id, status, actor = 'Staff') {
+    await ensureLoaded();
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
     const labels = { ready: 'Ready to Make', hold: 'On Hold', created: 'Created' };
@@ -535,7 +593,7 @@ export const VideoRepository = {
     v.isDraft = false;
     logActivity(v, actor, 'status', `Moved to ${labels[status]}`);
     touch(v, actor);
-    emitter.emit({ type: 'videos-changed' });
+    await persist(v);
     return { ...v };
   },
 
@@ -547,6 +605,7 @@ export const VideoRepository = {
    * and usage.youtubeVersionId).
    */
   async setYoutube(id, { youtubeUrl, youtubeId }, actor = 'Staff', reason = '') {
+    await ensureLoaded();
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
     const isReplacement = !!v.youtubeId && v.youtubeId !== youtubeId;
@@ -566,11 +625,12 @@ export const VideoRepository = {
       ? `YouTube video replaced — previous version retained in history${reason ? ` (${reason})` : ''}`
       : 'YouTube link added');
     touch(v, actor);
-    emitter.emit({ type: 'videos-changed' });
+    await persist(v);
     return { ...v };
   },
 
   async setVideoFormat(id, format, actor = 'Staff') {
+    await ensureLoaded();
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
     const meta = ReferenceDataRepository.videoFormatMeta(format);
@@ -579,7 +639,7 @@ export const VideoRepository = {
       ? 'Marked Needs Redo'
       : `Video Format changed to ${meta ? meta.label : format}`);
     touch(v, actor);
-    emitter.emit({ type: 'videos-changed' });
+    await persist(v);
     return { ...v };
   },
 
@@ -589,75 +649,101 @@ export const VideoRepository = {
   },
 
   async setHasTags(id, checked, actor = 'Staff') {
+    await ensureLoaded();
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
     v.hasTags = !!checked;
     logActivity(v, actor, 'format', v.hasTags ? 'Marked Has Tags' : 'Has Tags cleared');
     touch(v, actor);
-    emitter.emit({ type: 'videos-changed' });
+    await persist(v);
     return { ...v };
   },
 
   async setWorkingOn(id, name, actor = 'Staff') {
+    await ensureLoaded();
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
     v.workingOn = name;
     logActivity(v, actor, 'format', `${name} started building this video`);
     touch(v, actor);
-    emitter.emit({ type: 'videos-changed' });
+    await persist(v);
     return { ...v };
   },
 
   async clearWorkingOn(id, actor = 'Staff') {
+    await ensureLoaded();
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
     v.workingOn = null;
     logActivity(v, actor, 'format', 'Released — no longer building this video');
     touch(v, actor);
-    emitter.emit({ type: 'videos-changed' });
+    await persist(v);
     return { ...v };
   },
 
   /* =============================================================
    * Deletion — soft delete only. A trashed record disappears from
-   * every normal view (getVideos/getCounts/getDuplicateIdVideos
-   * already filter on !deletedAt) but nothing is actually destroyed
-   * until an explicit, separate purge — so clips/publishing/usage/
-   * history/notes/activity are never silently orphaned.
+   * every normal view (getVideos/getCounts already filter on
+   * !deletedAt) but nothing is actually destroyed until an explicit,
+   * separate purge — so clips/publishing/usage/history/notes/activity
+   * are never silently orphaned.
    * ============================================================= */
   async trashVideo(id, actor = 'Staff') {
+    await ensureLoaded();
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
     v.deletedAt = new Date().toISOString();
     v.deletedBy = actor;
     logActivity(v, actor, 'deleted', 'Moved to Trash');
     touch(v, actor);
-    emitter.emit({ type: 'videos-changed' });
+    await persist(v);
     return { ...v };
   },
 
   async restoreVideo(id, actor = 'Staff') {
+    await ensureLoaded();
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
     v.deletedAt = null;
     v.deletedBy = null;
     logActivity(v, actor, 'restored', 'Restored from Trash');
     touch(v, actor);
-    emitter.emit({ type: 'videos-changed' });
+    await persist(v);
     return { ...v };
   },
 
   /** Permanent, separate from trashVideo() on purpose — see doc comment above. */
   async purgeVideo(id) {
+    await ensureLoaded();
     const idx = videos.findIndex(v => v.id === id);
     if (idx === -1) throw new Error('Video not found');
     videos.splice(idx, 1);
+    await FirestoreData.deleteVideoDoc(id);
     emitter.emit({ type: 'videos-changed' });
     return true;
   },
 
   async getTrashedVideos() {
+    await ensureLoaded();
     return videos.filter(v => v.deletedAt).map(v => ({ ...v }));
+  },
+
+  /**
+   * Bulk-create/overwrite many fully-formed records at once — used
+   * only by the Monday migration import flow (see
+   * public/monday-migration-test.html). Each record's `id` should
+   * already be a stable, deterministic value (the import derives it
+   * from the Monday item id) so re-running the import is idempotent:
+   * it overwrites the same documents rather than creating duplicates.
+   */
+  async importRecords(records, onProgress) {
+    await ensureLoaded();
+    const byId = new Map(videos.map(v => [v.id, v]));
+    records.forEach(r => byId.set(r.id, r));
+    videos = [...byId.values()];
+    await FirestoreData.importVideosBatch(records, onProgress);
+    emitter.emit({ type: 'videos-changed' });
+    return records.length;
   },
 
   subscribe(fn) { return emitter.subscribe(fn); },

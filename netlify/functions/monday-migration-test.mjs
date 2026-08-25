@@ -20,7 +20,12 @@
  *   sample-items      Phase 2 — ~15 items with raw + text column values
  *   asset-test        Phase 3 — file/asset metadata + one real download test
  *   pagination-probe  Phase 4 — items_page/cursor behavior + item count
- *   dry-run-preview   Phase 5-7 — needs COLUMN_MAP filled in first (see below)
+ *   dry-run-preview   Phase 5-7 — real mapping, confirmed against the actual board (see COLUMN_MAP below)
+ *   export-records    Migration — one page of fully-resolved items for the real
+ *                      import UI to consume (public/monday-migration-test.html).
+ *                      Same field-resolution logic as dry-run-preview, paginated
+ *                      via `cursor`, but does NOT assign duplicate suffixes —
+ *                      that happens client-side once every page is combined.
  *
  * Auth: reads MONDAY_API_TOKEN from the environment (never hardcoded,
  * never logged — see netlify/functions/lib/monday-client.mjs and
@@ -33,36 +38,65 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { mondayQuery, jsonResponse, errorResponse, tokenFingerprint } from './lib/monday-client.mjs';
+import { parseVideoId } from '../../public/video-manager/video-id.js';
 
 /* =============================================================
- * Phase 5-7 config — DELIBERATELY EMPTY until Phase 1-2 has run
- * against the real board and we know the actual column IDs.
- * "Do not guess field names; inspect the actual Monday board" —
- * so dry-run-preview refuses to pretend a mapping exists until
- * this is filled in with real `column_values[].id` values from
- * a `board-schema`/`sample-items` call.
+ * Phase 5-7 config — confirmed against the real "Video Uploads"
+ * board (id 5462086473) via board-schema on 2026-08-25. These are
+ * real column ids, not guesses — re-verify with board-schema if
+ * this ever points at a different board or the columns change.
  *
- * Fill in the right-hand side with the Monday column id (NOT the
- * title — titles can be renamed, ids can't) once known, e.g.:
- *   videoId: 'text_mkr2xyz1'
+ * Notably NOT present as their own columns on the real board (see
+ * docs/MONDAY-MIGRATION.md for the full writeup):
+ *   - Video ID       — IS the item's `name`, not a column. Parsed
+ *                       with the same parseVideoId() the rest of
+ *                       the app uses, which also recovers weight
+ *                       and video month from the id itself.
+ *   - Status         — is the item's `group`, not a column. See
+ *                       GROUP_STATUS_MAP below.
+ *   - Base Weight / Video Month — embedded in the Video ID, see above.
+ *   - Canva Link     — does not exist on this board (expected —
+ *                       matches "none of the Monday videos will
+ *                       have Canva links yet").
  * ============================================================= */
 const COLUMN_MAP = {
-  videoId: null,      // expected Monday field: "Video ID"
-  consignor: null,    // "Consignor"
-  sex: null,           // "Sex"
-  sireBreed: null,     // "Bull Breed" / "Sire Breed"
-  damBreed: null,      // "Cow Breed" / "Dam Breed"
-  weight: null,        // "Base Weight"
-  videoMonth: null,    // "Video Month"
-  status: null,        // "Status"
-  videoMaker: null,    // "Video Maker"
-  previewLink: null,   // "Preview Link" / "YouTube Link"
-  embedLink: null,     // "Embed Link"
-  canvaLink: null,     // "Canva Link"
+  videoMaker: 'short_text',
+  clips: 'upload_file8',
+  consignor: 'single_select2',       // status column — resolve via labels, not .text (see resolveStatusValue)
+  otherConsignor: 'short_text2',     // free-text fallback when Consignor isn't in the dropdown
+  sex: 'single_select5',             // status column
+  sireBreed: 'single_select3',       // status column ("Bull Breed")
+  damBreed: 'single_select6',        // status column ("Cow Breed")
+  previewLink: 'text_mm2kc6g8',      // YouTube watch link
+  embedLink: 'text_mm2k7srm',        // YouTube embed link
 };
 
-function isColumnMapConfigured() {
-  return Object.values(COLUMN_MAP).some(v => v);
+const GROUP_STATUS_MAP = {
+  topics: 'ready',            // "New requests"
+  new_group42522: 'hold',     // "On Hold"
+  new_group22247: 'created',  // "Created"
+};
+
+/** Monday "status"/dropdown columns often return a null `.text` for values
+ * that were bulk-set rather than clicked through the UI — the real value
+ * only comes through as `{"index": N}` in `.value`, resolved against that
+ * column's own label list (from board-schema's `settings_str`). Confirmed
+ * against real data: some rows had proper .text, most didn't. */
+function parseStatusLabels(settingsStr) {
+  try {
+    return JSON.parse(settingsStr).labels || {};
+  } catch {
+    return {};
+  }
+}
+function resolveStatusValue(cv, labelsByIndex) {
+  if (!cv) return null;
+  if (cv.text) return cv.text;
+  try {
+    const v = JSON.parse(cv.value);
+    if (v && v.index != null) return labelsByIndex[String(v.index)] || null;
+  } catch { /* not a status-shaped value */ }
+  return null;
 }
 
 /* =============================================================
@@ -245,7 +279,7 @@ async function actionAssetTest(params) {
   // ("small/representative") for the actual download test.
   const assetData = await mondayQuery(
     `
-    query ($assetIds: [ID!]) {
+    query ($assetIds: [ID!]!) {
       assets (ids: $assetIds) {
         id
         name
@@ -281,7 +315,8 @@ async function actionAssetTest(params) {
 }
 
 async function tryDownload(asset) {
-  const label = `${asset.name}${asset.file_extension ? '.' + asset.file_extension : ''}`;
+  // Monday's asset `name` is already the full filename (extension included).
+  const label = asset.name || `asset-${asset.id}`;
   const CAP_BYTES = 20 * 1024 * 1024; // don't pull down anything huge for a feasibility test
   const tmpPath = join(tmpdir(), `monday-test-${randomUUID()}`);
 
@@ -379,91 +414,329 @@ async function actionPaginationProbe(params) {
   });
 }
 
+/**
+ * Some Monday item names are the clean Video ID; others have extra
+ * human-written notes tacked on (pen numbers, a stray group letter) that
+ * break strict parsing. Recovers the underlying id in the two patterns
+ * actually observed on the real board, and returns whatever's left over
+ * as a note — never silently drops information, and never guesses past
+ * these two specific, confirmed patterns (anything else stays flagged
+ * for manual review rather than being force-fit).
+ *
+ *  1. "6.1.2.3.000.1223 (3-1,2,3)"   -> id + trailing free text
+ *  2. "56.2.0.0.750.G.0126"          -> id with one stray dot-segment
+ */
+function extractVideoIdAndNotes(rawName) {
+  const trimmed = String(rawName || '').trim();
+  const exact = parseVideoId(trimmed);
+  if (exact.valid) {
+    return { baseId: exact.baseId, notes: null, strategy: 'exact' };
+  }
+
+  // Pattern 1: a valid id followed by whitespace + anything else.
+  const wsIdx = trimmed.search(/\s/);
+  if (wsIdx > 0) {
+    const lead = parseVideoId(trimmed.slice(0, wsIdx));
+    if (lead.valid) {
+      const extra = trimmed.slice(wsIdx).trim();
+      return {
+        baseId: lead.baseId,
+        notes: `Imported from Monday — original item name was "${trimmed}".`,
+        strategy: 'trailing-text',
+        extra,
+      };
+    }
+  }
+
+  // Pattern 2: exactly one extra dot-segment inserted somewhere.
+  const segs = trimmed.split('.');
+  if (segs.length === 7) {
+    for (let i = 0; i < segs.length; i++) {
+      const candidate = segs.slice(0, i).concat(segs.slice(i + 1)).join('.');
+      const p = parseVideoId(candidate);
+      if (p.valid) {
+        return {
+          baseId: p.baseId,
+          notes: `Imported from Monday — original item name was "${trimmed}".`,
+          strategy: 'extra-segment',
+          extra: segs[i],
+        };
+      }
+    }
+  }
+
+  return { baseId: null, notes: null, strategy: 'unresolved', error: exact.error };
+}
+
 /* =============================================================
- * Phase 5-7 — dry-run preview. Refuses to guess: only runs once
- * COLUMN_MAP above has real column ids in it.
+ * Phase 5-7 — dry-run preview against the real, confirmed mapping.
+ * Still entirely read-only: nothing is written to Firebase or
+ * Monday. Video ID comes from the item name (not a column) via
+ * extractVideoIdAndNotes() above; Status comes from the item's group.
+ *
+ * Duplicate Video IDs (including new ones created by stripping notes
+ * off two records that turn out to share a base id) get a suffix
+ * auto-assigned by Monday creation date — earliest keeps the bare id,
+ * each later one gets -2, -3, etc., matching the app's existing
+ * suffix convention (see repository.js's nextAvailableSuffix usage).
  * ============================================================= */
 async function actionDryRunPreview(params) {
-  if (!isColumnMapConfigured()) {
-    return jsonResponse({
-      ok: false,
-      error: 'COLUMN_MAP is not configured yet.',
-      note: 'Run board-schema first, read the real column ids off the board, fill them into COLUMN_MAP at the top of netlify/functions/monday-migration-test.mjs, then call this action again. This is intentional — the task explicitly said not to guess field names.',
-      currentColumnMap: COLUMN_MAP,
-    });
-  }
   const boardId = requireParam(params, 'boardId');
   const scan = clampInt(params.get('itemScan'), 100, 1, 500);
+  const neededColumnIds = Object.values(COLUMN_MAP);
 
   const data = await mondayQuery(
     `
-    query ($boardIds: [ID!], $limit: Int!) {
+    query ($boardIds: [ID!], $limit: Int!, $columnIds: [String!]) {
       boards (ids: $boardIds) {
+        columns { id settings_str }
         items_page (limit: $limit) {
           cursor
           items {
             id
             name
-            group { title }
-            column_values { id text value }
+            created_at
+            group { id title }
+            column_values (ids: $columnIds) { id text value }
             assets { id }
           }
         }
       }
     }
   `,
-    { boardIds: [boardId], limit: scan }
+    { boardIds: [boardId], limit: scan, columnIds: neededColumnIds }
   );
-  const page = (data.boards || [])[0]?.items_page || { items: [] };
+  const board = (data.boards || [])[0];
+  const page = board?.items_page || { items: [] };
   const items = page.items;
 
-  const getVal = (item, key) => {
-    const colId = COLUMN_MAP[key];
-    if (!colId) return null;
-    const cv = item.column_values.find(c => c.id === colId);
-    return cv ? cv.text : null;
-  };
+  const labelsByColumn = {};
+  (board?.columns || []).forEach(c => { labelsByColumn[c.id] = parseStatusLabels(c.settings_str); });
 
-  const videoIdCounts = new Map();
   const rows = items.map(item => {
-    const videoId = getVal(item, 'videoId');
-    if (videoId) videoIdCounts.set(videoId, (videoIdCounts.get(videoId) || 0) + 1);
+    const cvById = {};
+    item.column_values.forEach(cv => { cvById[cv.id] = cv; });
+    const getText = key => cvById[COLUMN_MAP[key]]?.text || null;
+    const getStatus = key => resolveStatusValue(cvById[COLUMN_MAP[key]], labelsByColumn[COLUMN_MAP[key]] || {});
+
+    const resolution = extractVideoIdAndNotes(item.name);
+    const parsedBase = resolution.baseId ? parseVideoId(resolution.baseId) : null;
+    const clipCount = (item.assets || []).length;
+
     return {
       mondayItemId: item.id,
       mondayItemName: item.name,
+      mondayCreatedAt: item.created_at,
       group: item.group ? item.group.title : null,
-      videoId,
-      consignor: getVal(item, 'consignor'),
-      hasClips: (item.assets || []).length > 0,
-      clipCount: (item.assets || []).length,
-      hasYoutubeUrl: !!getVal(item, 'previewLink'),
+      status: item.group ? (GROUP_STATUS_MAP[item.group.id] || null) : null,
+      videoIdResolved: !!resolution.baseId,
+      videoIdStrategy: resolution.strategy,
+      videoIdError: resolution.error || null,
+      baseVideoId: resolution.baseId,
+      extractedNote: resolution.notes,
+      extractedExtra: resolution.extra || null,
+      // Filled in below, once duplicates within this batch are grouped.
+      assignedSuffix: null,
+      assignedVideoId: null,
+      consignorCode: parsedBase ? parsedBase.consignorCode : null,
+      consignorLabel: getStatus('consignor') || getText('otherConsignor'),
+      sexCode: parsedBase ? parsedBase.sexCode : null,
+      sexLabel: getStatus('sex'),
+      sireCode: parsedBase ? parsedBase.sireCode : null,
+      sireLabel: getStatus('sireBreed'),
+      damCode: parsedBase ? parsedBase.damCode : null,
+      damLabel: getStatus('damBreed'),
+      weight: parsedBase ? Number(parsedBase.weight) : null,
+      monthYear: parsedBase ? parsedBase.monthYear : null,
+      videoMaker: getText('videoMaker'),
+      previewLink: getText('previewLink'),
+      embedLink: getText('embedLink'),
+      clipCount,
+      hasClips: clipCount > 0,
+      hasYoutubeUrl: !!getText('previewLink'),
     };
   });
 
-  const missingVideoId = rows.filter(r => !r.videoId);
-  const duplicateVideoIds = [...videoIdCounts.entries()].filter(([, n]) => n > 1).map(([id]) => id);
+  // Group by resolved base id (post notes-stripping) and assign suffixes
+  // in Monday creation-date order.
+  const byBaseId = new Map();
+  rows.forEach(r => {
+    if (!r.baseVideoId) return;
+    if (!byBaseId.has(r.baseVideoId)) byBaseId.set(r.baseVideoId, []);
+    byBaseId.get(r.baseVideoId).push(r);
+  });
+  const duplicateGroups = [];
+  byBaseId.forEach((group, baseId) => {
+    if (group.length < 2) {
+      group[0].assignedSuffix = null;
+      group[0].assignedVideoId = baseId;
+      return;
+    }
+    group.sort((a, b) => (a.mondayCreatedAt || '').localeCompare(b.mondayCreatedAt || ''));
+    group.forEach((r, i) => {
+      r.assignedSuffix = i === 0 ? null : i + 1; // 1st keeps base id, 2nd -> -2, 3rd -> -3, ...
+      r.assignedVideoId = i === 0 ? baseId : `${baseId}-${i + 1}`;
+    });
+    duplicateGroups.push({
+      baseVideoId: baseId,
+      count: group.length,
+      resolution: group.map(r => ({ mondayItemId: r.mondayItemId, mondayCreatedAt: r.mondayCreatedAt, assignedVideoId: r.assignedVideoId })),
+    });
+  });
+
+  const unresolved = rows.filter(r => !r.videoIdResolved);
+  const recoveredViaNotes = rows.filter(r => r.videoIdResolved && r.videoIdStrategy !== 'exact');
   const noClips = rows.filter(r => !r.hasClips);
-  const noYoutube = rows.filter(r => !r.hasYoutubeUrl);
+  // Only "Created" records are expected to have a YouTube link already —
+  // Ready/On Hold legitimately won't yet, so flagging those would just be noise.
+  const createdWithoutYoutube = rows.filter(r => r.status === 'created' && !r.hasYoutubeUrl);
 
   return jsonResponse({
     ok: true,
     scanned: rows.length,
     hasMoreBeyondThisScan: !!page.cursor,
     summary: {
-      readyLooking: rows.length - missingVideoId.length - duplicateVideoIds.length,
-      missingVideoId: missingVideoId.length,
-      duplicateVideoIds: duplicateVideoIds.length,
+      videoIdResolvedExactly: rows.length - recoveredViaNotes.length - unresolved.length,
+      videoIdRecoveredViaNotesStripping: recoveredViaNotes.length,
+      videoIdUnresolved: unresolved.length,
+      duplicateGroups: duplicateGroups.length,
+      duplicateRecordsNeedingASuffix: duplicateGroups.reduce((sum, g) => sum + (g.count - 1), 0),
       withClips: rows.length - noClips.length,
       withoutClips: noClips.length,
-      withYoutubeUrl: rows.length - noYoutube.length,
-      withoutYoutubeUrl: noYoutube.length,
+      createdWithoutYoutube: createdWithoutYoutube.length,
+      byStatus: {
+        ready: rows.filter(r => r.status === 'ready').length,
+        hold: rows.filter(r => r.status === 'hold').length,
+        created: rows.filter(r => r.status === 'created').length,
+        unrecognizedGroup: rows.filter(r => !r.status).length,
+      },
     },
     exceptions: {
-      missingVideoId: missingVideoId.slice(0, 25),
-      duplicateVideoIds,
-      noClips: noClips.slice(0, 25),
+      unresolvedVideoId: unresolved.slice(0, 25).map(r => ({ mondayItemId: r.mondayItemId, name: r.mondayItemName, error: r.videoIdError })),
+      recoveredViaNotesStripping: recoveredViaNotes.slice(0, 25).map(r => ({ mondayItemId: r.mondayItemId, originalName: r.mondayItemName, recoveredBaseId: r.baseVideoId, strategy: r.videoIdStrategy, notesFieldWillContain: r.extractedNote })),
+      duplicateGroups: duplicateGroups.slice(0, 25),
+      noClips: noClips.slice(0, 25).map(r => ({ mondayItemId: r.mondayItemId, name: r.mondayItemName, status: r.status })),
+      createdWithoutYoutube: createdWithoutYoutube.slice(0, 25).map(r => ({ mondayItemId: r.mondayItemId, name: r.mondayItemName })),
     },
-    note: 'This is a preview only — nothing was written anywhere. Increase itemScan and re-run to cover more of the board once the mapping looks right.',
+    sampleRows: rows.slice(0, 8),
+    note: 'Read-only preview — nothing written anywhere. "already exists in Auction Suite" duplicate checking isn\'t included yet since the live app has no real backend to check against (video-manager is still mock-data-only) — that check gets added once this runs against real Firestore data. Increase itemScan (max 500) to cover more of the board; re-run repeatedly with cursor-following to eventually cover all 629 for a true final count.',
+  });
+}
+
+/* =============================================================
+ * export-records — one page of fully-resolved items, shaped for
+ * the real import. Deliberately does NOT assign final duplicate
+ * suffixes here: that needs to see every record across the whole
+ * board first, which a single page can't guarantee. The import
+ * page (monday-migration-test.html) calls this in a cursor loop to
+ * pull every page, then does duplicate-grouping + creation-date
+ * suffix assignment once across the complete combined set — same
+ * algorithm as dry-run-preview's, just run client-side once
+ * everything is in hand. Still entirely read-only against Monday;
+ * nothing is written to Firestore from here.
+ * ============================================================= */
+async function actionExportRecords(params) {
+  const boardId = requireParam(params, 'boardId');
+  const cursor = params.get('cursor') || null;
+  const pageSize = clampInt(params.get('pageSize'), 100, 10, 500);
+  const neededColumnIds = Object.values(COLUMN_MAP);
+
+  // Column labels (needed to resolve status-type columns) are fetched
+  // alongside items on every page, not just the first — `next_items_page`
+  // and `boards` are independent root fields, so both fit in one request.
+  // This keeps each page self-contained instead of relying on the client
+  // to carry state from page 1 forward, which would break if a caller
+  // ever fetched pages out of order or resumed a partial import.
+  const query = cursor
+    ? `query ($boardIds: [ID!], $cursor: String!, $limit: Int!) {
+         boards (ids: $boardIds) { columns { id settings_str } }
+         next_items_page (cursor: $cursor, limit: $limit) {
+           cursor
+           items {
+             id
+             name
+             created_at
+             group { id title }
+             column_values (ids: ${JSON.stringify(neededColumnIds)}) { id text value }
+             assets { id }
+           }
+         }
+       }`
+    : `query ($boardIds: [ID!], $limit: Int!) {
+         boards (ids: $boardIds) {
+           columns { id settings_str }
+           items_page (limit: $limit) {
+             cursor
+             items {
+               id
+               name
+               created_at
+               group { id title }
+               column_values (ids: ${JSON.stringify(neededColumnIds)}) { id text value }
+               assets { id }
+             }
+           }
+         }
+       }`;
+  const variables = cursor
+    ? { boardIds: [boardId], cursor, limit: pageSize }
+    : { boardIds: [boardId], limit: pageSize };
+  const data = await mondayQuery(query, variables);
+
+  const columns = (data.boards || [])[0]?.columns || [];
+  let items, nextCursor;
+  if (cursor) {
+    items = data.next_items_page?.items || [];
+    nextCursor = data.next_items_page?.cursor || null;
+  } else {
+    const board = (data.boards || [])[0];
+    items = board?.items_page?.items || [];
+    nextCursor = board?.items_page?.cursor || null;
+  }
+
+  const labelsByColumn = {};
+  columns.forEach(c => { labelsByColumn[c.id] = parseStatusLabels(c.settings_str); });
+
+  const records = items.map(item => {
+    const cvById = {};
+    item.column_values.forEach(cv => { cvById[cv.id] = cv; });
+    const getText = key => cvById[COLUMN_MAP[key]]?.text || null;
+    const getStatus = key => resolveStatusValue(cvById[COLUMN_MAP[key]], labelsByColumn[COLUMN_MAP[key]] || {});
+
+    const resolution = extractVideoIdAndNotes(item.name);
+    const parsedBase = resolution.baseId ? parseVideoId(resolution.baseId) : null;
+
+    return {
+      mondayItemId: item.id,
+      mondayItemName: item.name,
+      mondayCreatedAt: item.created_at,
+      status: item.group ? (GROUP_STATUS_MAP[item.group.id] || null) : null,
+      videoIdResolved: !!resolution.baseId,
+      videoIdStrategy: resolution.strategy,
+      videoIdError: resolution.error || null,
+      baseVideoId: resolution.baseId,
+      extractedNote: resolution.notes,
+      consignorCode: parsedBase ? parsedBase.consignorCode : null,
+      consignorLabel: getStatus('consignor') || getText('otherConsignor'),
+      sexCode: parsedBase ? parsedBase.sexCode : null,
+      sexLabel: getStatus('sex'),
+      sireCode: parsedBase ? parsedBase.sireCode : null,
+      sireLabel: getStatus('sireBreed'),
+      damCode: parsedBase ? parsedBase.damCode : null,
+      damLabel: getStatus('damBreed'),
+      weight: parsedBase ? Number(parsedBase.weight) : null,
+      monthYear: parsedBase ? parsedBase.monthYear : null,
+      videoMaker: getText('videoMaker'),
+      previewLink: getText('previewLink'),
+      clipCount: (item.assets || []).length,
+    };
+  });
+
+  return jsonResponse({
+    ok: true,
+    returned: records.length,
+    cursor: nextCursor,
+    records,
   });
 }
 
@@ -490,6 +763,7 @@ const actions = {
   'asset-test': actionAssetTest,
   'pagination-probe': actionPaginationProbe,
   'dry-run-preview': actionDryRunPreview,
+  'export-records': actionExportRecords,
 };
 
 export default async (req) => {
