@@ -36,7 +36,8 @@ service cloud.firestore {
     match /appSettings/{key}       { allow read, write: if isApproved(); }
 
     // ── Video Manager ───────────────────────────────────────────
-    match /videoRecords/{id} { allow read, write: if isApproved(); }
+    match /videoRecords/{id}   { allow read, write: if isApproved(); }
+    match /referenceData/{key} { allow read, write: if isApproved(); }
 
     // ── Country Market ─────────────────────────────────────────
     match /cmLots/{id}        { allow read, write: if isApproved(); }

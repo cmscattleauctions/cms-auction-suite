@@ -41,6 +41,11 @@ export const ctx = {
  * Boot
  * ============================================================= */
 async function boot() {
+  // Reference dictionaries (consignors, sire/dam types) are read
+  // synchronously everywhere below (renderFiltersPanel, the Video ID
+  // Manager, the upload modal) — load them once before anything renders,
+  // same as ReferenceDataRepository's own doc comments assume.
+  await ReferenceDataRepository.preload();
   renderTabsShell();
   renderFiltersPanel();
   wireToolbar();

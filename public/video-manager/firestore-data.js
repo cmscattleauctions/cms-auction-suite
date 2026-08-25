@@ -21,6 +21,10 @@
  * (a live browser File object) written here — see stripFileHandles()
  * — actual clip bytes need Firebase Storage, which isn't wired up
  * yet (see docs/MONDAY-MIGRATION.md).
+ *
+ * Also holds referenceData/{consignors|sireTypes|damTypes} — the
+ * Video ID Manager's code dictionaries, small enough that each is one
+ * document holding its whole list rather than one doc per item.
  * ============================================================= */
 
 import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
@@ -33,6 +37,7 @@ import {
 import { firebaseConfig, FIREBASE_CONFIGURED } from '../shared/firebase-config.js';
 
 const COLLECTION = 'videoRecords';
+const REFERENCE_COLLECTION = 'referenceData';
 const BATCH_MAX = 450; // Firestore hard-caps a batch at 500 writes; leave headroom
 
 let db = null, auth = null;
@@ -113,4 +118,20 @@ export async function importVideosBatch(records, onProgress) {
     if (onProgress) onProgress(written, clean.length);
   }
   return written;
+}
+
+/**
+ * Reference dictionaries (consignors, sire/dam types) — small enough to
+ * live as one document per list rather than one document per item.
+ * `key` is 'consignors' | 'sireTypes' | 'damTypes'.
+ */
+export async function fetchReferenceList(key) {
+  if (!db) return null;
+  const snap = await getDoc(doc(db, REFERENCE_COLLECTION, key));
+  return snap.exists() ? snap.data().items : null;
+}
+
+export async function saveReferenceList(key, items) {
+  requireDb();
+  await setDoc(doc(db, REFERENCE_COLLECTION, key), { items });
 }
