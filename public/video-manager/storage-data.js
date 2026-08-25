@@ -23,13 +23,15 @@ import {
   getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject,
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js";
 
-import { firebaseConfig, FIREBASE_CONFIGURED } from '../shared/firebase-config.js';
+import { FIREBASE_CONFIGURED } from '../shared/firebase-config.js';
 import { getIdToken } from './firestore-data.js';
 
-// Deployed alongside this project's Firestore/Storage rules (see functions/index.js).
-// Default Firebase Functions v2 region — deploy config doesn't override it, so this
-// URL is stable as long as that stays true.
-const TRANSFER_CLIP_FUNCTION_URL = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/transferClip`;
+// The real URL confirmed from `firebase deploy --only functions` output — 2nd-gen
+// HTTPS functions are Cloud Run under the hood and get a Cloud Run-style URL
+// (with a per-deployment hash), not the cloudfunctions.net-style alias 1st-gen
+// functions used. Re-check this against the CLI's deploy output if the function
+// is ever deleted and redeployed from scratch, since the hash could change.
+const TRANSFER_CLIP_FUNCTION_URL = 'https://transferclip-gvw7ttoefq-uc.a.run.app';
 
 export const configured = FIREBASE_CONFIGURED;
 
