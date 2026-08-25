@@ -61,3 +61,11 @@ export function formatMonthYearShort(mmyy) {
 export function cattleSummaryLine({ sexLabel, sireLabel, damLabel, weight, monthYear }) {
   return `${sexShort(sexLabel)} · ${sireLabel} × ${damLabel} · ${weight} lb · ${formatMonthYearShort(monthYear)}`;
 }
+
+/** Two-line cattle summary: "HFR · Angus × Jersey" / "450 lb · Aug 26" */
+export function cattleSummaryTwoLine({ sexLabel, sireLabel, damLabel, weight, monthYear }) {
+  return {
+    line1: `${sexShort(sexLabel)} · ${sireLabel} × ${damLabel}`,
+    line2: `${weight} lb · ${formatMonthYearShort(monthYear)}`,
+  };
+}

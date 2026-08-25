@@ -12,7 +12,7 @@
  * ui-drawer.js's Cattle Information section).
  * ============================================================= */
 
-import { escapeHtml, formatDateShort, formatDuration, cattleSummaryLine } from './format.js';
+import { escapeHtml, formatDateShort, formatDuration, cattleSummaryTwoLine } from './format.js';
 import { showToast, copyToClipboard } from './toast.js';
 import { handleIdEntryLoop } from './ui-modals.js';
 import { openCompareModal } from './ui-compare.js';
@@ -25,10 +25,10 @@ export function renderTable(container, records, ctx) {
   const isCreated = ctx.state.statusTab === 'created';
   const showWorkingOn = ctx.state.statusTab === 'ready';
   const headCells = isCreated
-    ? ['', 'Video ID', 'Consignor', 'Cattle', 'Clips', 'Tags', 'Usage', 'Published', 'Added', '']
+    ? ['', 'Video', 'Cattle', 'Clips', 'Tags', 'Usage', 'Published', 'Added', '']
     : showWorkingOn
-      ? ['', 'Video ID', 'Consignor', 'Cattle', 'Clips', 'Status', 'Working On', 'Added', '']
-      : ['', 'Video ID', 'Consignor', 'Cattle', 'Clips', 'Status', 'Added', ''];
+      ? ['', 'Video', 'Cattle', 'Clips', 'Status', 'Working On', 'Added', '']
+      : ['', 'Video', 'Cattle', 'Clips', 'Status', 'Added', ''];
   const colspan = headCells.length;
 
   container.innerHTML = `
@@ -117,17 +117,30 @@ function rowExceptionClass(r, context) {
   return flags.some(f => f.severity === 'bad') ? 'has-exception is-bad-row' : 'has-exception';
 }
 
-function videoIdCell(r, context) {
+/**
+ * Merged identity cell — consignor name is the primary/scannable text,
+ * Video ID is secondary underneath. Consignor is what staff actually
+ * recognize a record by; the ID matters for lookups/copying but
+ * shouldn't be the loudest thing in the row.
+ */
+function identityCell(r, context) {
   return `
-    <span class="vm-videoid-cell">${exceptionDot(r, context)}${escapeHtml(r.baseVideoId)}${r.suffix ? `<span class="suffix">-${r.suffix}</span>` : ''}</span>`;
+    <div class="vm-identity-cell">
+      <div class="vm-identity-primary">${exceptionDot(r, context)}${escapeHtml(r.consignorName)}</div>
+      <div class="vm-identity-secondary">${escapeHtml(r.baseVideoId)}${r.suffix ? `<span class="suffix">-${r.suffix}</span>` : ''}</div>
+    </div>`;
 }
 
 function cattleCell(r, ctx) {
   const sexLabel = ctx.ref.sexLabel(r.sexCode) || `Code ${r.sexCode}`;
   const sireLabel = ctx.ref.sireLabel(r.sireCode) || `Code ${r.sireCode}`;
   const damLabel = ctx.ref.damLabel(r.damCode) || `Code ${r.damCode}`;
-  const line = cattleSummaryLine({ sexLabel, sireLabel, damLabel, weight: r.weight, monthYear: r.monthYear });
-  return `<span class="vm-cattle-cell" title="${escapeHtml(line)}">${escapeHtml(line)}</span>`;
+  const { line1, line2 } = cattleSummaryTwoLine({ sexLabel, sireLabel, damLabel, weight: r.weight, monthYear: r.monthYear });
+  return `
+    <div class="vm-cattle-cell" title="${escapeHtml(`${line1} · ${line2}`)}">
+      <div class="vm-cattle-line1">${escapeHtml(line1)}</div>
+      <div class="vm-cattle-line2">${escapeHtml(line2)}</div>
+    </div>`;
 }
 
 function clipsCell(r) {
@@ -197,8 +210,7 @@ function readyRowHtml(r, ctx, showWorkingOn) {
   return `
     <tr data-id="${r.id}" class="${rowExceptionClass(r, 'ready')}">
       <td class="vm-col-check">${compareCheckboxCell(r)}</td>
-      <td>${videoIdCell(r, 'ready')}</td>
-      <td>${escapeHtml(r.consignorName)}</td>
+      <td>${identityCell(r, 'ready')}</td>
       <td>${cattleCell(r, ctx)}</td>
       <td>${clipsCell(r)}</td>
       <td>${statusIssueCell(r)}</td>
@@ -212,8 +224,7 @@ function createdRowHtml(r, ctx) {
   return `
     <tr data-id="${r.id}" class="${rowExceptionClass(r, 'created')}">
       <td class="vm-col-check">${compareCheckboxCell(r)}</td>
-      <td>${videoIdCell(r, 'created')}</td>
-      <td>${escapeHtml(r.consignorName)}</td>
+      <td>${identityCell(r, 'created')}</td>
       <td>${cattleCell(r, ctx)}</td>
       <td>${clipsCell(r)}</td>
       <td>${hasTagsCell(r)}</td>

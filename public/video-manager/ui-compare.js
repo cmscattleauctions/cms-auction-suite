@@ -15,20 +15,27 @@
 import { escapeHtml, cattleSummaryLine } from './format.js';
 
 export function openCompareModal(records, ctx) {
+  let active = [...records]; // mutable — panels can be ruled out (closed) one at a time without leaving compare mode
   const root = document.getElementById('vm-modal-root');
   const backdrop = document.createElement('div');
   backdrop.className = 'vm-modal-backdrop';
-  backdrop.innerHTML = `<div class="vm-modal vm-compare-modal">${panelShellHtml(records.length)}</div>`;
+  backdrop.innerHTML = `<div class="vm-modal vm-compare-modal"></div>`;
   root.appendChild(backdrop);
   backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
   function close() { backdrop.remove(); }
   const modal = backdrop.querySelector('.vm-modal');
 
-  function wire() {
+  function paint() {
+    modal.innerHTML = panelShellHtml(active.length);
     modal.querySelector('.vm-modal-close').addEventListener('click', close);
     modal.querySelectorAll('[data-use-video]').forEach(btn => btn.addEventListener('click', () => {
       close();
       ctx.openDrawer(btn.dataset.useVideo);
+    }));
+    modal.querySelectorAll('[data-rule-out]').forEach(btn => btn.addEventListener('click', () => {
+      active = active.filter(r => r.id !== btn.dataset.ruleOut);
+      if (!active.length) { close(); return; }
+      paint();
     }));
   }
 
@@ -36,14 +43,14 @@ export function openCompareModal(records, ctx) {
     return `
       <div class="vm-modal-header">
         <div>
-          <h2>Compare ${count} Videos</h2>
-          <p class="field-hint">Pick the one you want to use — the rest stay untouched.</p>
+          <h2>Compare ${count} Video${count === 1 ? '' : 's'}</h2>
+          <p class="field-hint">Pick the one you want to use, or close the ones you've ruled out — the rest stay untouched.</p>
         </div>
         <button class="vm-modal-close" type="button">&times;</button>
       </div>
       <div class="vm-modal-body vm-compare-body">
         <div class="vm-compare-grid">
-          ${records.map(r => panelHtml(r)).join('')}
+          ${active.map(r => panelHtml(r)).join('')}
         </div>
       </div>`;
   }
@@ -58,6 +65,7 @@ export function openCompareModal(records, ctx) {
 
     return `
       <div class="vm-compare-panel">
+        <button class="vm-compare-rule-out" data-rule-out="${r.id}" type="button" title="Rule out — remove from comparison">&times;</button>
         <div class="vm-compare-media">
           ${r.embedUrl
             ? `<iframe src="${escapeHtml(r.embedUrl)}" title="${escapeHtml(r.videoId)}" frameborder="0" allow="autoplay" allowfullscreen></iframe>`
@@ -76,5 +84,5 @@ export function openCompareModal(records, ctx) {
       </div>`;
   }
 
-  wire();
+  paint();
 }
