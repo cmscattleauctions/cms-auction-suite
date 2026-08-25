@@ -20,7 +20,7 @@
  *   sample-items      Phase 2 — ~15 items with raw + text column values
  *   asset-test        Phase 3 — file/asset metadata + one real download test
  *   pagination-probe  Phase 4 — items_page/cursor behavior + item count
- *   dry-run-preview   Phase 5-7 — needs COLUMN_MAP filled in first (see below)
+ *   dry-run-preview   Phase 5-7 — real mapping, confirmed against the actual board (see COLUMN_MAP below)
  *
  * Auth: reads MONDAY_API_TOKEN from the environment (never hardcoded,
  * never logged — see netlify/functions/lib/monday-client.mjs and
@@ -33,36 +33,65 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { mondayQuery, jsonResponse, errorResponse, tokenFingerprint } from './lib/monday-client.mjs';
+import { parseVideoId } from '../../public/video-manager/video-id.js';
 
 /* =============================================================
- * Phase 5-7 config — DELIBERATELY EMPTY until Phase 1-2 has run
- * against the real board and we know the actual column IDs.
- * "Do not guess field names; inspect the actual Monday board" —
- * so dry-run-preview refuses to pretend a mapping exists until
- * this is filled in with real `column_values[].id` values from
- * a `board-schema`/`sample-items` call.
+ * Phase 5-7 config — confirmed against the real "Video Uploads"
+ * board (id 5462086473) via board-schema on 2026-08-25. These are
+ * real column ids, not guesses — re-verify with board-schema if
+ * this ever points at a different board or the columns change.
  *
- * Fill in the right-hand side with the Monday column id (NOT the
- * title — titles can be renamed, ids can't) once known, e.g.:
- *   videoId: 'text_mkr2xyz1'
+ * Notably NOT present as their own columns on the real board (see
+ * docs/MONDAY-MIGRATION.md for the full writeup):
+ *   - Video ID       — IS the item's `name`, not a column. Parsed
+ *                       with the same parseVideoId() the rest of
+ *                       the app uses, which also recovers weight
+ *                       and video month from the id itself.
+ *   - Status         — is the item's `group`, not a column. See
+ *                       GROUP_STATUS_MAP below.
+ *   - Base Weight / Video Month — embedded in the Video ID, see above.
+ *   - Canva Link     — does not exist on this board (expected —
+ *                       matches "none of the Monday videos will
+ *                       have Canva links yet").
  * ============================================================= */
 const COLUMN_MAP = {
-  videoId: null,      // expected Monday field: "Video ID"
-  consignor: null,    // "Consignor"
-  sex: null,           // "Sex"
-  sireBreed: null,     // "Bull Breed" / "Sire Breed"
-  damBreed: null,      // "Cow Breed" / "Dam Breed"
-  weight: null,        // "Base Weight"
-  videoMonth: null,    // "Video Month"
-  status: null,        // "Status"
-  videoMaker: null,    // "Video Maker"
-  previewLink: null,   // "Preview Link" / "YouTube Link"
-  embedLink: null,     // "Embed Link"
-  canvaLink: null,     // "Canva Link"
+  videoMaker: 'short_text',
+  clips: 'upload_file8',
+  consignor: 'single_select2',       // status column — resolve via labels, not .text (see resolveStatusValue)
+  otherConsignor: 'short_text2',     // free-text fallback when Consignor isn't in the dropdown
+  sex: 'single_select5',             // status column
+  sireBreed: 'single_select3',       // status column ("Bull Breed")
+  damBreed: 'single_select6',        // status column ("Cow Breed")
+  previewLink: 'text_mm2kc6g8',      // YouTube watch link
+  embedLink: 'text_mm2k7srm',        // YouTube embed link
 };
 
-function isColumnMapConfigured() {
-  return Object.values(COLUMN_MAP).some(v => v);
+const GROUP_STATUS_MAP = {
+  topics: 'ready',            // "New requests"
+  new_group42522: 'hold',     // "On Hold"
+  new_group22247: 'created',  // "Created"
+};
+
+/** Monday "status"/dropdown columns often return a null `.text` for values
+ * that were bulk-set rather than clicked through the UI — the real value
+ * only comes through as `{"index": N}` in `.value`, resolved against that
+ * column's own label list (from board-schema's `settings_str`). Confirmed
+ * against real data: some rows had proper .text, most didn't. */
+function parseStatusLabels(settingsStr) {
+  try {
+    return JSON.parse(settingsStr).labels || {};
+  } catch {
+    return {};
+  }
+}
+function resolveStatusValue(cv, labelsByIndex) {
+  if (!cv) return null;
+  if (cv.text) return cv.text;
+  try {
+    const v = JSON.parse(cv.value);
+    if (v && v.index != null) return labelsByIndex[String(v.index)] || null;
+  } catch { /* not a status-shaped value */ }
+  return null;
 }
 
 /* =============================================================
@@ -381,90 +410,116 @@ async function actionPaginationProbe(params) {
 }
 
 /* =============================================================
- * Phase 5-7 — dry-run preview. Refuses to guess: only runs once
- * COLUMN_MAP above has real column ids in it.
+ * Phase 5-7 — dry-run preview against the real, confirmed mapping.
+ * Still entirely read-only: nothing is written to Firebase or
+ * Monday. Video ID comes from the item name (not a column) via the
+ * app's own parseVideoId(); Status comes from the item's group.
  * ============================================================= */
 async function actionDryRunPreview(params) {
-  if (!isColumnMapConfigured()) {
-    return jsonResponse({
-      ok: false,
-      error: 'COLUMN_MAP is not configured yet.',
-      note: 'Run board-schema first, read the real column ids off the board, fill them into COLUMN_MAP at the top of netlify/functions/monday-migration-test.mjs, then call this action again. This is intentional — the task explicitly said not to guess field names.',
-      currentColumnMap: COLUMN_MAP,
-    });
-  }
   const boardId = requireParam(params, 'boardId');
   const scan = clampInt(params.get('itemScan'), 100, 1, 500);
+  const neededColumnIds = Object.values(COLUMN_MAP);
 
   const data = await mondayQuery(
     `
-    query ($boardIds: [ID!], $limit: Int!) {
+    query ($boardIds: [ID!], $limit: Int!, $columnIds: [String!]) {
       boards (ids: $boardIds) {
+        columns { id settings_str }
         items_page (limit: $limit) {
           cursor
           items {
             id
             name
-            group { title }
-            column_values { id text value }
+            group { id title }
+            column_values (ids: $columnIds) { id text value }
             assets { id }
           }
         }
       }
     }
   `,
-    { boardIds: [boardId], limit: scan }
+    { boardIds: [boardId], limit: scan, columnIds: neededColumnIds }
   );
-  const page = (data.boards || [])[0]?.items_page || { items: [] };
+  const board = (data.boards || [])[0];
+  const page = board?.items_page || { items: [] };
   const items = page.items;
 
-  const getVal = (item, key) => {
-    const colId = COLUMN_MAP[key];
-    if (!colId) return null;
-    const cv = item.column_values.find(c => c.id === colId);
-    return cv ? cv.text : null;
-  };
+  const labelsByColumn = {};
+  (board?.columns || []).forEach(c => { labelsByColumn[c.id] = parseStatusLabels(c.settings_str); });
 
-  const videoIdCounts = new Map();
   const rows = items.map(item => {
-    const videoId = getVal(item, 'videoId');
-    if (videoId) videoIdCounts.set(videoId, (videoIdCounts.get(videoId) || 0) + 1);
+    const cvById = {};
+    item.column_values.forEach(cv => { cvById[cv.id] = cv; });
+    const getText = key => cvById[COLUMN_MAP[key]]?.text || null;
+    const getStatus = key => resolveStatusValue(cvById[COLUMN_MAP[key]], labelsByColumn[COLUMN_MAP[key]] || {});
+
+    const parsed = parseVideoId(item.name);
+    const clipCount = (item.assets || []).length;
+
     return {
       mondayItemId: item.id,
       mondayItemName: item.name,
       group: item.group ? item.group.title : null,
-      videoId,
-      consignor: getVal(item, 'consignor'),
-      hasClips: (item.assets || []).length > 0,
-      clipCount: (item.assets || []).length,
-      hasYoutubeUrl: !!getVal(item, 'previewLink'),
+      status: item.group ? (GROUP_STATUS_MAP[item.group.id] || null) : null,
+      videoIdValid: parsed.valid,
+      videoIdError: parsed.valid ? null : parsed.error,
+      baseVideoId: parsed.valid ? parsed.baseId : null,
+      suffix: parsed.suffix,
+      finalVideoId: parsed.valid ? parsed.finalId : null,
+      consignorCode: parsed.valid ? parsed.consignorCode : null,
+      consignorLabel: getStatus('consignor') || getText('otherConsignor'),
+      sexCode: parsed.valid ? parsed.sexCode : null,
+      sexLabel: getStatus('sex'),
+      sireCode: parsed.valid ? parsed.sireCode : null,
+      sireLabel: getStatus('sireBreed'),
+      damCode: parsed.valid ? parsed.damCode : null,
+      damLabel: getStatus('damBreed'),
+      weight: parsed.valid ? Number(parsed.weight) : null,
+      monthYear: parsed.valid ? parsed.monthYear : null,
+      videoMaker: getText('videoMaker'),
+      previewLink: getText('previewLink'),
+      embedLink: getText('embedLink'),
+      clipCount,
+      hasClips: clipCount > 0,
+      hasYoutubeUrl: !!getText('previewLink'),
     };
   });
 
-  const missingVideoId = rows.filter(r => !r.videoId);
-  const duplicateVideoIds = [...videoIdCounts.entries()].filter(([, n]) => n > 1).map(([id]) => id);
+  const invalidVideoId = rows.filter(r => !r.videoIdValid);
+  const idCounts = new Map();
+  rows.forEach(r => { if (r.finalVideoId) idCounts.set(r.finalVideoId, (idCounts.get(r.finalVideoId) || 0) + 1); });
+  const duplicateVideoIds = [...idCounts.entries()].filter(([, n]) => n > 1).map(([id]) => id);
   const noClips = rows.filter(r => !r.hasClips);
-  const noYoutube = rows.filter(r => !r.hasYoutubeUrl);
+  // Only "Created" records are expected to have a YouTube link already —
+  // Ready/On Hold legitimately won't yet, so flagging those would just be noise.
+  const createdWithoutYoutube = rows.filter(r => r.status === 'created' && !r.hasYoutubeUrl);
 
   return jsonResponse({
     ok: true,
     scanned: rows.length,
     hasMoreBeyondThisScan: !!page.cursor,
     summary: {
-      readyLooking: rows.length - missingVideoId.length - duplicateVideoIds.length,
-      missingVideoId: missingVideoId.length,
+      validVideoId: rows.length - invalidVideoId.length,
+      invalidVideoId: invalidVideoId.length,
       duplicateVideoIds: duplicateVideoIds.length,
       withClips: rows.length - noClips.length,
       withoutClips: noClips.length,
-      withYoutubeUrl: rows.length - noYoutube.length,
-      withoutYoutubeUrl: noYoutube.length,
+      createdWithoutYoutube: createdWithoutYoutube.length,
+      byStatus: {
+        ready: rows.filter(r => r.status === 'ready').length,
+        hold: rows.filter(r => r.status === 'hold').length,
+        created: rows.filter(r => r.status === 'created').length,
+        unrecognizedGroup: rows.filter(r => !r.status).length,
+      },
     },
     exceptions: {
-      missingVideoId: missingVideoId.slice(0, 25),
+      invalidVideoId: invalidVideoId.slice(0, 25).map(r => ({ mondayItemId: r.mondayItemId, name: r.mondayItemName, error: r.videoIdError })),
       duplicateVideoIds,
-      noClips: noClips.slice(0, 25),
+      noClips: noClips.slice(0, 25).map(r => ({ mondayItemId: r.mondayItemId, name: r.mondayItemName, status: r.status })),
+      createdWithoutYoutube: createdWithoutYoutube.slice(0, 25).map(r => ({ mondayItemId: r.mondayItemId, name: r.mondayItemName })),
     },
-    note: 'This is a preview only — nothing was written anywhere. Increase itemScan and re-run to cover more of the board once the mapping looks right.',
+    sampleRows: rows.slice(0, 8),
+    note: 'Read-only preview — nothing written anywhere. "already exists in Auction Suite" duplicate checking isn\'t included yet since the live app has no real backend to check against (video-manager is still mock-data-only) — that check gets added once this runs against real Firestore data. Increase itemScan (max 500) to cover more of the board; re-run repeatedly with cursor-following to eventually cover all 629 for a true final count.',
   });
 }
 
