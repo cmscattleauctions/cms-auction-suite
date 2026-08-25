@@ -11,5 +11,8 @@ netlify/functions/.env
 # Firebase CLI debug log
 firebase-debug.log
 
+# Cloud Functions dependencies — installed locally before `firebase deploy`
+functions/node_modules/
+
 # OS/editor noise
 .DS_Store

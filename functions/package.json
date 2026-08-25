@@ -1,0 +1,13 @@
+{
+  "name": "cms-auction-suite-functions",
+  "private": true,
+  "description": "Server-side proxy for the Monday clips migration (see index.js) — the one place this project uses the Firebase Admin SDK.",
+  "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^5.1.0"
+  }
+}
