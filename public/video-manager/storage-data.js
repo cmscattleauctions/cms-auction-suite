@@ -12,10 +12,13 @@
  *
  * The Monday clips migration (uploadClipFromUrl) is different: it
  * needs bytes that live on Monday's CDN, and Monday's CORS policy
- * blocks the browser from fetching them directly. That leg goes
- * through the transferClip Cloud Function (functions/index.js)
- * instead, which does the Monday fetch + Storage write server-side.
- * Both paths produce clips in the same shape either way.
+ * blocks the browser from fetching them directly. That leg is
+ * delegated to firestore-data.js's requestClipTransfer(), which
+ * triggers the transferClip Cloud Function via a Firestore write
+ * (see that function's own doc comment for why it's a Firestore
+ * trigger rather than a direct HTTP call) — the function does the
+ * Monday fetch + Storage write server-side. Both paths produce clips
+ * in the same shape either way.
  * ============================================================= */
 
 import { getApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
@@ -24,14 +27,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js";
 
 import { FIREBASE_CONFIGURED } from '../shared/firebase-config.js';
-import { getIdToken } from './firestore-data.js';
-
-// The real URL confirmed from `firebase deploy --only functions` output — 2nd-gen
-// HTTPS functions are Cloud Run under the hood and get a Cloud Run-style URL
-// (with a per-deployment hash), not the cloudfunctions.net-style alias 1st-gen
-// functions used. Re-check this against the CLI's deploy output if the function
-// is ever deleted and redeployed from scratch, since the hash could change.
-const TRANSFER_CLIP_FUNCTION_URL = 'https://transferclip-gvw7ttoefq-uc.a.run.app';
+import { requestClipTransfer } from './firestore-data.js';
 
 export const configured = FIREBASE_CONFIGURED;
 
@@ -84,29 +80,12 @@ export function uploadClip(recordId, file, { onProgress } = {}) {
 
 /**
  * Move a clip from a remote URL (Monday's asset public_url) into Storage —
- * used only by the Monday clips migration. This does NOT fetch+upload from
- * the browser: Monday's CDN doesn't send CORS headers permitting a
- * cross-origin fetch() from this app's origin (confirmed by every transfer
- * failing with "Failed to fetch" in live testing), so the download has to
- * happen server-side. Proxying through a Netlify Function was the first
- * choice, but the account's Netlify bandwidth/credit budget can't absorb
- * ~169GB in one shot, so this calls transferClip (functions/index.js)
- * instead — a Firebase Cloud Function in the same Google Cloud project
- * Storage already lives in, so the fetch-from-Monday and write-to-Storage
- * legs both stay inside infrastructure already being paid for here, with
- * nothing routed through a second vendor.
+ * used only by the Monday clips migration. See the file header for why
+ * this delegates to requestClipTransfer() instead of fetching/uploading
+ * from the browser directly.
  */
-export async function uploadClipFromUrl(recordId, sourceUrl, filename) {
-  const idToken = await getIdToken();
-  if (!idToken) throw new Error('Not signed in');
-  const res = await fetch(TRANSFER_CLIP_FUNCTION_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-    body: JSON.stringify({ publicUrl: sourceUrl, recordId, filename }),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok || !json.ok) throw new Error(json.error || `Transfer failed (HTTP ${res.status})`);
-  return { storagePath: json.storagePath, downloadUrl: json.downloadUrl, sizeBytes: json.sizeBytes };
+export function uploadClipFromUrl(recordId, sourceUrl, filename) {
+  return requestClipTransfer(recordId, sourceUrl, filename);
 }
 
 export async function deleteClipFile(storagePath) {

@@ -33,13 +33,16 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-aut
 import {
   getFirestore, collection, doc,
   getDoc, getDocs, setDoc, deleteDoc, writeBatch,
+  addDoc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
 import { firebaseConfig, FIREBASE_CONFIGURED } from '../shared/firebase-config.js';
 
 const COLLECTION = 'videoRecords';
 const REFERENCE_COLLECTION = 'referenceData';
+const JOBS_COLLECTION = 'clipTransferJobs';
 const BATCH_MAX = 450; // Firestore hard-caps a batch at 500 writes; leave headroom
+const TRANSFER_TIMEOUT_MS = 10 * 60 * 1000; // generous headroom over the function's own 540s cap
 
 let db = null, auth = null;
 if (FIREBASE_CONFIGURED) {
@@ -63,9 +66,47 @@ export function currentUserEmail() {
 }
 
 /** ID token for calling the transferClip Cloud Function — that endpoint verifies it server-side (see functions/index.js) rather than trusting Firestore/Storage rules, since it's a second front door onto Storage. */
-export async function getIdToken() {
-  if (!auth || !auth.currentUser) return null;
-  return auth.currentUser.getIdToken();
+/**
+ * Ask the transferClip Cloud Function to move a clip from a remote URL
+ * (Monday's asset public_url) into Storage — used only by the Monday
+ * clips migration. Writes a clipTransferJobs doc (a normal rules-gated
+ * Firestore write, same trust model as everything else in this app),
+ * which triggers the function; then watches that same doc until it
+ * flips to done/error. See functions/index.js for why this goes through
+ * Firestore instead of a direct HTTP call to the function.
+ */
+export function requestClipTransfer(recordId, publicUrl, filename) {
+  return new Promise((resolve, reject) => {
+    if (!db || !auth?.currentUser) { reject(new Error('Not signed in')); return; }
+
+    addDoc(collection(db, JOBS_COLLECTION), {
+      recordId, publicUrl, filename,
+      requestedBy: auth.currentUser.uid,
+      status: 'pending',
+      createdAt: serverTimestamp(),
+    }).then(jobRef => {
+      const timeoutId = setTimeout(() => {
+        unsub();
+        reject(new Error('Transfer timed out waiting for the server'));
+      }, TRANSFER_TIMEOUT_MS);
+
+      const unsub = onSnapshot(jobRef, snap => {
+        const data = snap.data();
+        if (!data || data.status === 'pending') return;
+        clearTimeout(timeoutId);
+        unsub();
+        if (data.status === 'done') {
+          resolve({ storagePath: data.storagePath, downloadUrl: data.downloadUrl, sizeBytes: data.sizeBytes });
+        } else {
+          reject(new Error(data.error || 'Transfer failed'));
+        }
+      }, err => {
+        clearTimeout(timeoutId);
+        unsub();
+        reject(err);
+      });
+    }).catch(reject);
+  });
 }
 
 /** Strip anything Firestore can't store — a live File object is the only offender today. */
