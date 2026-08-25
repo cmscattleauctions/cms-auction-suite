@@ -146,10 +146,19 @@ let totalDone = 0;
 
 async function poll() {
   if (inFlight.size >= CONCURRENCY) return;
-  const snap = await db.collection('clipTransferJobs')
-    .where('status', '==', 'pending')
-    .limit(CONCURRENCY + inFlight.size)
-    .get();
+  let snap;
+  try {
+    snap = await db.collection('clipTransferJobs')
+      .where('status', '==', 'pending')
+      .limit(CONCURRENCY + inFlight.size)
+      .get();
+  } catch (err) {
+    // Surface it and keep polling rather than letting an unhandled
+    // rejection silently kill the whole process — a transient network
+    // blip or a stale auth token shouldn't end the run.
+    console.log(`Couldn't check for jobs: ${err.message}`);
+    return;
+  }
 
   for (const doc of snap.docs) {
     if (inFlight.size >= CONCURRENCY) break;
