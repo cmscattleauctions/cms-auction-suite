@@ -88,13 +88,13 @@ export function openQuickAddCodeModal(kind, code, ctx) {
         <button class="btn btn-primary" id="qa-save">Add ${label} ${escapeHtml(code)}</button>
       </div>
     `);
-    modal.querySelector('#qa-save').addEventListener('click', () => {
+    modal.querySelector('#qa-save').addEventListener('click', async () => {
       const val = modal.querySelector('#qa-name').value.trim();
       if (!val) return;
       try {
-        if (kind === 'consignor') ctx.ref.addConsignor({ name: val, code });
-        else if (kind === 'sire') ctx.ref.addSireType(code, val);
-        else if (kind === 'dam') ctx.ref.addDamType(code, val);
+        if (kind === 'consignor') await ctx.ref.addConsignor({ name: val, code });
+        else if (kind === 'sire') await ctx.ref.addSireType(code, val);
+        else if (kind === 'dam') await ctx.ref.addDamType(code, val);
         showToast(`Added ${label.toLowerCase()} ${code}`);
         resolve(true);
       } catch (err) {
@@ -126,12 +126,12 @@ export function openNewConsignorModal(ctx) {
         <button class="btn btn-primary" id="nc-save">Create Consignor</button>
       </div>
     `);
-    modal.querySelector('#nc-save').addEventListener('click', () => {
+    modal.querySelector('#nc-save').addEventListener('click', async () => {
       const name = modal.querySelector('#nc-name').value.trim();
       const code = modal.querySelector('#nc-code').value.trim();
       if (!name || !code) return;
       try {
-        const rec = ctx.ref.addConsignor({ name, code });
+        const rec = await ctx.ref.addConsignor({ name, code });
         showToast(`Consignor ${name} added — NEW, needs review`);
         resolve(rec);
       } catch (err) {
@@ -314,13 +314,13 @@ function renderConsignorsTab(container, ctx) {
       if (!name) { showToast('Name cannot be empty'); return; }
       try { await ctx.ref.renameConsignor(code, name); showToast(`Updated ${name}`); ctx.refresh(); editingCode = null; paint(); } catch (err) { showToast(err.message); }
     }));
-    list.querySelectorAll('[data-review]').forEach(btn => btn.addEventListener('click', () => {
-      ctx.ref.clearConsignorFlag(btn.dataset.review); ctx.refresh(); paint();
+    list.querySelectorAll('[data-review]').forEach(btn => btn.addEventListener('click', async () => {
+      await ctx.ref.clearConsignorFlag(btn.dataset.review); ctx.refresh(); paint();
     }));
-    list.querySelectorAll('[data-toggle-active]').forEach(btn => btn.addEventListener('click', () => {
+    list.querySelectorAll('[data-toggle-active]').forEach(btn => btn.addEventListener('click', async () => {
       const code = btn.dataset.toggleActive;
       const rec = ctx.ref.getConsignors().find(c => c.code === code);
-      ctx.ref.setConsignorActive(code, rec.active === false);
+      await ctx.ref.setConsignorActive(code, rec.active === false);
       ctx.refresh();
       paint();
     }));
@@ -394,29 +394,29 @@ function renderCodeTab(container, ctx, cfg) {
     `;
     list.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => { editingCode = btn.dataset.edit; paint(); }));
     list.querySelectorAll('[data-cancel-edit]').forEach(btn => btn.addEventListener('click', () => { editingCode = null; paint(); }));
-    list.querySelectorAll('[data-save]').forEach(btn => btn.addEventListener('click', () => {
+    list.querySelectorAll('[data-save]').forEach(btn => btn.addEventListener('click', async () => {
       const code = btn.dataset.save;
       const input = list.querySelector(`tr[data-code="${CSS.escape(code)}"] .idmgr-code-name-input`);
       const label = input.value.trim();
       if (!label) { showToast('Name cannot be empty'); return; }
-      try { cfg.rename(code, label); showToast(`Updated code ${code}`); ctx.refresh(); editingCode = null; paint(); } catch (err) { showToast(err.message); }
+      try { await cfg.rename(code, label); showToast(`Updated code ${code}`); ctx.refresh(); editingCode = null; paint(); } catch (err) { showToast(err.message); }
     }));
-    list.querySelectorAll('[data-toggle]').forEach(btn => btn.addEventListener('click', () => {
+    list.querySelectorAll('[data-toggle]').forEach(btn => btn.addEventListener('click', async () => {
       const code = btn.dataset.toggle;
       const rec = cfg.get().find(r => r.code === code);
-      cfg.setActive(code, rec.active === false);
+      await cfg.setActive(code, rec.active === false);
       ctx.refresh();
       paint();
     }));
     wireOverflowMenus(list);
-    list.querySelector('#idmgr-code-add').addEventListener('click', () => {
+    list.querySelector('#idmgr-code-add').addEventListener('click', async () => {
       const codeInput = list.querySelector('#idmgr-code-new-code');
       const nameInput = list.querySelector('#idmgr-code-new-name');
       const code = codeInput.value.trim();
       const name = nameInput.value.trim();
       if (!code || !name) { showToast('Enter both a code and a name'); return; }
       try {
-        cfg.add(code, name);
+        await cfg.add(code, name);
         showToast(`Added ${cfg.title.toLowerCase()} ${code}`);
         paint();
       } catch (err) { showToast(err.message); }

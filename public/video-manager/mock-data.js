@@ -2,12 +2,17 @@
  * CMS Video Manager — Reference dictionaries
  * -------------------------------------------------------------
  * Consignors, sex/sire/dam code lists, video makers, video format
- * definitions, and staff. Still static/in-memory (not Firestore —
- * see the note on ReferenceDataRepository in repository.js), but
- * the actual video RECORDS are real now: repository.js reads/writes
- * those from the `videoRecords` Firestore collection via
- * firestore-data.js. Nothing in the UI layer should hardcode these
- * arrays; it all comes through repository.js.
+ * definitions, and staff.
+ *
+ * The arrays below are the SEED/default values only. Consignors and
+ * sire/dam types are Firestore-backed (see referenceData/* in
+ * firestore-data.js and ensureReferenceLoaded() in repository.js) —
+ * repository.js mutates these same array objects in place once real
+ * data loads, or writes them to Firestore as-is the very first time
+ * (bootstrapping the collection). Sex types, video makers, video
+ * formats, and staff are still plain static/in-memory data; nothing
+ * edits those at runtime. Nothing in the UI layer should import this
+ * file directly — it all comes through repository.js.
  * ============================================================= */
 
 /* =============================================================

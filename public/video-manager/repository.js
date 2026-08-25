@@ -7,18 +7,21 @@
  * repositories.
  *
  * Video records are real and Firestore-backed (see firestore-data.js
- * for the `videoRecords` collection). Reference dictionaries
- * (consignors, sex/sire/dam types, staff, video formats) are still
- * the static lists in mock-data.js — those change rarely enough,
- * and are edited by few enough people, that moving them to Firestore
- * wasn't part of this pass; see the note on ReferenceDataRepository
- * below if that's ever needed.
+ * for the `videoRecords` collection). Consignors and sire/dam types
+ * (the Video ID Manager's editable dictionaries) are Firestore-backed
+ * too, one document per list under referenceData/* — see
+ * ensureReferenceLoaded() below. Sex types, video makers, video
+ * formats, and staff are still plain static lists in mock-data.js;
+ * nothing edits those at runtime, so there was no need to move them.
  *
  * All video records load once into an in-memory cache on first use
  * (629 documents is trivial for a single Firestore read) and every
  * write updates both Firestore and the cache before emitting
  * 'videos-changed', so the UI layer's existing subscribe()-based
- * refresh keeps working completely unchanged.
+ * refresh keeps working completely unchanged. Reference data follows
+ * the same shape but is preloaded explicitly by app.js's boot() (see
+ * ReferenceDataRepository.preload()) rather than loaded lazily on
+ * first read, since several places read it synchronously.
  * ============================================================= */
 
 import {
@@ -68,6 +71,41 @@ function touch(record, actor) {
   record.lastUpdated = new Date().toISOString();
 }
 
+/* =============================================================
+ * Reference data cache — same load-once-then-persist pattern as
+ * the video cache above. CONSIGNORS/SIRE_TYPES/DAM_TYPES (imported
+ * from mock-data.js) are mutated in place — cleared and repopulated
+ * from Firestore, or left as-is and used to seed Firestore the very
+ * first time a document doesn't exist yet — rather than reassigned,
+ * since nothing outside this file imports those array bindings.
+ * ============================================================= */
+const REFERENCE_LISTS = { consignors: CONSIGNORS, sireTypes: SIRE_TYPES, damTypes: DAM_TYPES };
+let referenceLoadPromise = null;
+
+async function loadOrSeedReferenceList(key, arr) {
+  const stored = await FirestoreData.fetchReferenceList(key);
+  if (stored) {
+    arr.length = 0;
+    arr.push(...stored);
+  } else {
+    await FirestoreData.saveReferenceList(key, arr);
+  }
+}
+
+function ensureReferenceLoaded() {
+  if (!referenceLoadPromise) {
+    referenceLoadPromise = Promise.all(
+      Object.entries(REFERENCE_LISTS).map(([key, arr]) => loadOrSeedReferenceList(key, arr))
+    );
+  }
+  return referenceLoadPromise;
+}
+
+async function persistReferenceList(key) {
+  await FirestoreData.saveReferenceList(key, REFERENCE_LISTS[key]);
+  emitter.emit({ type: 'reference-changed' });
+}
+
 function logActivity(record, actor, type, message) {
   record.activity.unshift({ ts: new Date().toISOString(), actor, type, message });
 }
@@ -81,6 +119,9 @@ function logActivity(record, actor, type, message) {
  * mock-data.js-backed, not Firestore — see file header.
  * ============================================================= */
 export const ReferenceDataRepository = {
+  /** Awaited once by app.js's boot(), before anything below is read — see ensureReferenceLoaded() above. */
+  preload() { return ensureReferenceLoaded(); },
+
   getSexTypes()  { return [...SEX_TYPES].sort((a, b) => Number(a.code) - Number(b.code)); },
   getSireTypes() { return [...SIRE_TYPES].sort((a, b) => Number(a.code) - Number(b.code)); },
   getDamTypes()  { return [...DAM_TYPES].sort((a, b) => Number(a.code) - Number(b.code)); },
@@ -108,13 +149,13 @@ export const ReferenceDataRepository = {
     return String(n);
   },
 
-  addConsignor({ name, code }) {
+  async addConsignor({ name, code }) {
     if (CONSIGNORS.some(c => c.code === String(code))) {
       throw new Error(`Consignor code ${code} is already in use`);
     }
     const rec = { code: String(code), name, flaggedNew: true, active: true };
     CONSIGNORS.push(rec);
-    emitter.emit({ type: 'reference-changed' });
+    await persistReferenceList('consignors');
     return rec;
   },
 
@@ -127,72 +168,72 @@ export const ReferenceDataRepository = {
     const affected = videos.filter(v => v.consignorCode === String(code));
     affected.forEach(v => { v.consignorName = name; });
     if (affected.length) await FirestoreData.importVideosBatch(affected);
-    emitter.emit({ type: 'reference-changed' });
+    await persistReferenceList('consignors');
     emitter.emit({ type: 'videos-changed' });
     return rec;
   },
 
-  setConsignorActive(code, active) {
+  async setConsignorActive(code, active) {
     const rec = CONSIGNORS.find(c => c.code === String(code));
     if (!rec) throw new Error('Consignor not found');
     rec.active = active;
-    emitter.emit({ type: 'reference-changed' });
+    await persistReferenceList('consignors');
     return rec;
   },
 
-  clearConsignorFlag(code) {
+  async clearConsignorFlag(code) {
     const rec = CONSIGNORS.find(c => c.code === String(code));
     if (!rec) throw new Error('Consignor not found');
     rec.flaggedNew = false;
-    emitter.emit({ type: 'reference-changed' });
+    await persistReferenceList('consignors');
     return rec;
   },
 
-  addSireType(code, label) {
+  async addSireType(code, label) {
     if (SIRE_TYPES.some(s => s.code === String(code))) throw new Error('Sire code already exists');
     const rec = { code: String(code), label, active: true };
     SIRE_TYPES.push(rec);
-    emitter.emit({ type: 'reference-changed' });
+    await persistReferenceList('sireTypes');
     return rec;
   },
 
-  renameSireType(code, label) {
+  async renameSireType(code, label) {
     const rec = SIRE_TYPES.find(s => s.code === String(code));
     if (!rec) throw new Error('Sire type not found');
     rec.label = label;
-    emitter.emit({ type: 'reference-changed' });
+    await persistReferenceList('sireTypes');
     return rec;
   },
 
-  setSireActive(code, active) {
+  async setSireActive(code, active) {
     const rec = SIRE_TYPES.find(s => s.code === String(code));
     if (!rec) throw new Error('Sire type not found');
     rec.active = active;
-    emitter.emit({ type: 'reference-changed' });
+    await persistReferenceList('sireTypes');
     return rec;
   },
 
-  addDamType(code, label) {
+  async addDamType(code, label) {
     if (DAM_TYPES.some(s => s.code === String(code))) throw new Error('Dam code already exists');
     const rec = { code: String(code), label, active: true };
     DAM_TYPES.push(rec);
-    emitter.emit({ type: 'reference-changed' });
+    await persistReferenceList('damTypes');
     return rec;
   },
 
-  renameDamType(code, label) {
+  async renameDamType(code, label) {
     const rec = DAM_TYPES.find(s => s.code === String(code));
     if (!rec) throw new Error('Dam type not found');
     rec.label = label;
-    emitter.emit({ type: 'reference-changed' });
+    await persistReferenceList('damTypes');
     return rec;
   },
 
-  setDamActive(code, active) {
+  async setDamActive(code, active) {
     const rec = DAM_TYPES.find(s => s.code === String(code));
     if (!rec) throw new Error('Dam type not found');
     rec.active = active;
-    emitter.emit({ type: 'reference-changed' });
+    await persistReferenceList('damTypes');
     return rec;
   },
 
