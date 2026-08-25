@@ -1,0 +1,9 @@
+{
+  "name": "cms-auction-suite-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Local one-off scripts, run manually on an operator's own machine — not deployed anywhere. See transfer-clips.mjs.",
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}
