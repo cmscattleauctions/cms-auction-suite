@@ -54,10 +54,12 @@ function logActivity(record, actor, type, message) {
  * consignors are flagged NEW — NEEDS REVIEW.
  * ============================================================= */
 export const ReferenceDataRepository = {
-  getSexTypes()  { return [...SEX_TYPES]; },
-  getSireTypes() { return [...SIRE_TYPES]; },
-  getDamTypes()  { return [...DAM_TYPES]; },
-  getConsignors() { return [...CONSIGNORS].sort((a, b) => a.name.localeCompare(b.name)); },
+  getSexTypes()  { return [...SEX_TYPES].sort((a, b) => Number(a.code) - Number(b.code)); },
+  getSireTypes() { return [...SIRE_TYPES].sort((a, b) => Number(a.code) - Number(b.code)); },
+  getDamTypes()  { return [...DAM_TYPES].sort((a, b) => Number(a.code) - Number(b.code)); },
+  // Numeric order by code, per staff request — matches how the ID system
+  // itself is organized, and how it reads on the printed code sheet.
+  getConsignors() { return [...CONSIGNORS].sort((a, b) => Number(a.code) - Number(b.code)); },
   countVideosForConsignor(code) { return videos.filter(v => v.consignorCode === String(code)).length; },
 
   findConsignor(code) { return consignorFor(code); },
@@ -348,28 +350,43 @@ function matchesFilters(v, filters = {}) {
   return true;
 }
 
+/**
+ * Video IDs are supposed to be unique (collisions get an explicit -2/-3
+ * suffix at creation/edit time — see setVideoIdFields), but a bulk import
+ * (e.g. from Monday) can land records outside that flow. This flags any
+ * videoId shared by more than one non-trashed record so staff can resolve
+ * it with a suffix, same as the live collision UI does.
+ */
+function duplicateIdSet() {
+  const counts = new Map();
+  videos.forEach(v => { if (!v.deletedAt) counts.set(v.videoId, (counts.get(v.videoId) || 0) + 1); });
+  return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([id]) => id));
+}
+
 export const VideoRepository = {
   /** Full query: status tab + search + filters + sort. Always resolves ALL matches — no pagination. */
   async getVideos({ status = null, search = '', filters = {}, sort = null } = {}) {
-    let list = videos.filter(v => (status ? v.status === status : true));
+    const dupes = duplicateIdSet();
+    let list = videos.filter(v => !v.deletedAt && (status ? v.status === status : true));
     list = list.filter(v => matchesSearch(v, search) && matchesFilters(v, filters));
     if (sort) list = [...list].sort(sort);
-    return list.map(v => ({ ...v }));
+    return list.map(v => ({ ...v, isDuplicateId: dupes.has(v.videoId) }));
   },
 
   async getCounts() {
+    const active = videos.filter(v => !v.deletedAt);
     return {
-      ready: videos.filter(v => v.status === 'ready').length,
-      hold: videos.filter(v => v.status === 'hold').length,
-      created: videos.filter(v => v.status === 'created').length,
-      draft: videos.filter(v => v.isDraft).length,
-      total: videos.length,
+      ready: active.filter(v => v.status === 'ready').length,
+      hold: active.filter(v => v.status === 'hold').length,
+      created: active.filter(v => v.status === 'created').length,
+      draft: active.filter(v => v.isDraft).length,
+      total: active.length,
     };
   },
 
   async getVideoById(id) {
     const v = videos.find(v => v.id === id);
-    return v ? { ...v } : null;
+    return v ? { ...v, isDuplicateId: duplicateIdSet().has(v.videoId) } : null;
   },
 
   /** Exact-match lookup against the CURRENT active id of any record. */
@@ -599,6 +616,48 @@ export const VideoRepository = {
     touch(v, actor);
     emitter.emit({ type: 'videos-changed' });
     return { ...v };
+  },
+
+  /* =============================================================
+   * Deletion — soft delete only. A trashed record disappears from
+   * every normal view (getVideos/getCounts/getDuplicateIdVideos
+   * already filter on !deletedAt) but nothing is actually destroyed
+   * until an explicit, separate purge — so clips/publishing/usage/
+   * history/notes/activity are never silently orphaned.
+   * ============================================================= */
+  async trashVideo(id, actor = 'Staff') {
+    const v = videos.find(v => v.id === id);
+    if (!v) throw new Error('Video not found');
+    v.deletedAt = new Date().toISOString();
+    v.deletedBy = actor;
+    logActivity(v, actor, 'deleted', 'Moved to Trash');
+    touch(v, actor);
+    emitter.emit({ type: 'videos-changed' });
+    return { ...v };
+  },
+
+  async restoreVideo(id, actor = 'Staff') {
+    const v = videos.find(v => v.id === id);
+    if (!v) throw new Error('Video not found');
+    v.deletedAt = null;
+    v.deletedBy = null;
+    logActivity(v, actor, 'restored', 'Restored from Trash');
+    touch(v, actor);
+    emitter.emit({ type: 'videos-changed' });
+    return { ...v };
+  },
+
+  /** Permanent, separate from trashVideo() on purpose — see doc comment above. */
+  async purgeVideo(id) {
+    const idx = videos.findIndex(v => v.id === id);
+    if (idx === -1) throw new Error('Video not found');
+    videos.splice(idx, 1);
+    emitter.emit({ type: 'videos-changed' });
+    return true;
+  },
+
+  async getTrashedVideos() {
+    return videos.filter(v => v.deletedAt).map(v => ({ ...v }));
   },
 
   subscribe(fn) { return emitter.subscribe(fn); },

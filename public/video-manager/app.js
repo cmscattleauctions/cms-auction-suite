@@ -10,7 +10,7 @@ import { VideoRepository, ReferenceDataRepository, UsageRepository, Notification
 import { renderTable } from './ui-table.js';
 import { renderGrid } from './ui-grid.js';
 import { openDrawer, closeDrawer } from './ui-drawer.js';
-import { openUploadModal, openCsvImportModal, openNotificationsModal, openVideoIdManagerModal } from './ui-modals.js';
+import { openUploadModal, openCsvImportModal, openNotificationsModal, openVideoIdManagerModal, openTrashModal } from './ui-modals.js';
 
 const state = {
   statusTab: 'ready',
@@ -196,6 +196,7 @@ function wireToolbar() {
   document.getElementById('vm-btn-idmanager').addEventListener('click', () => { closeTools(); openVideoIdManagerModal(ctx); });
   document.getElementById('vm-btn-import-csv').addEventListener('click', () => { closeTools(); openCsvImportModal(ctx); });
   document.getElementById('vm-btn-notifications').addEventListener('click', () => { closeTools(); openNotificationsModal(ctx); });
+  document.getElementById('vm-btn-trash').addEventListener('click', () => { closeTools(); openTrashModal(ctx); });
 }
 
 function renderFiltersPanel() {
@@ -216,20 +217,20 @@ function renderFiltersPanel() {
     <div class="vm-filters-panel-row">
       <label>Sex</label>
       <select id="f-sex"><option value="">All</option>
-        ${sexes.map(s => `<option value="${s.code}">${s.label}</option>`).join('')}
+        ${sexes.map(s => `<option value="${s.code}">${s.code}- ${s.label}</option>`).join('')}
       </select>
     </div>
     <div class="field-row vm-filters-panel-row">
       <div>
         <label>Sire</label>
         <select id="f-sire"><option value="">All</option>
-          ${sires.map(s => `<option value="${s.code}">${s.label}</option>`).join('')}
+          ${sires.map(s => `<option value="${s.code}">${s.code}- ${s.label}</option>`).join('')}
         </select>
       </div>
       <div>
         <label>Dam</label>
         <select id="f-dam"><option value="">All</option>
-          ${dams.map(s => `<option value="${s.code}">${s.label}</option>`).join('')}
+          ${dams.map(s => `<option value="${s.code}">${s.code}- ${s.label}</option>`).join('')}
         </select>
       </div>
     </div>
