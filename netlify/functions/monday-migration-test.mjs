@@ -423,8 +423,12 @@ async function actionPaginationProbe(params) {
  * these two specific, confirmed patterns (anything else stays flagged
  * for manual review rather than being force-fit).
  *
- *  1. "6.1.2.3.000.1223 (3-1,2,3)"   -> id + trailing free text
+ *  1. "6.1.2.3.000.1223 (3-1,2,3)"   -> id + trailing free text (space-separated)
  *  2. "56.2.0.0.750.G.0126"          -> id with one stray dot-segment
+ *  3. "43.2.0.0.760.0526-4/5"        -> id + trailing free text (hyphen-separated
+ *                                        pen/ear-tag numbers or a name — NOT a real
+ *                                        duplicate suffix, which is plain digits and
+ *                                        already succeeds via the exact/splitSuffix path)
  */
 function extractVideoIdAndNotes(rawName) {
   const trimmed = String(rawName || '').trim();
@@ -462,6 +466,24 @@ function extractVideoIdAndNotes(rawName) {
           extra: segs[i],
         };
       }
+    }
+  }
+
+  // Pattern 3: a valid id followed by "-" + free text that ISN'T a plain
+  // numeric suffix. A real duplicate suffix ("-2", "-3") already succeeds
+  // via the exact/splitSuffix path above — this only catches hand-typed
+  // notes tacked on with a hyphen instead of a space.
+  const dashIdx = trimmed.lastIndexOf('-');
+  if (dashIdx > 0) {
+    const lead = parseVideoId(trimmed.slice(0, dashIdx));
+    const extra = trimmed.slice(dashIdx + 1).trim();
+    if (lead.valid && extra && !/^\d+$/.test(extra)) {
+      return {
+        baseId: lead.baseId,
+        notes: `Imported from Monday — original item name was "${trimmed}".`,
+        strategy: 'trailing-text-dash',
+        extra,
+      };
     }
   }
 
