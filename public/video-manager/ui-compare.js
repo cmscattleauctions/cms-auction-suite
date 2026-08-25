@@ -1,38 +1,31 @@
 /* =============================================================
  * CMS Video Manager — Compare mode
  * -------------------------------------------------------------
- * Side-by-side/stacked/grid comparison for deciding which of a
- * handful of candidate videos to actually use (e.g. two video
- * packages shot for the same cattle classification). Read-only —
- * "Use This Video" just opens that record's drawer to continue
- * work there; it doesn't move or delete the others.
+ * Grid comparison for deciding which of a handful of candidate
+ * videos to actually use (e.g. two video packages shot for the
+ * same cattle classification). Always a responsive grid — as many
+ * videos as were selected, wrapping and scrolling rather than
+ * capping at a fixed count. Players autoplay (muted) via the same
+ * embedUrl used everywhere else, so it's an actual side-by-side
+ * watch, not just stills. Read-only — "Use This Video" just opens
+ * that record's drawer to continue work there; it doesn't move or
+ * delete the others.
  * ============================================================= */
 
 import { escapeHtml, cattleSummaryLine } from './format.js';
-
-let currentLayout = 'side-by-side'; // 'side-by-side' | 'stacked' | 'grid'
 
 export function openCompareModal(records, ctx) {
   const root = document.getElementById('vm-modal-root');
   const backdrop = document.createElement('div');
   backdrop.className = 'vm-modal-backdrop';
-  backdrop.innerHTML = `<div class="vm-modal vm-modal-wide vm-compare-modal">${panelShellHtml(records.length)}</div>`;
+  backdrop.innerHTML = `<div class="vm-modal vm-compare-modal">${panelShellHtml(records.length)}</div>`;
   root.appendChild(backdrop);
   backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
   function close() { backdrop.remove(); }
   const modal = backdrop.querySelector('.vm-modal');
 
-  function repaint() {
-    modal.innerHTML = panelShellHtml(records.length);
-    wire();
-  }
-
   function wire() {
     modal.querySelector('.vm-modal-close').addEventListener('click', close);
-    modal.querySelectorAll('[data-layout]').forEach(btn => btn.addEventListener('click', () => {
-      currentLayout = btn.dataset.layout;
-      repaint();
-    }));
     modal.querySelectorAll('[data-use-video]').forEach(btn => btn.addEventListener('click', () => {
       close();
       ctx.openDrawer(btn.dataset.useVideo);
@@ -48,13 +41,8 @@ export function openCompareModal(records, ctx) {
         </div>
         <button class="vm-modal-close" type="button">&times;</button>
       </div>
-      <div class="vm-compare-layout-toggle">
-        <button type="button" class="vm-compare-layout-btn ${currentLayout === 'side-by-side' ? 'active' : ''}" data-layout="side-by-side">Side by Side</button>
-        <button type="button" class="vm-compare-layout-btn ${currentLayout === 'stacked' ? 'active' : ''}" data-layout="stacked">Top / Bottom</button>
-        <button type="button" class="vm-compare-layout-btn ${currentLayout === 'grid' ? 'active' : ''}" data-layout="grid">4 Corners</button>
-      </div>
       <div class="vm-modal-body vm-compare-body">
-        <div class="vm-compare-grid layout-${currentLayout}">
+        <div class="vm-compare-grid">
           ${records.map(r => panelHtml(r)).join('')}
         </div>
       </div>`;
@@ -71,8 +59,8 @@ export function openCompareModal(records, ctx) {
     return `
       <div class="vm-compare-panel">
         <div class="vm-compare-media">
-          ${r.youtubeId
-            ? `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(r.youtubeId)}" title="${escapeHtml(r.videoId)}" frameborder="0" allowfullscreen></iframe>`
+          ${r.embedUrl
+            ? `<iframe src="${escapeHtml(r.embedUrl)}" title="${escapeHtml(r.videoId)}" frameborder="0" allow="autoplay" allowfullscreen></iframe>`
             : `<div class="vm-compare-media-empty">No YouTube video yet${r.clips.length ? ` — ${r.clips.length} source clip${r.clips.length === 1 ? '' : 's'} uploaded` : ''}</div>`}
         </div>
         <div class="vm-compare-info">

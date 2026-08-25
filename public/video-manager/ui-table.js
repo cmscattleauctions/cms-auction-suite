@@ -18,7 +18,6 @@ import { handleIdEntryLoop } from './ui-modals.js';
 import { openCompareModal } from './ui-compare.js';
 
 let addRowOpen = false;
-const MAX_COMPARE = 4;
 const compareSelection = new Map(); // id -> record snapshot, so the compare bar/modal work across tabs
 
 export function renderTable(container, records, ctx) {
@@ -298,11 +297,6 @@ function wireRows(tbody, ctx) {
       e.stopPropagation();
       const id = compareCheck.dataset.compare;
       if (compareCheck.checked) {
-        if (compareSelection.size >= MAX_COMPARE) {
-          compareCheck.checked = false;
-          showToast(`Compare supports up to ${MAX_COMPARE} videos at once`);
-          return;
-        }
         const rec = await ctx.repo.getVideoById(id);
         compareSelection.set(id, rec);
       } else {
