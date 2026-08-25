@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monday Migration Test (internal)</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f3ef; color: #1a1d22; }
+  header { background: #131820; color: #fff; padding: 16px 24px; }
+  header h1 { margin: 0; font-size: 16px; }
+  header p { margin: 4px 0 0; font-size: 12.5px; color: #b7bcc4; }
+  .banner { background: #fff4e0; border-bottom: 1px solid #e0b563; padding: 10px 24px; font-size: 12.5px; color: #7a5310; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 24px 60px; }
+  section { background: #fff; border: 1px solid #e3e1da; border-radius: 8px; padding: 16px 18px; margin-bottom: 16px; }
+  section h2 { font-size: 13.5px; margin: 0 0 4px; }
+  section p.desc { font-size: 12px; color: #6b7078; margin: 0 0 12px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #6b7078; }
+  input[type="text"], input[type="number"] {
+    padding: 6px 8px; font-size: 12.5px; border: 1px solid #d7d4cb; border-radius: 5px; min-width: 160px;
+  }
+  button {
+    padding: 7px 14px; font-size: 12.5px; font-weight: 600; border-radius: 6px; border: 1px solid #2563eb;
+    background: #2563eb; color: #fff; cursor: pointer;
+  }
+  button:hover { background: #1d4ed8; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  pre {
+    background: #131820; color: #d9dde3; padding: 12px 14px; border-radius: 6px; font-size: 11.5px;
+    overflow-x: auto; max-height: 480px; overflow-y: auto; margin: 10px 0 0; white-space: pre-wrap; word-break: break-word;
+  }
+  .status { font-size: 11.5px; margin-top: 6px; }
+  .status.ok { color: #1a7f37; }
+  .status.err { color: #c0392b; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Monday → Video Manager migration test</h1>
+  <p>Internal diagnostic only. Not linked from anywhere in the app — bookmark this URL directly.</p>
+</header>
+<div class="banner">
+  Read-only. No Monday mutations, no Firebase writes, no Storage uploads happen from this page.
+  Requires <code>MONDAY_API_TOKEN</code> to be set for the Netlify function this page calls
+  (see <code>netlify/functions/README.md</code>). If it's not set, every action below will show a
+  clear "MONDAY_API_TOKEN is not set" error instead of a crash.
+</div>
+<main>
+
+  <section id="s-whoami">
+    <h2>1. Who am I? <span style="font-weight:400;color:#6b7078;">(Phase 1.2)</span></h2>
+    <p class="desc">Confirms the token authenticates and shows the account it belongs to.</p>
+    <button data-run="whoami">Run</button>
+    <div class="status" data-status-for="whoami"></div>
+    <pre data-out-for="whoami" hidden></pre>
+  </section>
+
+  <section id="s-boards">
+    <h2>2. List boards <span style="font-weight:400;color:#6b7078;">(Phase 1.3-1.4)</span></h2>
+    <p class="desc">Lists every board the token can see and guesses which one is Video Manager (name contains "video").</p>
+    <button data-run="boards">Run</button>
+    <div class="status" data-status-for="boards"></div>
+    <pre data-out-for="boards" hidden></pre>
+  </section>
+
+  <section id="s-schema">
+    <h2>3. Board schema <span style="font-weight:400;color:#6b7078;">(Phase 1.5 / 2)</span></h2>
+    <p class="desc">Groups + full column list (with real column ids) for one board. Copy a board id from step 2.</p>
+    <div class="row">
+      <label>Board ID</label>
+      <input type="text" id="in-schema-boardid" placeholder="1234567890" />
+      <button data-run="board-schema">Run</button>
+    </div>
+    <div class="status" data-status-for="board-schema"></div>
+    <pre data-out-for="board-schema" hidden></pre>
+  </section>
+
+  <section id="s-items">
+    <h2>4. Sample items <span style="font-weight:400;color:#6b7078;">(Phase 2)</span></h2>
+    <p class="desc">~15 items with every column's raw value + displayed text, across groups.</p>
+    <div class="row">
+      <label>Board ID</label>
+      <input type="text" id="in-items-boardid" placeholder="1234567890" />
+      <label>Limit</label>
+      <input type="number" id="in-items-limit" value="15" style="min-width:70px;" />
+      <button data-run="sample-items">Run</button>
+    </div>
+    <div class="status" data-status-for="sample-items"></div>
+    <pre data-out-for="sample-items" hidden></pre>
+  </section>
+
+  <section id="s-assets">
+    <h2>5. Asset / file test <span style="font-weight:400;color:#6b7078;">(Phase 3)</span></h2>
+    <p class="desc">Scans items for attached files, reports full asset metadata, and actually downloads the smallest one server-side (to a temp file, verified, then deleted — never persisted).</p>
+    <div class="row">
+      <label>Board ID</label>
+      <input type="text" id="in-asset-boardid" placeholder="1234567890" />
+      <label>Items to scan</label>
+      <input type="number" id="in-asset-scan" value="25" style="min-width:70px;" />
+      <button data-run="asset-test">Run</button>
+    </div>
+    <div class="status" data-status-for="asset-test"></div>
+    <pre data-out-for="asset-test" hidden></pre>
+  </section>
+
+  <section id="s-pagination">
+    <h2>6. Pagination probe <span style="font-weight:400;color:#6b7078;">(Phase 4)</span></h2>
+    <p class="desc">Walks a few pages of cursor pagination and reports the board's total item count, so we can estimate a full migration's request count.</p>
+    <div class="row">
+      <label>Board ID</label>
+      <input type="text" id="in-page-boardid" placeholder="1234567890" />
+      <label>Page size</label>
+      <input type="number" id="in-page-size" value="100" style="min-width:70px;" />
+      <label>Pages to walk</label>
+      <input type="number" id="in-page-max" value="3" style="min-width:70px;" />
+      <button data-run="pagination-probe">Run</button>
+    </div>
+    <div class="status" data-status-for="pagination-probe"></div>
+    <pre data-out-for="pagination-probe" hidden></pre>
+  </section>
+
+  <section id="s-dryrun">
+    <h2>7. Dry-run migration preview <span style="font-weight:400;color:#6b7078;">(Phase 5-7)</span></h2>
+    <p class="desc">Only works once COLUMN_MAP in <code>netlify/functions/monday-migration-test.mjs</code> has real column ids filled in from step 3. Until then this reports that clearly instead of guessing.</p>
+    <div class="row">
+      <label>Board ID</label>
+      <input type="text" id="in-dry-boardid" placeholder="1234567890" />
+      <label>Items to scan</label>
+      <input type="number" id="in-dry-scan" value="100" style="min-width:70px;" />
+      <button data-run="dry-run-preview">Run</button>
+    </div>
+    <div class="status" data-status-for="dry-run-preview"></div>
+    <pre data-out-for="dry-run-preview" hidden></pre>
+  </section>
+
+</main>
+<script>
+  // Explicit per-action param list (input id -> query param name) — kept
+  // out of data-* attributes on purpose, since HTML lowercases attribute
+  // names and silently breaks camelCase query param names like itemScan.
+  const ACTIONS = {
+    'whoami': { params: {} },
+    'boards': { params: {} },
+    'board-schema': { params: { 'in-schema-boardid': 'boardId' } },
+    'sample-items': { params: { 'in-items-boardid': 'boardId', 'in-items-limit': 'limit' } },
+    'asset-test': { params: { 'in-asset-boardid': 'boardId', 'in-asset-scan': 'itemScan' } },
+    'pagination-probe': { params: { 'in-page-boardid': 'boardId', 'in-page-size': 'pageSize', 'in-page-max': 'maxPages' } },
+    'dry-run-preview': { params: { 'in-dry-boardid': 'boardId', 'in-dry-scan': 'itemScan' } },
+  };
+
+  document.querySelectorAll('button[data-run]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const action = btn.dataset.run;
+      const params = new URLSearchParams({ action });
+      for (const [inputId, paramName] of Object.entries(ACTIONS[action].params)) {
+        const val = document.getElementById(inputId)?.value;
+        if (val) params.set(paramName, val);
+      }
+
+      const statusEl = document.querySelector(`[data-status-for="${action}"]`);
+      const outEl = document.querySelector(`[data-out-for="${action}"]`);
+      btn.disabled = true;
+      statusEl.textContent = 'Running…';
+      statusEl.className = 'status';
+      outEl.hidden = true;
+
+      try {
+        const res = await fetch(`/api/monday-migration?${params.toString()}`);
+        const json = await res.json();
+        outEl.textContent = JSON.stringify(json, null, 2);
+        outEl.hidden = false;
+        statusEl.textContent = json.ok ? `Done (HTTP ${res.status})` : `Error (HTTP ${res.status})`;
+        statusEl.className = 'status ' + (json.ok ? 'ok' : 'err');
+      } catch (err) {
+        statusEl.textContent = 'Request failed: ' + err.message;
+        statusEl.className = 'status err';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+</script>
+</body>
+</html>

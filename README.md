@@ -92,7 +92,10 @@ across the top reminds you to set values in `shared/firebase-config.js`.
 Netlify reads `netlify.toml`. Push to `main`, deploy happens automatically.
 
 See `docs/PHASES.md` for the full build history and `docs/TODO.md` for
-known issues and small cleanup opportunities.
+known issues and small cleanup opportunities. See `docs/MONDAY-MIGRATION.md`
+for the read-only Monday.com → Video Manager migration feasibility test
+(server-side Netlify function + a small internal diagnostic page, not
+linked from the app — nothing has been imported yet).
 
 For the full first-time install (creating the Firebase project, deploying
 to Netlify, approving the first user), see `docs/INSTALL.md`.
