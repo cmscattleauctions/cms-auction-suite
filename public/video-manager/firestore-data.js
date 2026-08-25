@@ -62,6 +62,12 @@ export function currentUserEmail() {
   try { return (auth && auth.currentUser && auth.currentUser.email) || ''; } catch { return ''; }
 }
 
+/** ID token for calling the transferClip Cloud Function — that endpoint verifies it server-side (see functions/index.js) rather than trusting Firestore/Storage rules, since it's a second front door onto Storage. */
+export async function getIdToken() {
+  if (!auth || !auth.currentUser) return null;
+  return auth.currentUser.getIdToken();
+}
+
 /** Strip anything Firestore can't store — a live File object is the only offender today. */
 function stripFileHandles(record) {
   if (!record.clips || !record.clips.length) return record;
