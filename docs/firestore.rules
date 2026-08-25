@@ -39,6 +39,19 @@ service cloud.firestore {
     match /videoRecords/{id}   { allow read, write: if isApproved(); }
     match /referenceData/{key} { allow read, write: if isApproved(); }
 
+    // Monday clips migration — a client write here triggers the
+    // transferClip Cloud Function (see functions/index.js); only that
+    // function (via the Admin SDK, which bypasses these rules) is ever
+    // allowed to update a job after it's created, so a client can't
+    // fake a "done" result for itself.
+    match /clipTransferJobs/{jobId} {
+      allow read:   if isApproved();
+      allow create: if isApproved()
+                    && request.resource.data.requestedBy == request.auth.uid
+                    && request.resource.data.status == 'pending';
+      allow update, delete: if false;
+    }
+
     // ── Country Market ─────────────────────────────────────────
     match /cmLots/{id}        { allow read, write: if isApproved(); }
     match /cmActivityLog/{id} { allow read, write: if isApproved(); }
