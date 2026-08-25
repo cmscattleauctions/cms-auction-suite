@@ -1,0 +1,12 @@
+# Local secrets for `netlify dev` — never commit real tokens/keys.
+# See netlify/functions/README.md for what belongs in here.
+.env
+.env.local
+.env.*.local
+netlify/functions/.env
+
+# Netlify CLI local state
+.netlify/
+
+# OS/editor noise
+.DS_Store
