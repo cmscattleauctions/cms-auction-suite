@@ -8,6 +8,7 @@ import { escapeHtml, formatDate, formatBytes, formatDuration, cattleSummaryLine 
 import { showToast, copyToClipboard } from './toast.js';
 import { resolveVideoIdEntry, CODE_KIND_LABELS, CODE_KIND_SHORT_LABELS } from './id-workflow.js';
 import { buildBaseId, formatMonthYear, parseVideoId, monthYearToInputValue, inputValueToMonthYear } from './video-id.js';
+import * as StorageData from './storage-data.js';
 
 /* ----- generic modal shell ----- */
 function mountModal(innerHtml, { wide = false } = {}) {
@@ -609,10 +610,14 @@ export function openUploadModal(ctx) {
   });
 
   function addFileRow(file) {
-    const entry = { file, progress: 0, status: 'uploading', durationSec: null };
+    // No real record id exists yet at pick time (it may not even be
+    // created until submit, e.g. the build-a-new-id path) — uploads start
+    // immediately anyway under a throwaway per-file folder, since Storage
+    // paths don't need to match a Firestore doc id, only be unique.
+    const entry = { file, progress: 0, status: 'uploading', durationSec: null, uploadId: crypto.randomUUID(), storagePath: null, downloadUrl: null, error: null };
     pickedFiles.push(entry);
     renderFileList();
-    simulateUpload(entry);
+    startUpload(entry);
     readDuration(file).then(d => { entry.durationSec = d; renderFileList(); });
   }
 
@@ -629,18 +634,23 @@ export function openUploadModal(ctx) {
     });
   }
 
-  function simulateUpload(entry) {
-    const willFail = Math.random() < 0.12 && entry.progress === 0;
-    const timer = setInterval(() => {
-      if (entry.status !== 'uploading') { clearInterval(timer); return; }
-      entry.progress += 8 + Math.random() * 14;
-      if (willFail && entry.progress > 45) {
-        entry.status = 'failed'; entry.progress = 45; clearInterval(timer);
-      } else if (entry.progress >= 100) {
-        entry.progress = 100; entry.status = 'complete'; clearInterval(timer);
-      }
-      renderFileList();
-    }, 220);
+  async function startUpload(entry) {
+    entry.status = 'uploading';
+    entry.progress = 0;
+    entry.error = null;
+    try {
+      const result = await StorageData.uploadClip(entry.uploadId, entry.file, {
+        onProgress: pct => { entry.progress = pct; renderFileList(); },
+      });
+      entry.status = 'complete';
+      entry.progress = 100;
+      entry.storagePath = result.storagePath;
+      entry.downloadUrl = result.downloadUrl;
+    } catch (err) {
+      entry.status = 'failed';
+      entry.error = err.message;
+    }
+    renderFileList();
   }
 
   function renderFileList() {
@@ -650,7 +660,7 @@ export function openUploadModal(ctx) {
         <div style="flex:1">
           <div class="name">${escapeHtml(entry.file.name)} · ${entry.durationSec != null ? formatDuration(entry.durationSec) : formatBytes(entry.file.size)}</div>
           <div class="vm-progress-bar"><div class="vm-progress-fill ${entry.status === 'failed' ? 'failed' : entry.status === 'complete' ? 'complete' : ''}" style="width:${entry.progress}%"></div></div>
-          <div class="vm-upload-status">${entry.status === 'uploading' ? `Uploading… ${Math.round(entry.progress)}%` : entry.status === 'complete' ? 'Complete' : 'Failed — connection dropped'}</div>
+          <div class="vm-upload-status">${entry.status === 'uploading' ? `Uploading… ${Math.round(entry.progress)}%` : entry.status === 'complete' ? 'Complete' : `Failed — ${escapeHtml(entry.error || 'upload error')}`}</div>
         </div>
         ${entry.status === 'failed' ? `<button class="btn btn-sm" data-retry="${i}" type="button">Retry</button>` : ''}
         <button class="btn btn-icon btn-ghost" data-remove-file="${i}" type="button" title="Remove">×</button>
@@ -660,9 +670,7 @@ export function openUploadModal(ctx) {
     const totalDur = pickedFiles.reduce((s, e) => s + (e.durationSec || 0), 0);
     summary.textContent = pickedFiles.length ? `${pickedFiles.length} clip${pickedFiles.length === 1 ? '' : 's'}${totalDur ? ` · ${formatDuration(totalDur)} total` : ''}` : '';
     list.querySelectorAll('[data-retry]').forEach(b => b.addEventListener('click', () => {
-      const entry = pickedFiles[Number(b.dataset.retry)];
-      entry.status = 'uploading'; entry.progress = 0;
-      simulateUpload(entry);
+      startUpload(pickedFiles[Number(b.dataset.retry)]);
     }));
     list.querySelectorAll('[data-remove-file]').forEach(b => b.addEventListener('click', () => {
       pickedFiles.splice(Number(b.dataset.removeFile), 1);
@@ -672,6 +680,10 @@ export function openUploadModal(ctx) {
 
   /* ----- submit ----- */
   modal.querySelector('#um-submit').addEventListener('click', async () => {
+    if (pickedFiles.some(e => e.status === 'uploading')) {
+      showToast('Still uploading — wait for clips to finish before submitting');
+      return;
+    }
     const clips = pickedFiles.filter(e => e.status === 'complete').map(e => ({
       id: 'clip_' + Math.random().toString(36).slice(2, 10),
       filename: e.file.name,
@@ -681,7 +693,8 @@ export function openUploadModal(ctx) {
       uploader: 'Staff',
       uploadedAt: new Date().toISOString(),
       isOriginal: true,
-      fileHandle: e.file,
+      storagePath: e.storagePath,
+      downloadUrl: e.downloadUrl,
     }));
     const notes = modal.querySelector('#um-notes').value.trim();
 

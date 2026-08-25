@@ -197,6 +197,59 @@
     </div>
   </section>
 
+  <section id="s-clips" class="import">
+    <h2>9. Clips — Monday to Firebase Storage</h2>
+    <p class="desc">
+      Pulls the actual video clip files from Monday and uploads them to Firebase Storage, linking them
+      into the already-imported video records. This step costs real money (Storage), so it never runs
+      anything until you've seen a real size estimate and typed a confirmation below.
+      <b>Requires the Blaze plan</b> to be active on the Firebase project — Storage rejects every write
+      on the free Spark plan regardless of file size.
+    </p>
+    <div class="row">
+      <label>Board ID</label>
+      <input type="text" id="in-clips-boardid" value="5462086473" />
+      <button id="clips-scan-btn" data-clips-scan type="button">1. Scan for clips</button>
+    </div>
+    <div class="status" id="clips-scan-status"></div>
+    <div class="import-progress" id="clips-scan-progress" hidden><div></div></div>
+
+    <div id="clips-summary" hidden>
+      <div class="import-stats">
+        <div class="import-stat"><b id="clips-stat-items">0</b>items with clips</div>
+        <div class="import-stat"><b id="clips-stat-count">0</b>total clip files</div>
+        <div class="import-stat"><b id="clips-stat-size">0</b>total size</div>
+        <div class="import-stat"><b id="clips-stat-cost">$0</b>est. Storage cost/mo</div>
+        <div class="import-stat"><b id="clips-stat-remaining">0</b>not yet uploaded</div>
+      </div>
+      <p class="desc" style="margin-top:0;">
+        Cost estimate is Storage only, at Firebase's standard $0.026/GB/month rate — a rough monthly
+        figure, not a one-time charge. Bandwidth/operation costs are typically small in comparison but
+        not included here. Only the "not yet uploaded" count will actually transfer — anything already
+        migrated is skipped automatically, so this is safe to re-run if it gets interrupted.
+      </p>
+
+      <div class="confirm-box">
+        <p style="margin:0 0 8px;font-size:12.5px;">
+          Type <code>TRANSFER</code> below, then click Begin to start uploading. This processes a few
+          files at a time and updates live — you can close this tab at any point and re-run the scan
+          later to pick up where it left off.
+        </p>
+        <div class="row" style="margin-bottom:0;">
+          <input type="text" id="clips-confirm-input" placeholder="Type TRANSFER" />
+          <button id="clips-transfer-btn" class="danger" data-clips-transfer type="button" disabled>2. Begin Transfer</button>
+          <button id="clips-stop-btn" class="secondary" data-clips-stop type="button" hidden>Stop after current file</button>
+        </div>
+      </div>
+      <div class="status" id="clips-transfer-status"></div>
+      <div class="import-progress" id="clips-transfer-progress" hidden><div></div></div>
+      <details class="skip-list" id="clips-error-details" hidden>
+        <summary>Show files that failed to transfer</summary>
+        <pre id="clips-error-out"></pre>
+      </details>
+    </div>
+  </section>
+
 </main>
 <script>
   // Explicit per-action param list (input id -> query param name) — kept
@@ -251,6 +304,7 @@
   // the same in-memory cache as everything else — no separate write path.
   import { VideoRepository, ReferenceDataRepository } from './video-manager/repository.js';
   import { isSignedIn, currentUserEmail, configured as firebaseConfigured } from './video-manager/firestore-data.js';
+  import * as StorageData from './video-manager/storage-data.js';
 
   const authPill = document.getElementById('import-auth-pill');
   function refreshAuthPill() {
@@ -454,6 +508,212 @@
       statusEl.textContent = 'Import failed: ' + err.message;
       statusEl.className = 'status err';
       btn.disabled = false;
+    }
+  });
+
+  /* =============================================================
+   * Clips — Monday clip files -> Firebase Storage
+   * -------------------------------------------------------------
+   * Runs entirely in the browser: fetches each clip straight from
+   * Monday's signed public_url, then uploads it straight to Storage
+   * via storage-data.js (same upload path a normal staff upload
+   * uses). The Netlify function is never in the byte path — it only
+   * ever returns metadata (see clip-batch's doc comment) — so the
+   * only real cost source is Storage itself, not serverless
+   * bandwidth. Small batches, live progress, and a per-asset
+   * already-uploaded check make this resumable: closing the tab and
+   * re-running the scan + transfer later just picks up where it
+   * left off.
+   * ============================================================= */
+  const GB = 1024 * 1024 * 1024;
+  const STORAGE_PRICE_PER_GB_MONTH = 0.026; // Firebase's standard published rate
+
+  function formatBytes(n) {
+    if (!n) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0, v = n;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return `${v.toFixed(i === 0 || v >= 100 ? 0 : 1)} ${units[i]}`;
+  }
+
+  let clipScanItems = []; // [{ mondayItemId, recordId, clipCount, clipTotalBytes }]
+  let clipStopRequested = false;
+
+  async function countRemainingClipFiles(items) {
+    let remaining = 0;
+    for (const item of items) {
+      const rec = await VideoRepository.getVideoById(item.recordId);
+      const already = rec ? rec.clips.filter(c => c.mondayAssetId).length : 0;
+      if (already < item.clipCount) remaining += (item.clipCount - already);
+    }
+    return remaining;
+  }
+
+  document.getElementById('clips-scan-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('clips-scan-btn');
+    const statusEl = document.getElementById('clips-scan-status');
+    const progressWrap = document.getElementById('clips-scan-progress');
+    const boardId = document.getElementById('in-clips-boardid').value.trim();
+    if (!boardId) { statusEl.textContent = 'Board ID is required.'; statusEl.className = 'status err'; return; }
+
+    btn.disabled = true;
+    progressWrap.hidden = false;
+    progressWrap.querySelector('div').style.width = '10%';
+    statusEl.textContent = 'Scanning…';
+    statusEl.className = 'status';
+    document.getElementById('clips-confirm-input').value = '';
+    document.getElementById('clips-transfer-btn').disabled = true;
+    document.getElementById('clips-transfer-status').textContent = '';
+
+    try {
+      const all = [];
+      let cursor = null, page = 0;
+      do {
+        const params = new URLSearchParams({ action: 'export-records', boardId, pageSize: '200' });
+        if (cursor) params.set('cursor', cursor);
+        const res = await fetch(`/api/monday-migration?${params.toString()}`);
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error || 'export-records failed');
+        all.push(...json.records);
+        cursor = json.cursor;
+        page++;
+        statusEl.textContent = `Scanned ${all.length} items so far (page ${page})…`;
+      } while (cursor);
+
+      const withClips = all.filter(r => r.videoIdResolved && r.clipCount > 0);
+      clipScanItems = withClips.map(r => ({
+        mondayItemId: r.mondayItemId,
+        recordId: `monday-${r.mondayItemId}`,
+        clipCount: r.clipCount,
+        clipTotalBytes: r.clipTotalBytes || 0,
+      }));
+
+      const totalClips = clipScanItems.reduce((s, r) => s + r.clipCount, 0);
+      const totalBytes = clipScanItems.reduce((s, r) => s + r.clipTotalBytes, 0);
+      const estCost = (totalBytes / GB) * STORAGE_PRICE_PER_GB_MONTH;
+      statusEl.textContent = `Checking what's already uploaded…`;
+      const remaining = await countRemainingClipFiles(clipScanItems);
+
+      document.getElementById('clips-stat-items').textContent = clipScanItems.length;
+      document.getElementById('clips-stat-count').textContent = totalClips;
+      document.getElementById('clips-stat-size').textContent = formatBytes(totalBytes);
+      document.getElementById('clips-stat-cost').textContent = `~$${estCost.toFixed(2)}`;
+      document.getElementById('clips-stat-remaining').textContent = `${remaining} file${remaining === 1 ? '' : 's'}`;
+      document.getElementById('clips-summary').hidden = false;
+
+      progressWrap.querySelector('div').style.width = '100%';
+      statusEl.textContent = `Done — scanned ${all.length} items, ${clipScanItems.length} have clips, ${remaining} file(s) still need uploading.`;
+      statusEl.className = 'status ok';
+    } catch (err) {
+      statusEl.textContent = 'Scan failed: ' + err.message;
+      statusEl.className = 'status err';
+    } finally {
+      btn.disabled = false;
+      setTimeout(() => { progressWrap.hidden = true; }, 600);
+    }
+  });
+
+  document.getElementById('clips-confirm-input').addEventListener('input', e => {
+    document.getElementById('clips-transfer-btn').disabled = e.target.value.trim() !== 'TRANSFER' || !clipScanItems.length;
+  });
+
+  document.getElementById('clips-stop-btn').addEventListener('click', () => {
+    clipStopRequested = true;
+    document.getElementById('clips-transfer-status').textContent = 'Stopping after the current file…';
+  });
+
+  document.getElementById('clips-transfer-btn').addEventListener('click', async () => {
+    const statusEl = document.getElementById('clips-transfer-status');
+    if (!refreshAuthPill()) {
+      statusEl.textContent = 'You must be signed in (same-origin session) to upload files.';
+      statusEl.className = 'status err';
+      return;
+    }
+    const btn = document.getElementById('clips-transfer-btn');
+    const stopBtn = document.getElementById('clips-stop-btn');
+    const progressWrap = document.getElementById('clips-transfer-progress');
+    const errorDetails = document.getElementById('clips-error-details');
+    const errorOut = document.getElementById('clips-error-out');
+    clipStopRequested = false;
+    btn.disabled = true;
+    stopBtn.hidden = false;
+    progressWrap.hidden = false;
+    statusEl.textContent = 'Starting…';
+    statusEl.className = 'status';
+
+    const errors = [];
+    let filesDone = 0, bytesDone = 0;
+    const totalBytesAll = clipScanItems.reduce((s, r) => s + r.clipTotalBytes, 0);
+    const BATCH_SIZE = 20; // clip-batch caps at 25 server-side; leave headroom
+    const CONCURRENCY = 3; // simultaneous file transfers — throttles both Monday's CDN and Storage
+
+    for (let i = 0; i < clipScanItems.length; i += BATCH_SIZE) {
+      if (clipStopRequested) break;
+      const batch = clipScanItems.slice(i, i + BATCH_SIZE);
+      const params = new URLSearchParams({ action: 'clip-batch', itemIds: batch.map(b => b.mondayItemId).join(',') });
+      const res = await fetch(`/api/monday-migration?${params.toString()}`);
+      const json = await res.json();
+      if (!json.ok) { errors.push({ file: `batch starting at item ${batch[0].mondayItemId}`, error: json.error }); continue; }
+
+      // Flatten into individual upload tasks, skipping anything a
+      // previous (possibly interrupted) run already uploaded.
+      const tasks = [];
+      for (const rec of json.records) {
+        const recordId = `monday-${rec.mondayItemId}`;
+        const existing = await VideoRepository.getVideoById(recordId);
+        const existingAssetIds = new Set((existing?.clips || []).map(c => c.mondayAssetId).filter(Boolean));
+        for (const clip of rec.clips) {
+          if (existingAssetIds.has(clip.assetId)) continue;
+          if (!clip.publicUrl) { errors.push({ file: clip.filename, error: 'No public_url returned by Monday for this file' }); continue; }
+          tasks.push({ recordId, ...clip });
+        }
+      }
+
+      let idx = 0;
+      async function worker() {
+        while (idx < tasks.length) {
+          if (clipStopRequested) return;
+          const task = tasks[idx++];
+          statusEl.textContent = `Uploading ${task.filename}… (${filesDone} done, ${formatBytes(bytesDone)} of ~${formatBytes(totalBytesAll)})`;
+          try {
+            const result = await StorageData.uploadClipFromUrl(task.recordId, task.publicUrl, task.filename);
+            await VideoRepository.addClips(task.recordId, [{
+              id: 'clip_' + Math.random().toString(36).slice(2, 10),
+              filename: task.filename,
+              swatch: Math.floor(Math.random() * 8),
+              durationSec: null,
+              sizeBytes: result.sizeBytes,
+              uploader: 'Monday Migration',
+              uploadedAt: new Date().toISOString(),
+              isOriginal: true,
+              storagePath: result.storagePath,
+              downloadUrl: result.downloadUrl,
+              mondayAssetId: task.assetId,
+            }], 'Monday Migration');
+            filesDone++;
+            bytesDone += result.sizeBytes || task.fileSize || 0;
+            const pct = totalBytesAll ? Math.min(100, Math.round((bytesDone / totalBytesAll) * 100)) : 0;
+            progressWrap.querySelector('div').style.width = `${pct}%`;
+          } catch (err) {
+            errors.push({ file: task.filename, error: err.message });
+          }
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, worker));
+    }
+
+    btn.disabled = false;
+    stopBtn.hidden = true;
+    statusEl.textContent = clipStopRequested
+      ? `Stopped — ${filesDone} file(s) transferred (${formatBytes(bytesDone)}). Re-run the scan and transfer again to continue.`
+      : `Done — ${filesDone} file(s) transferred (${formatBytes(bytesDone)}).`;
+    statusEl.className = clipStopRequested ? 'status' : 'status ok';
+
+    if (errors.length) {
+      errorDetails.hidden = false;
+      errorOut.textContent = errors.map(e => `${e.file} — ${e.error}`).join('\n');
+    } else {
+      errorDetails.hidden = true;
     }
   });
 </script>

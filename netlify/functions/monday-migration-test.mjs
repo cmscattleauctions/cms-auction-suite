@@ -26,6 +26,10 @@
  *                      Same field-resolution logic as dry-run-preview, paginated
  *                      via `cursor`, but does NOT assign duplicate suffixes —
  *                      that happens client-side once every page is combined.
+ *   clip-batch        Clips migration — fresh clip file metadata (incl.
+ *                      Monday's signed public_url) for up to 25 item ids at a
+ *                      time, requeried just before each small transfer batch
+ *                      so signed URLs never sit around long enough to expire.
  *
  * Auth: reads MONDAY_API_TOKEN from the environment (never hardcoded,
  * never logged — see netlify/functions/lib/monday-client.mjs and
@@ -680,7 +684,7 @@ async function actionExportRecords(params) {
              created_at
              group { id title }
              column_values (ids: ${JSON.stringify(neededColumnIds)}) { id text value }
-             assets { id }
+             assets { id file_size }
            }
          }
        }`
@@ -695,7 +699,7 @@ async function actionExportRecords(params) {
                created_at
                group { id title }
                column_values (ids: ${JSON.stringify(neededColumnIds)}) { id text value }
-               assets { id }
+               assets { id file_size }
              }
            }
          }
@@ -751,6 +755,7 @@ async function actionExportRecords(params) {
       videoMaker: getText('videoMaker'),
       previewLink: getText('previewLink'),
       clipCount: (item.assets || []).length,
+      clipTotalBytes: (item.assets || []).reduce((sum, a) => sum + (a.file_size || 0), 0),
     };
   });
 
@@ -760,6 +765,62 @@ async function actionExportRecords(params) {
     cursor: nextCursor,
     records,
   });
+}
+
+/* =============================================================
+ * clip-batch — fresh clip file metadata (including public_url) for
+ * a specific, small set of Monday item ids.
+ *
+ * Deliberately NOT part of export-records: Monday's public_url is a
+ * signed link that expires (~1 hour), and a full-board clip transfer
+ * at real upload speeds can run far longer than that. Re-querying a
+ * small batch right before it's actually transferred (rather than
+ * caching URLs from one big upfront fetch) means a signed URL is
+ * never more than a few seconds old by the time it's used. The
+ * browser fetches these URLs directly — this function only ever
+ * returns metadata, never proxies file bytes itself.
+ * ============================================================= */
+async function actionClipBatch(params) {
+  const itemIdsRaw = requireParam(params, 'itemIds');
+  const itemIds = itemIdsRaw.split(',').map(s => s.trim()).filter(Boolean);
+  if (!itemIds.length) throw new Error('itemIds must be a non-empty comma-separated list');
+  if (itemIds.length > 25) throw new Error('itemIds is capped at 25 per call — request smaller batches');
+
+  const itemsData = await mondayQuery(
+    `query ($itemIds: [ID!]) {
+       items (ids: $itemIds) { id assets { id } }
+     }`,
+    { itemIds }
+  );
+  const items = itemsData.items || [];
+  const allAssetIds = items.flatMap(it => (it.assets || []).map(a => a.id));
+
+  let assetsById = {};
+  if (allAssetIds.length) {
+    const assetData = await mondayQuery(
+      `query ($assetIds: [ID!]!) {
+         assets (ids: $assetIds) { id name file_extension file_size public_url }
+       }`,
+      { assetIds: allAssetIds }
+    );
+    (assetData.assets || []).forEach(a => { assetsById[a.id] = a; });
+  }
+
+  const records = items.map(item => ({
+    mondayItemId: item.id,
+    clips: (item.assets || [])
+      .map(a => assetsById[a.id])
+      .filter(Boolean)
+      .map(a => ({
+        assetId: a.id,
+        // Monday's asset `name` is already the full filename, extension included.
+        filename: a.name || `clip-${a.id}${a.file_extension ? '.' + a.file_extension : ''}`,
+        fileSize: a.file_size ?? null,
+        publicUrl: a.public_url || null,
+      })),
+  }));
+
+  return jsonResponse({ ok: true, records });
 }
 
 /* =============================================================
@@ -786,6 +847,7 @@ const actions = {
   'pagination-probe': actionPaginationProbe,
   'dry-run-preview': actionDryRunPreview,
   'export-records': actionExportRecords,
+  'clip-batch': actionClipBatch,
 };
 
 export default async (req) => {
