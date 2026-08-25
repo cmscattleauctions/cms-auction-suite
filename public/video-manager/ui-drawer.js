@@ -31,6 +31,15 @@ import * as StorageData from './storage-data.js';
 
 const FORMAT_BADGE_CLASS = { clean: 'format-clean', 'legacy-tagged': 'format-legacy', 'needs-redo': 'format-redo', unknown: 'format-unknown' };
 
+/* Small identifying marks for each publishing surface — not the real
+ * brand logos (those are trademarked assets we don't have rights to
+ * ship), just enough visual distinction to scan the list at a glance. */
+const PUB_ICONS = {
+  youtube: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="4" fill="currentColor"/><path d="M10 8.7v6.6l5.8-3.3-5.8-3.3Z" fill="#fff"/></svg>`,
+  embed: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8.5 6.5 3.5 12l5 5.5M15.5 6.5l5 5.5-5 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  canva: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="M8.3 12.2a3.7 3.7 0 0 1 6-2.9" stroke="#fff" stroke-width="1.6" stroke-linecap="round" fill="none"/><circle cx="15.3" cy="12.2" r="1.3" fill="#fff"/></svg>`,
+};
+
 const WIDTH_KEY = 'vm-drawer-width';
 const WIDTH_MIN = 380;
 const WIDTH_MAX = 900;
@@ -93,7 +102,7 @@ async function paint(ctx) {
           <div class="vm-drawer-cattleline">${escapeHtml(cattleLine)}</div>
           <div class="vm-drawer-badges">
             <span class="status-pill status-${rec.isDraft ? 'draft' : rec.status}">${rec.isDraft ? 'Draft' : statusLabel(rec.status)}</span>
-            <span class="format-pill ${FORMAT_BADGE_CLASS[rec.videoFormat] || ''}">${escapeHtml(formatMeta ? formatMeta.short : rec.videoFormat)}</span>
+            ${rec.videoFormat && rec.videoFormat !== 'unknown' ? `<span class="format-pill ${FORMAT_BADGE_CLASS[rec.videoFormat] || ''}">${escapeHtml(formatMeta ? formatMeta.short : rec.videoFormat)}</span>` : ''}
             ${rec.hasTags ? `<span class="format-pill format-legacy">Has Tags</span>` : ''}
             ${rec.isDuplicateId ? `<span class="format-pill format-redo">Duplicate ID</span>` : ''}
           </div>
@@ -533,6 +542,7 @@ function publishingSectionHtml(rec) {
       <div class="vm-drawer-section-title">Publishing</div>
       ${rec.youtubeUrl ? `
         <div class="vm-pub-row">
+          <span class="vm-pub-icon vm-pub-icon-youtube">${PUB_ICONS.youtube}</span>
           <div class="vm-pub-main">
             <div class="vm-pub-label">YouTube</div>
             <div class="vm-pub-value" title="${escapeHtml(ytUrl)}">${escapeHtml(truncateMiddle(ytUrl))}</div>
@@ -545,6 +555,7 @@ function publishingSectionHtml(rec) {
         </div>
         <div id="d-change-yt-panel"></div>
         <div class="vm-pub-row">
+          <span class="vm-pub-icon vm-pub-icon-embed">${PUB_ICONS.embed}</span>
           <div class="vm-pub-main">
             <div class="vm-pub-label">Embed</div>
             <div class="vm-pub-value" title="${escapeHtml(rec.embedUrl)}">${escapeHtml(truncateMiddle(rec.embedUrl))}</div>
@@ -557,7 +568,10 @@ function publishingSectionHtml(rec) {
         ${canvaRowHtml(rec)}
         ${previousVersionsHtml(rec)}
       ` : `
-        <div class="vm-link-row"><input type="text" id="d-yt-input" placeholder="Paste YouTube link…" /><button class="btn btn-sm btn-primary" id="d-yt-save" type="button">Save</button></div>
+        <div class="field" style="margin-top:2px;">
+          <label><span class="vm-pub-icon vm-pub-icon-youtube vm-pub-icon-inline">${PUB_ICONS.youtube}</span>YouTube</label>
+          <div class="vm-link-row"><input type="text" id="d-yt-input" placeholder="Paste YouTube link…" /><button class="btn btn-sm btn-primary" id="d-yt-save" type="button">Save</button></div>
+        </div>
         ${canvaRowHtml(rec)}
       `}
     </div>`;
@@ -567,6 +581,7 @@ function canvaRowHtml(rec) {
   if (rec.canvaLink) {
     return `
       <div class="vm-pub-row">
+        <span class="vm-pub-icon vm-pub-icon-canva">${PUB_ICONS.canva}</span>
         <div class="vm-pub-main">
           <div class="vm-pub-label">Canva Design</div>
           <div class="vm-pub-value" title="${escapeHtml(rec.canvaLink)}">${escapeHtml(truncateMiddle(rec.canvaLink))}</div>
@@ -583,7 +598,7 @@ function canvaRowHtml(rec) {
   // so it's obvious at a glance that this one still needs a Canva link.
   return `
     <div class="field" style="margin-top:2px;">
-      <label>Canva Design</label>
+      <label><span class="vm-pub-icon vm-pub-icon-canva vm-pub-icon-inline">${PUB_ICONS.canva}</span>Canva Design</label>
       <div class="vm-link-row">
         <input type="text" id="d-canva-input" placeholder="Paste Canva design link…" />
         <button class="btn btn-sm btn-primary" id="d-canva-save" type="button">Save</button>
@@ -851,7 +866,7 @@ function clipCardHtml(c, index, isPlaying) {
       <div class="vm-clip-card2-label">Clip ${index + 1}</div>
       <div class="vm-clip-thumb">
         ${c.downloadUrl
-          ? `<video preload="metadata" muted playsinline ${isPlaying ? 'controls autoplay' : ''} src="${escapeHtml(c.downloadUrl)}#t=0.5"></video>`
+          ? `<video preload="metadata" muted playsinline data-clip-video="${c.id}" ${isPlaying ? 'controls autoplay' : ''} src="${escapeHtml(c.downloadUrl)}#t=0.5"></video>`
           : `<div class="vm-clip-thumb-empty">No file yet</div>`}
         ${c.downloadUrl && !isPlaying ? `
           <button class="vm-clip-play-btn" data-play-clip2="${c.id}" type="button" title="Play">
@@ -886,7 +901,27 @@ function setPreviewClip(rec, clipId) {
   previewClipId = clipId;
 }
 
+/* Force a real decoded frame to paint as the thumbnail. The `#t=0.5`
+ * URL fragment alone isn't reliably honored as a poster frame across
+ * browsers (some just show black until playback starts), so explicitly
+ * seek once metadata is ready. Also swap in a "couldn't load" state on
+ * error instead of leaving a blank/broken video box. */
+function wireClipThumbnails(root) {
+  root.querySelectorAll('[data-clip-video]').forEach(video => {
+    video.addEventListener('loadedmetadata', () => {
+      if (video.currentTime < 0.1) {
+        try { video.currentTime = Math.min(0.5, (video.duration || 1) / 4); } catch { /* ignore */ }
+      }
+    }, { once: true });
+    video.addEventListener('error', () => {
+      const thumb = video.closest('.vm-clip-thumb');
+      if (thumb) thumb.innerHTML = `<div class="vm-clip-thumb-empty vm-clip-thumb-error">Couldn't load preview</div>`;
+    }, { once: true });
+  });
+}
+
 function wireClipsTab(root, rec, ctx) {
+  wireClipThumbnails(root);
   const addBtn = root.querySelector('#c-add-clips');
   if (addBtn) addBtn.addEventListener('click', () => {
     const input = document.createElement('input');

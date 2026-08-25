@@ -77,7 +77,7 @@ export function openCompareModal(records, ctx) {
           <div class="vm-compare-cattle">${escapeHtml(cattle)}</div>
           <div class="vm-compare-badges">
             <span class="status-pill status-${r.status}">${statusWord}</span>
-            <span class="format-pill ${{clean:'format-clean','legacy-tagged':'format-legacy','needs-redo':'format-redo',unknown:'format-unknown'}[r.videoFormat] || ''}">${escapeHtml(formatMeta ? formatMeta.short : r.videoFormat)}</span>
+            ${r.videoFormat && r.videoFormat !== 'unknown' ? `<span class="format-pill ${{clean:'format-clean','legacy-tagged':'format-legacy','needs-redo':'format-redo'}[r.videoFormat] || ''}">${escapeHtml(formatMeta ? formatMeta.short : r.videoFormat)}</span>` : ''}
           </div>
           <button class="btn btn-primary btn-sm btn-block" data-use-video="${r.id}" type="button" style="margin-top:8px;">Use This Video</button>
         </div>

@@ -173,7 +173,8 @@ label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spa
 .vm-sort-wrap { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
 .vm-sort-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
 .vm-sort-select {
-  font-size: 12.5px; padding: 0 10px; height: 34px; border: 1px solid var(--border-subtle);
+  width: auto; min-width: 0; flex-shrink: 0;
+  font-size: 12.5px; padding: 0 10px; height: 34px; line-height: 32px; border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-primary);
 }
 
@@ -555,6 +556,19 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 .vm-pub-actions { display: flex; gap: 10px; flex-shrink: 0; }
 .vm-pub-actions .btn-text { font-size: 12px; }
 
+.vm-pub-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 22px; height: 22px; border-radius: 6px; color: #fff;
+}
+.vm-pub-icon svg { width: 14px; height: 14px; }
+.vm-pub-icon-youtube { background: #d33; }
+.vm-pub-icon-embed { background: var(--text-muted); }
+.vm-pub-icon-canva { background: #7d2ae8; }
+.vm-pub-icon-inline {
+  width: 15px; height: 15px; border-radius: 4px; vertical-align: -3px; margin-right: 5px;
+}
+.vm-pub-icon-inline svg { width: 10px; height: 10px; }
+
 .vm-version-item { padding: 8px 0; border-bottom: 1px dashed var(--border-subtle); font-size: 12px; }
 .vm-version-item:last-child { border-bottom: none; }
 .vm-version-date { font-size: 10.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
@@ -604,7 +618,8 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 .vm-clip-card2-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; padding: 8px 10px 0; }
 .vm-clip-thumb { position: relative; aspect-ratio: 16/9; background: #000; margin-top: 6px; }
 .vm-clip-thumb video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
-.vm-clip-thumb-empty { height: 100%; display: grid; place-items: center; color: #9aa1ab; font-size: 12px; background: var(--bg-muted); }
+.vm-clip-thumb-empty { height: 100%; display: grid; place-items: center; color: #9aa1ab; font-size: 12px; background: var(--bg-muted); text-align: center; padding: 0 8px; }
+.vm-clip-thumb-error { color: var(--format-redo-fg); }
 .vm-clip-play-btn {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   width: 44px; height: 44px; border-radius: 50%; border: none;

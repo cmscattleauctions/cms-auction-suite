@@ -18,7 +18,7 @@ const state = {
   search: '',
   filters: {},
   draftsOnly: false,
-  sort: 'updated-desc',
+  sort: 'added-desc',
   selectedId: null,
 };
 
