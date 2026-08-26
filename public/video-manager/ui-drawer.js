@@ -28,7 +28,6 @@ import { formatMonthYear, buildBaseId, monthYearToInputValue, inputValueToMonthY
 import { showToast, copyToClipboard } from './toast.js';
 import { openDeleteConfirmModal } from './ui-modals.js';
 import * as StorageData from './storage-data.js';
-import { downloadFilesAsZip } from './zip.js';
 
 const FORMAT_BADGE_CLASS = { clean: 'format-clean', 'legacy-tagged': 'format-legacy', 'needs-redo': 'format-redo', unknown: 'format-unknown' };
 
@@ -1037,7 +1036,7 @@ function wireClipsTab(root, rec, ctx) {
   });
 
   const downloadAllBtn = root.querySelector('#c-download-all');
-  if (downloadAllBtn) downloadAllBtn.addEventListener('click', () => downloadClips(rec.clips, `${rec.videoId}-clips.zip`));
+  if (downloadAllBtn) downloadAllBtn.addEventListener('click', () => downloadClips(rec.clips));
 
   root.querySelectorAll('[data-download-clip2]').forEach(btn => btn.addEventListener('click', () => {
     const clip = rec.clips.find(c => c.id === btn.dataset.downloadClip2);
@@ -1067,22 +1066,10 @@ function wireClipsTab(root, rec, ctx) {
   }));
 }
 
-/** A single file just opens directly; two or more get bundled into one ZIP so "Download All" produces one file instead of a pile of browser tabs. */
-async function downloadClips(clips, zipFilename) {
+function downloadClips(clips) {
   const real = clips.filter(c => c.downloadUrl);
   if (!real.length) { showToast('No files to download yet'); return; }
-  if (real.length === 1) {
-    window.open(real[0].downloadUrl, '_blank', 'noopener');
-    return;
-  }
-  showToast(`Zipping ${real.length} files…`);
-  try {
-    await downloadFilesAsZip(real, zipFilename || 'clips.zip');
-    showToast('Download ready');
-  } catch (err) {
-    if (err && err.name === 'AbortError') return;
-    showToast(`Zip failed: ${err.message}`);
-  }
+  real.forEach(c => window.open(c.downloadUrl, '_blank', 'noopener'));
 }
 
 /* =============================================================

@@ -17,7 +17,6 @@ import { showToast, copyToClipboard } from './toast.js';
 import { handleIdEntryLoop } from './ui-modals.js';
 import { openCompareModal } from './ui-compare.js';
 import * as StorageData from './storage-data.js';
-import { downloadFilesAsZip } from './zip.js';
 
 let addRowOpen = false;
 const compareSelection = new Map(); // id -> record snapshot, so the compare bar/modal work across tabs
@@ -594,16 +593,5 @@ async function downloadAll(id, ctx) {
     showToast('No files to download yet');
     return;
   }
-  if (real.length === 1) {
-    window.open(real[0].downloadUrl, '_blank', 'noopener');
-    return;
-  }
-  showToast(`Zipping ${real.length} files…`);
-  try {
-    await downloadFilesAsZip(real, `${rec.videoId}-clips.zip`);
-    showToast('Download ready');
-  } catch (err) {
-    if (err && err.name === 'AbortError') return;
-    showToast(`Zip failed: ${err.message}`);
-  }
+  real.forEach(c => window.open(c.downloadUrl, '_blank', 'noopener'));
 }
