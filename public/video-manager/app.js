@@ -193,10 +193,7 @@ function paintTabCounts(counts) {
  * Toolbar: search, filters, view toggle, top actions
  * ============================================================= */
 function wireToolbar() {
-  const sortSelect = document.getElementById('vm-sort-select');
-  sortSelect.innerHTML = SORT_OPTIONS.map(o => `<option value="${o.id}">${o.label}</option>`).join('');
-  sortSelect.value = state.sort;
-  sortSelect.addEventListener('change', e => { state.sort = e.target.value; refresh(); });
+  wireSortMenu();
 
   const searchInput = document.getElementById('vm-search-input');
   let debounce;
@@ -244,6 +241,47 @@ function wireToolbar() {
   document.getElementById('vm-btn-idmanager').addEventListener('click', () => { closeTools(); openVideoIdManagerModal(ctx); });
   document.getElementById('vm-btn-import-csv').addEventListener('click', () => { closeTools(); openCsvImportModal(ctx); });
   document.getElementById('vm-btn-trash').addEventListener('click', () => { closeTools(); openTrashModal(ctx); });
+}
+
+/**
+ * Sort — a proper dropdown menu instead of a native <select>, which
+ * fought the shared theme.css select styling for width/centering no
+ * matter how it was patched. The button always shows the active
+ * option's label, so it's obvious the control actually did something.
+ */
+function wireSortMenu() {
+  const btn = document.getElementById('vm-btn-sort');
+  const label = document.getElementById('vm-sort-btn-label');
+  const menu = document.getElementById('vm-sort-menu');
+
+  function paintLabel() {
+    const active = SORT_OPTIONS.find(o => o.id === state.sort);
+    label.textContent = `Sort: ${active ? active.label : SORT_OPTIONS[0].label}`;
+  }
+
+  function paintMenu() {
+    menu.innerHTML = SORT_OPTIONS.map(o => `
+      <button class="vm-sort-option ${o.id === state.sort ? 'active' : ''}" data-sort="${o.id}" type="button">${o.label}</button>
+    `).join('');
+    menu.querySelectorAll('[data-sort]').forEach(opt => opt.addEventListener('click', () => {
+      state.sort = opt.dataset.sort;
+      paintLabel();
+      paintMenu();
+      closeMenu();
+      refresh();
+    }));
+  }
+
+  function openMenu() { menu.hidden = false; btn.setAttribute('aria-expanded', 'true'); }
+  function closeMenu() { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+
+  btn.addEventListener('click', () => { menu.hidden ? openMenu() : closeMenu(); });
+  document.addEventListener('click', e => {
+    if (!menu.hidden && !menu.contains(e.target) && e.target !== btn && !btn.contains(e.target)) closeMenu();
+  });
+
+  paintLabel();
+  paintMenu();
 }
 
 function renderFiltersPanel() {
@@ -339,14 +377,7 @@ function renderFiltersPanel() {
     </div>
   `;
 
-  panel.querySelector('#f-clear').addEventListener('click', () => {
-    panel.querySelectorAll('select').forEach(s => s.value = '');
-    panel.querySelectorAll('input').forEach(i => i.type === 'checkbox' ? i.checked = false : i.value = '');
-    state.filters = {};
-    state.draftsOnly = false;
-    updateFilterBadge();
-    refresh();
-  });
+  panel.querySelector('#f-clear').addEventListener('click', () => resetAllFilters());
 
   panel.querySelector('#f-apply').addEventListener('click', () => {
     const filters = {};
@@ -407,6 +438,22 @@ const FILTER_LABELS = {
   hasClips: v => v ? 'Has clips' : 'No clips',
 };
 
+/** Full reset — filters, drafts-only, and the search box — used by both the filters panel's own "Clear all" and the toolbar-level Clear Filters button. */
+function resetAllFilters() {
+  const panel = document.getElementById('vm-filters-panel');
+  if (panel) {
+    panel.querySelectorAll('select').forEach(s => s.value = '');
+    panel.querySelectorAll('input').forEach(i => i.type === 'checkbox' ? i.checked = false : i.value = '');
+  }
+  state.filters = {};
+  state.draftsOnly = false;
+  state.search = '';
+  const searchInput = document.getElementById('vm-search-input');
+  if (searchInput) searchInput.value = '';
+  updateFilterBadge();
+  refresh();
+}
+
 function renderActiveFilterChips() {
   const wrap = document.getElementById('vm-active-filters');
   const chips = Object.entries(state.filters).map(([key, val]) => {
@@ -416,7 +463,10 @@ function renderActiveFilterChips() {
   if (state.search.trim()) {
     chips.unshift(`<span class="vm-chip" data-key="__search">Search: "${state.search}" <button type="button" data-remove="__search">&times;</button></span>`);
   }
-  wrap.innerHTML = chips.join('');
+  const hasAny = chips.length > 0 || state.draftsOnly;
+  wrap.innerHTML = hasAny
+    ? chips.join('') + `<button class="vm-clear-filters-btn" id="vm-btn-clear-filters" type="button">Clear all filters</button>`
+    : '';
   wrap.querySelectorAll('[data-remove]').forEach(btn => {
     btn.addEventListener('click', () => {
       const key = btn.dataset.remove;
@@ -430,6 +480,8 @@ function renderActiveFilterChips() {
       refresh();
     });
   });
+  const clearBtn = document.getElementById('vm-btn-clear-filters');
+  if (clearBtn) clearBtn.addEventListener('click', () => resetAllFilters());
 }
 
 document.addEventListener('DOMContentLoaded', boot);

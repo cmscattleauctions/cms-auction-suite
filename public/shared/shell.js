@@ -88,10 +88,7 @@ function renderShell(root, user) {
     ${demoBanner}
     <header class="mobile-topbar">
       <div class="sidebar-brand" style="padding:0;border:0;">
-        <span class="sidebar-brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 L21 19 L3 19 Z"/></svg>
-        </span>
-        <span class="sidebar-brand-text">CMS Auction Suite</span>
+        <img class="sidebar-brand-logo" src="shared/assets/cms-auction-suite-logo.png" alt="CMS Auction Suite" />
       </div>
       <button class="signout-btn" type="button" data-signout>Sign out</button>
     </header>
@@ -99,10 +96,7 @@ function renderShell(root, user) {
     <div class="shell">
       <aside class="sidebar" aria-label="Primary navigation">
         <div class="sidebar-brand">
-          <span class="sidebar-brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 L21 19 L3 19 Z"/></svg>
-          </span>
-          <span class="sidebar-brand-text">CMS Auction Suite</span>
+          <img class="sidebar-brand-logo" src="shared/assets/cms-auction-suite-logo.png" alt="CMS Auction Suite" />
         </div>
 
         <nav class="sidebar-nav" id="sidebar-nav" aria-label="App tabs"></nav>

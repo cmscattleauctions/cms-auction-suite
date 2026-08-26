@@ -56,9 +56,12 @@
         <div class="vm-filters-panel" id="vm-filters-panel" hidden></div>
       </div>
 
-      <div class="vm-sort-wrap">
-        <label for="vm-sort-select" class="vm-sort-label">Sort</label>
-        <select id="vm-sort-select" class="vm-sort-select"></select>
+      <div class="vm-sort-wrap" id="vm-sort-wrap">
+        <button class="btn btn-ghost vm-sort-btn" type="button" id="vm-btn-sort" aria-haspopup="true" aria-expanded="false">
+          <span id="vm-sort-btn-label">Sort</span>
+          <svg viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="vm-sort-menu" id="vm-sort-menu" hidden></div>
       </div>
 
       <div class="vm-view-toggle" id="vm-view-toggle" role="tablist" aria-label="View">
