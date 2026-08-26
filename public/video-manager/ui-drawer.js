@@ -32,13 +32,13 @@ import { downloadFilesAsZip } from './zip.js';
 
 const FORMAT_BADGE_CLASS = { clean: 'format-clean', 'legacy-tagged': 'format-legacy', 'needs-redo': 'format-redo', unknown: 'format-unknown' };
 
-/* Small identifying marks for each publishing surface — not the real
- * brand logos (those are trademarked assets we don't have rights to
- * ship), just enough visual distinction to scan the list at a glance. */
+/* Small identifying marks for each publishing surface. YouTube/Canva use
+ * the real brand assets (public/video-manager/assets); Embed isn't a
+ * specific brand, so it stays a plain generic icon. */
 const PUB_ICONS = {
-  youtube: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="4" fill="currentColor"/><path d="M10 8.7v6.6l5.8-3.3-5.8-3.3Z" fill="#fff"/></svg>`,
+  youtube: `<img src="./assets/youtube-logo.png" alt="" />`,
   embed: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8.5 6.5 3.5 12l5 5.5M15.5 6.5l5 5.5-5 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-  canva: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="M8.3 12.2a3.7 3.7 0 0 1 6-2.9" stroke="#fff" stroke-width="1.6" stroke-linecap="round" fill="none"/><circle cx="15.3" cy="12.2" r="1.3" fill="#fff"/></svg>`,
+  canva: `<img src="./assets/canva-logo.webp" alt="" />`,
 };
 
 const WIDTH_KEY = 'vm-drawer-width';

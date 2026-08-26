@@ -41,23 +41,11 @@
   border-bottom: 1px solid var(--sidebar-divider);
 }
 
-.sidebar-brand-mark {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  color: var(--accent-soft);
-  flex-shrink: 0;
-}
-
-.sidebar-brand-mark svg { width: 22px; height: 22px; }
-
-.sidebar-brand-text {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--sidebar-fg);
+.sidebar-brand-logo {
+  display: block;
+  width: 100%;
+  max-width: 190px;
+  height: auto;
 }
 
 .sidebar-nav {
@@ -292,8 +280,8 @@
     flex-shrink: 0;
   }
 
-  .mobile-topbar .sidebar-brand-text {
-    color: var(--sidebar-fg);
+  .mobile-topbar .sidebar-brand-logo {
+    max-width: 150px;
   }
 
   .mobile-topbar .signout-btn {

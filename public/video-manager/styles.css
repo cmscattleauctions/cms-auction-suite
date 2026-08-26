@@ -155,7 +155,8 @@ label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spa
 .vm-search input:focus { border-color: var(--accent); outline: none; }
 
 .vm-filters-wrap { position: relative; flex-shrink: 0; }
-.vm-filters-btn { height: 38px; padding: 0 16px; font-size: 13px; display: inline-flex; align-items: center; }
+.vm-filters-btn { height: 38px; padding: 0 16px; font-size: 13px; display: inline-flex; align-items: center; border: 1px solid var(--border-subtle); }
+.vm-filters-btn:hover { border-color: var(--border-strong); }
 .vm-filter-badge { margin-left: 4px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; }
 .vm-filters-panel {
   position: absolute; top: calc(100% + 6px); right: 0; width: 320px; max-width: calc(100vw - 32px);
@@ -170,14 +171,25 @@ label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spa
 .vm-filter-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 12px; }
 .vm-filter-toggle-row .switch-label { color: var(--text-secondary); }
 
-.vm-sort-wrap { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
-.vm-sort-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
-.vm-sort-select {
-  width: auto; min-width: 0; flex-shrink: 0;
-  display: flex; align-items: center;
-  font-size: 12.5px; padding: 0 10px; height: 34px; line-height: 32px; border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-primary);
+.vm-sort-wrap { position: relative; flex-shrink: 0; }
+.vm-sort-btn {
+  height: 38px; padding: 0 14px; font-size: 13px; border: 1px solid var(--border-subtle);
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
 }
+.vm-sort-btn:hover { border-color: var(--border-strong); }
+.vm-sort-btn svg { width: 9px; height: 9px; flex-shrink: 0; transition: transform 120ms; }
+.vm-sort-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.vm-sort-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; min-width: 210px; z-index: 40;
+  background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg); padding: 4px; display: flex; flex-direction: column;
+}
+.vm-sort-option {
+  display: block; width: 100%; text-align: left; padding: 8px 10px; font-size: 12.5px; font-weight: 500;
+  color: var(--text-primary); background: none; border: none; border-radius: 5px;
+}
+.vm-sort-option:hover { background: var(--bg-muted); }
+.vm-sort-option.active { color: var(--accent); font-weight: 700; background: var(--accent-bg); }
 
 .vm-view-toggle { display: flex; background: var(--bg-muted); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 3px; height: 34px; flex-shrink: 0; }
 .vm-view-btn { padding: 0 14px; font-size: 12px; font-weight: 600; background: none; border: none; border-radius: 5px; color: var(--text-secondary); }
@@ -190,6 +202,11 @@ label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spa
 }
 .vm-chip button { background: none; border: none; color: var(--text-muted); font-size: 13px; line-height: 1; padding: 0; }
 .vm-chip button:hover { color: var(--danger); }
+.vm-clear-filters-btn {
+  display: inline-flex; align-items: center; background: none; border: none;
+  color: var(--accent); font-size: 11.5px; font-weight: 600; padding: 3px 2px;
+}
+.vm-clear-filters-btn:hover { text-decoration: underline; }
 
 .vm-meta { padding: 5px 24px 3px; font-size: 11.5px; color: var(--text-muted); flex-shrink: 0; }
 
@@ -223,6 +240,9 @@ table.vm-table { width: 100%; min-width: 100%; border-collapse: collapse; font-s
   border-bottom: 1px solid var(--border-subtle); font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em;
   text-transform: uppercase; color: var(--text-muted); white-space: nowrap;
 }
+/* Body rows reserve a 3px left border for the exception-color accent
+   stripe — match it on the header so columns actually line up. */
+.vm-table thead th:first-child { border-left: 3px solid transparent; }
 .vm-table tbody tr { border-bottom: 1px solid var(--border-subtle); height: 52px; cursor: pointer; border-left: 3px solid transparent; }
 .vm-table tbody tr:hover { background: var(--bg-surface-hover); }
 .vm-table tbody tr.has-exception { border-left-color: var(--format-legacy-fg); }
@@ -297,8 +317,8 @@ td:focus, .vm-cell:focus { outline: none; }
    go blank for the (common) zero-usage case the way the old text did. */
 .vm-usage-cell { display: flex; align-items: center; gap: 5px; color: var(--text-secondary); }
 .vm-usage-icon { width: 13px; height: 13px; flex-shrink: 0; opacity: 0.7; }
-.vm-usage-count { font-size: 12.5px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-.vm-usage-label { font-size: 11.5px; color: var(--text-muted); }
+.vm-usage-lots { font-size: 12.5px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.vm-usage-empty { color: var(--text-muted); }
 
 /* Published — subtle square icon buttons instead of a loose icon row. */
 .yt-actions { display: flex; gap: 4px; }
@@ -549,16 +569,16 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 
 .vm-pub-icon {
   display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-  width: 22px; height: 22px; border-radius: 6px; color: #fff;
+  width: 22px; height: 22px; border-radius: 6px; color: #fff; overflow: hidden;
 }
 .vm-pub-icon svg { width: 14px; height: 14px; }
-.vm-pub-icon-youtube { background: #d33; }
+.vm-pub-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .vm-pub-icon-embed { background: var(--text-muted); }
-.vm-pub-icon-canva { background: #7d2ae8; }
 .vm-pub-icon-inline {
   width: 15px; height: 15px; border-radius: 4px; vertical-align: -3px; margin-right: 5px;
 }
 .vm-pub-icon-inline svg { width: 10px; height: 10px; }
+.vm-pub-icon-inline img { width: 100%; height: 100%; object-fit: contain; display: inline-block; }
 
 .vm-version-item { padding: 8px 0; border-bottom: 1px dashed var(--border-subtle); font-size: 12px; }
 .vm-version-item:last-child { border-bottom: none; }
@@ -604,7 +624,7 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
   display: flex; flex-direction: column; gap: 14px;
   max-height: 60vh; overflow-y: auto; padding-right: 2px;
 }
-.vm-clip-card2 { border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; background: var(--bg-surface); }
+.vm-clip-card2 { border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; background: var(--bg-surface); flex-shrink: 0; }
 .vm-clip-card2.is-playing { border-color: var(--accent); }
 .vm-clip-card2-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; padding: 8px 10px 0; }
 .vm-clip-thumb { position: relative; aspect-ratio: 16/9; background: #000; margin-top: 6px; }

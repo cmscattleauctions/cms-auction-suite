@@ -100,7 +100,6 @@ function rowExceptions(r, context) {
   if (r.needsReview) flags.push({ label: 'Needs Review', severity: 'warn' });
   if (r.videoFormat === 'needs-redo') flags.push({ label: 'Needs Redo', severity: 'bad' });
   if (context === 'created') {
-    if (!r.clips.length) flags.push({ label: 'No clips', severity: 'warn' });
     if (!r.youtubeUrl) flags.push({ label: 'Missing YouTube link', severity: 'bad' });
   }
   return flags;
@@ -160,11 +159,9 @@ function clipsCell(r) {
   if (!r.clips.length) {
     return `<div class="vm-clips-cell"><span class="vm-clips-empty">—</span><button class="vm-clips-addlink" data-add-files="${r.id}" type="button">Add clips</button></div>`;
   }
-  const lastDate = r.clips.map(c => c.uploadedAt).filter(Boolean).sort().slice(-1)[0];
   return `
     <button class="vm-clips-trigger" data-clips-trigger="${r.id}" type="button" title="View clips">
       <div class="vm-clips-count">${r.clips.length} clip${r.clips.length === 1 ? '' : 's'}</div>
-      ${lastDate ? `<div class="vm-clips-last">Last: ${formatDateShort(lastDate)}</div>` : ''}
     </button>`;
 }
 
@@ -176,11 +173,17 @@ function statusIssueCell(r) {
 
 function usageCell(r) {
   const n = r.usage.length;
+  if (!n) {
+    return `<div class="vm-usage-cell"><span class="vm-usage-empty">—</span></div>`;
+  }
+  const sorted = [...r.usage].sort((a, b) => (b.auctionDate || '').localeCompare(a.auctionDate || ''));
+  const allLots = sorted.flatMap(u => u.lots || []);
+  const shown = allLots.slice(0, 3);
+  const more = allLots.length > shown.length;
   return `
     <div class="vm-usage-cell" title="${n} auction usage record${n === 1 ? '' : 's'}">
       <svg viewBox="0 0 16 16" fill="none" class="vm-usage-icon" aria-hidden="true"><path d="M2 6.5 8 2l6 4.5M3 6v7h10V6" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.5 13V9h3v4" stroke="currentColor" stroke-width="1.2"/></svg>
-      <span class="vm-usage-count">${n}</span>
-      <span class="vm-usage-label">Auction${n === 1 ? '' : 's'}</span>
+      <span class="vm-usage-lots">Lot${allLots.length === 1 ? '' : 's'} ${shown.map(escapeHtml).join(', ')}${more ? '…' : ''}</span>
     </div>`;
 }
 
