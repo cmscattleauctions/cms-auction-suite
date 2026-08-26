@@ -439,9 +439,11 @@ async function applyFieldEdit(id, field, value, ctx) {
 }
 
 function extractYoutubeId(link) {
-  const m = link.match(/(?:youtu\.be\/|v=|embed\/)([a-zA-Z0-9_-]{5,})/);
+  const trimmed = link.trim();
+  if (trimmed.length > 100) return null;
+  const m = trimmed.match(/^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{5,})/i);
   if (m) return m[1];
-  if (/^[a-zA-Z0-9_-]{5,}$/.test(link.trim())) return link.trim();
+  if (/^[a-zA-Z0-9_-]{5,}$/.test(trimmed)) return trimmed;
   return null;
 }
 

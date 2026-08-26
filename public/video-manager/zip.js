@@ -9,11 +9,19 @@
  * in-memory Blob and triggering a normal download when that API
  * isn't available (Safari/Firefox).
  *
- * Uses the standard "data descriptor" ZIP feature (general-purpose
- * flag bit 3) so CRC-32/size can be written *after* each file's
- * bytes have streamed through, rather than needing to know them
- * up front — every mainstream unzip tool (Explorer, Archive
- * Utility, 7-Zip, unzip) supports this.
+ * Each file's CRC-32/size is only known once its bytes have finished
+ * streaming through, but the local file header needs to record them
+ * *before* that data — the ZIP spec's answer is a "data descriptor"
+ * written after the file (general-purpose flag bit 3). That's valid
+ * per spec, but macOS's built-in Archive Utility has real, documented
+ * trouble extracting archives built that way (can produce truncated/
+ * unplayable files). So instead: write a placeholder local header,
+ * stream the file while hashing it, then go back and patch the real
+ * CRC/size into the header that's already been written — a positioned
+ * write on the File System Access stream, or an in-place buffer
+ * mutation for the in-memory fallback (since nothing's been flushed to
+ * an actual file yet in that path). No data descriptors anywhere, so
+ * every mainstream unzip tool reads these the same way.
  *
  * No Zip64 support: fine for a handful of clips per video record
  * (each already capped at 2GB elsewhere in this app), not intended
@@ -44,30 +52,31 @@ function sanitizeZipName(name) {
   return String(name || 'clip').replace(/[\\/:*?"<>|]/g, '_');
 }
 
+/** 30-byte local file header, sizes/CRC left as 0 — patched in after the file streams through. */
 function localHeaderBytes(nameBytes) {
   const buf = new ArrayBuffer(30);
   const v = new DataView(buf);
   v.setUint32(0, 0x04034b50, true);
   v.setUint16(4, 20, true);
-  v.setUint16(6, 0x0008, true); // bit 3: sizes/CRC follow in a data descriptor
+  v.setUint16(6, 0, true); // no data-descriptor flag — sizes/CRC get patched into this header directly
   v.setUint16(8, 0, true); // method: store
   v.setUint16(10, 0, true); // time
   v.setUint16(12, 0x21, true); // date: fixed placeholder (1980-01-01) — not meaningful here
-  v.setUint32(14, 0, true); // crc — in data descriptor instead
-  v.setUint32(18, 0, true); // compressed size — in data descriptor instead
-  v.setUint32(22, 0, true); // uncompressed size — in data descriptor instead
+  v.setUint32(14, 0, true); // crc — patched later
+  v.setUint32(18, 0, true); // compressed size — patched later
+  v.setUint32(22, 0, true); // uncompressed size — patched later
   v.setUint16(26, nameBytes.length, true);
   v.setUint16(28, 0, true); // extra field length
   return new Uint8Array(buf);
 }
 
-function dataDescriptorBytes(crc, size) {
-  const buf = new ArrayBuffer(16);
+/** The three fields (crc, compressed size, uncompressed size) sit contiguously at offset 14 in the local header. */
+function sizeFieldsPatch(crc, size) {
+  const buf = new ArrayBuffer(12);
   const v = new DataView(buf);
-  v.setUint32(0, 0x08074b50, true);
-  v.setUint32(4, crc, true);
+  v.setUint32(0, crc, true);
+  v.setUint32(4, size, true);
   v.setUint32(8, size, true);
-  v.setUint32(12, size, true);
   return new Uint8Array(buf);
 }
 
@@ -77,7 +86,7 @@ function centralHeaderBytes(rec) {
   v.setUint32(0, 0x02014b50, true);
   v.setUint16(4, 20, true);
   v.setUint16(6, 20, true);
-  v.setUint16(8, 0x0008, true);
+  v.setUint16(8, 0, true);
   v.setUint16(10, 0, true);
   v.setUint16(12, 0, true);
   v.setUint16(14, 0x21, true);
@@ -117,8 +126,11 @@ function eocdBytes(count, centralSize, centralOffset) {
 export async function downloadFilesAsZip(files, zipFilename, { onProgress } = {}) {
   if (!files.length) throw new Error('No files to zip');
 
-  let useFsApi = typeof window.showSaveFilePicker === 'function';
+  const useFsApi = typeof window.showSaveFilePicker === 'function';
   let fsStream = null;
+  // In-memory fallback: keep the actual header Uint8Arrays (not copies) so
+  // they can be mutated in place once each file's real CRC/size is known —
+  // the Blob built at the end reads whatever is in these arrays then.
   const memChunks = useFsApi ? null : [];
 
   if (useFsApi) {
@@ -135,11 +147,21 @@ export async function downloadFilesAsZip(files, zipFilename, { onProgress } = {}
     else memChunks.push(bytes);
   }
 
+  async function patchSizeFields(localHeaderOffset, headerRef, crc, size) {
+    const patch = sizeFieldsPatch(crc, size);
+    if (useFsApi) {
+      await fsStream.write({ type: 'write', position: localHeaderOffset + 14, data: patch });
+    } else {
+      headerRef.set(patch, 14); // same backing buffer already pushed into memChunks
+    }
+  }
+
   const centralRecords = [];
   for (const file of files) {
     const nameBytes = new TextEncoder().encode(sanitizeZipName(file.filename));
     const localHeaderOffset = offset;
-    await write(localHeaderBytes(nameBytes));
+    const headerBytes = localHeaderBytes(nameBytes);
+    await write(headerBytes);
     await write(nameBytes);
 
     const res = await fetch(file.downloadUrl);
@@ -154,7 +176,7 @@ export async function downloadFilesAsZip(files, zipFilename, { onProgress } = {}
       size += value.byteLength;
       await write(value);
     }
-    await write(dataDescriptorBytes(crc.value(), size));
+    await patchSizeFields(localHeaderOffset, headerBytes, crc.value(), size);
 
     centralRecords.push({ nameBytes, crc: crc.value(), size, localHeaderOffset });
     onProgress?.(file, centralRecords.length, files.length);

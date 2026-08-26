@@ -613,10 +613,15 @@ function truncateMiddle(str, max = 44) {
 
 function publishingSectionHtml(rec) {
   const ytUrl = cleanYoutubeUrl(rec);
+  // A Ready/On Hold record hasn't actually been made yet, so it can never
+  // have a real published link regardless of what's stored — protects
+  // against ever showing one even if bad data (see extractYoutubeId's
+  // comment) slips in again upstream.
+  const hasRealLink = rec.status === 'created' && !!rec.youtubeUrl;
   return `
     <div class="vm-drawer-section">
       <div class="vm-drawer-section-title">Publishing</div>
-      ${rec.youtubeUrl ? `
+      ${hasRealLink ? `
         <div class="vm-pub-row">
           <span class="vm-pub-icon vm-pub-icon-youtube">${PUB_ICONS.youtube}</span>
           <div class="vm-pub-main">
@@ -778,8 +783,10 @@ function wirePublishingSection(root, rec, ctx) {
 }
 
 function parseYoutubeLink(val) {
-  const m = val.match(/(?:youtu\.be\/|v=|embed\/)([a-zA-Z0-9_-]{5,})/);
-  return m ? m[1] : (/^[a-zA-Z0-9_-]{5,}$/.test(val) ? val : null);
+  const trimmed = val.trim();
+  if (trimmed.length > 100) return null;
+  const m = trimmed.match(/^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{5,})/i);
+  return m ? m[1] : (/^[a-zA-Z0-9_-]{5,}$/.test(trimmed) ? trimmed : null);
 }
 
 /* =============================================================
