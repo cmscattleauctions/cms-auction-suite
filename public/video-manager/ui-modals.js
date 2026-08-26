@@ -900,15 +900,15 @@ export function openCsvImportModal(ctx) {
         csvText = modal.querySelector('#csv-text-input').value;
       }
       if (!csvText.trim()) { showToast('Choose a file or paste CSV text'); return; }
-      preview = ctx.usage.previewCsv(csvText);
+      preview = await ctx.usage.previewCsv(csvText);
       step = 'preview';
       repaint();
     });
     const backBtn = modal.querySelector('#csv-back-btn');
     if (backBtn) backBtn.addEventListener('click', () => { step = 'upload'; repaint(); });
     const confirmBtn = modal.querySelector('#csv-confirm-btn');
-    if (confirmBtn) confirmBtn.addEventListener('click', () => {
-      const result = ctx.usage.confirmImport(preview);
+    if (confirmBtn) confirmBtn.addEventListener('click', async () => {
+      const result = await ctx.usage.confirmImport(preview);
       preview._result = result;
       lastImportId = result.importId;
       step = 'done';
@@ -916,8 +916,8 @@ export function openCsvImportModal(ctx) {
       ctx.refresh();
     });
     const undoBtn = modal.querySelector('#csv-undo-btn');
-    if (undoBtn) undoBtn.addEventListener('click', () => {
-      ctx.usage.undoImport(lastImportId);
+    if (undoBtn) undoBtn.addEventListener('click', async () => {
+      await ctx.usage.undoImport(lastImportId);
       showToast('Import undone');
       close();
       ctx.refresh();
@@ -1018,33 +1018,6 @@ export function openTrashModal(ctx) {
       showToast('Permanently deleted');
       paint();
     }));
-  }
-  paint();
-}
-
-/* =============================================================
- * Notification settings
- * ============================================================= */
-export function openNotificationsModal(ctx) {
-  const { modal } = mountModal(`
-    <div class="vm-modal-header"><h2>Notification Settings</h2><button class="vm-modal-close" data-modal-close>&times;</button></div>
-    <div class="vm-modal-body">
-      <p class="muted" style="margin-bottom:10px;">Watch a teammate to be notified when they create a video, upload clips, or update a video. (Prototype — no notifications are actually sent yet.)</p>
-      <div id="notify-list"></div>
-    </div>
-    <div class="vm-modal-footer"><button class="btn btn-primary" data-modal-close>Done</button></div>
-  `);
-  const list = modal.querySelector('#notify-list');
-  function paint() {
-    list.innerHTML = ctx.notifications.getWatchList().map(s => `
-      <div class="vm-notify-row">
-        <div><div class="name">${escapeHtml(s.name)}</div><div class="role">${s.role}</div></div>
-        <label class="switch"><input type="checkbox" data-watch="${s.id}" ${s.watch ? 'checked' : ''} /><span class="track"></span></label>
-      </div>
-    `).join('');
-    list.querySelectorAll('[data-watch]').forEach(inp => {
-      inp.addEventListener('change', () => ctx.notifications.setWatch(inp.dataset.watch, inp.checked));
-    });
   }
   paint();
 }

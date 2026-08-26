@@ -28,8 +28,18 @@ import { formatMonthYear, buildBaseId, monthYearToInputValue, inputValueToMonthY
 import { showToast, copyToClipboard } from './toast.js';
 import { openDeleteConfirmModal } from './ui-modals.js';
 import * as StorageData from './storage-data.js';
+import { downloadFilesAsZip } from './zip.js';
 
 const FORMAT_BADGE_CLASS = { clean: 'format-clean', 'legacy-tagged': 'format-legacy', 'needs-redo': 'format-redo', unknown: 'format-unknown' };
+
+/* Small identifying marks for each publishing surface — not the real
+ * brand logos (those are trademarked assets we don't have rights to
+ * ship), just enough visual distinction to scan the list at a glance. */
+const PUB_ICONS = {
+  youtube: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="4" fill="currentColor"/><path d="M10 8.7v6.6l5.8-3.3-5.8-3.3Z" fill="#fff"/></svg>`,
+  embed: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8.5 6.5 3.5 12l5 5.5M15.5 6.5l5 5.5-5 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  canva: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="M8.3 12.2a3.7 3.7 0 0 1 6-2.9" stroke="#fff" stroke-width="1.6" stroke-linecap="round" fill="none"/><circle cx="15.3" cy="12.2" r="1.3" fill="#fff"/></svg>`,
+};
 
 const WIDTH_KEY = 'vm-drawer-width';
 const WIDTH_MIN = 380;
@@ -45,6 +55,7 @@ function getStoredWidth() {
 let activeId = null;
 let activeTab = 'details'; // 'details' | 'clips'
 let editingCattleField = null;
+let editingSuffix = false;
 let usageExpanded = false;
 let activityExpanded = false;
 let notesEditing = false;
@@ -56,6 +67,7 @@ export async function openDrawer(id, ctx) {
   activeId = id;
   activeTab = 'details';
   editingCattleField = null;
+  editingSuffix = false;
   usageExpanded = false;
   activityExpanded = false;
   notesEditing = false;
@@ -93,7 +105,7 @@ async function paint(ctx) {
           <div class="vm-drawer-cattleline">${escapeHtml(cattleLine)}</div>
           <div class="vm-drawer-badges">
             <span class="status-pill status-${rec.isDraft ? 'draft' : rec.status}">${rec.isDraft ? 'Draft' : statusLabel(rec.status)}</span>
-            <span class="format-pill ${FORMAT_BADGE_CLASS[rec.videoFormat] || ''}">${escapeHtml(formatMeta ? formatMeta.short : rec.videoFormat)}</span>
+            ${rec.videoFormat && rec.videoFormat !== 'unknown' ? `<span class="format-pill ${FORMAT_BADGE_CLASS[rec.videoFormat] || ''}">${escapeHtml(formatMeta ? formatMeta.short : rec.videoFormat)}</span>` : ''}
             ${rec.hasTags ? `<span class="format-pill format-legacy">Has Tags</span>` : ''}
             ${rec.isDuplicateId ? `<span class="format-pill format-redo">Duplicate ID</span>` : ''}
           </div>
@@ -125,8 +137,8 @@ async function paint(ctx) {
   const body = root.querySelector('#vm-drawer-tabbody');
   if (body) body.scrollTop = prevScrollTop;
 
-  root.querySelector('#vm-drawer-close').addEventListener('click', closeDrawer);
-  root.querySelector('#vm-drawer-backdrop').addEventListener('click', closeDrawer);
+  root.querySelector('#vm-drawer-close').addEventListener('click', () => ctx.closeDrawer());
+  root.querySelector('#vm-drawer-backdrop').addEventListener('click', () => ctx.closeDrawer());
   root.querySelector('#vm-drawer-prev')?.addEventListener('click', () => navigateDrawer(-1, ctx));
   root.querySelector('#vm-drawer-next')?.addEventListener('click', () => navigateDrawer(1, ctx));
   root.querySelectorAll('[data-move]').forEach(btn => btn.addEventListener('click', async () => {
@@ -148,6 +160,7 @@ async function paint(ctx) {
   wireCattleSection(root, rec, ctx);
 
   if (activeTab === 'details') {
+    wireSuffixCell(root, rec, ctx);
     wireDuplicateBanner(root, rec, ctx);
     wireVideoMakerBanner(root, rec, ctx);
     wirePublishingSection(root, rec, ctx);
@@ -338,6 +351,7 @@ function cattleSectionHtml(rec, ctx, sexLabel, sireLabel, damLabel) {
       <div class="vm-drawer-section-title">Cattle Information</div>
       <div class="vm-cattle-grid">
         ${CATTLE_FIELDS.map(f => cattleCellHtml(rec, ctx, f, sexLabel, sireLabel, damLabel)).join('')}
+        ${suffixCellHtml(rec)}
       </div>
       ${idMismatch ? `
         <div class="vm-id-warning">
@@ -385,6 +399,77 @@ function cattleControlHtml(rec, ctx, field) {
     return `<input type="number" id="cattle-input-${field.key}" value="${rec.weight}" />`;
   }
   return `<input type="month" id="cattle-input-${field.key}" value="${escapeHtml(monthYearToInputValue(rec.monthYear))}" />`;
+}
+
+/* =============================================================
+ * SUFFIX — manual override. Suffixes normally get auto-assigned on
+ * collision, but staff also use them deliberately to split the same
+ * cattle classification across multiple lots, so it needs its own
+ * direct editor rather than only the auto-assign paths.
+ * ============================================================= */
+function suffixCellHtml(rec) {
+  if (editingSuffix) {
+    return `
+      <div class="vm-cattle-cell2 is-span is-editing" data-suffix-editing>
+        <span class="k">Suffix</span>
+        <input type="number" id="cattle-input-suffix" min="1" step="1" value="${rec.suffix || ''}" placeholder="None" />
+        <div class="vm-fieldedit-actions">
+          <button class="btn btn-xs btn-primary" id="cattle-suffix-save" type="button">Save</button>
+          <button class="btn btn-xs btn-ghost" id="cattle-suffix-cancel" type="button">Cancel</button>
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="vm-cattle-cell2 is-span" data-suffix-field>
+      <span class="k">Suffix</span>
+      <span class="v">${rec.suffix ? `-${rec.suffix}` : 'None — click to assign'}</span>
+    </div>`;
+}
+
+function wireSuffixCell(root, rec, ctx) {
+  const field = root.querySelector('[data-suffix-field]');
+  if (field) field.addEventListener('click', () => { editingSuffix = true; paint(ctx); });
+
+  const cancelBtn = root.querySelector('#cattle-suffix-cancel');
+  if (cancelBtn) cancelBtn.addEventListener('click', () => { editingSuffix = false; paint(ctx); });
+
+  const input = root.querySelector('#cattle-input-suffix');
+  if (input) {
+    input.focus();
+    input.select();
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); root.querySelector('#cattle-suffix-save')?.click(); }
+      if (e.key === 'Escape') { e.preventDefault(); editingSuffix = false; paint(ctx); }
+    });
+  }
+
+  const saveBtn = root.querySelector('#cattle-suffix-save');
+  if (saveBtn) saveBtn.addEventListener('click', async () => {
+    const raw = root.querySelector('#cattle-input-suffix').value.trim();
+    const suffixNum = raw ? Number(raw) : null;
+    if (raw && (!Number.isInteger(suffixNum) || suffixNum < 1)) {
+      showToast('Suffix must be a positive whole number');
+      return;
+    }
+    const fields = { consignorCode: rec.consignorCode, sexCode: rec.sexCode, sireCode: rec.sireCode, damCode: rec.damCode, weight: rec.weight, monthYear: rec.monthYear };
+    const candidateFinalId = suffixNum ? `${buildBaseId(fields)}-${suffixNum}` : buildBaseId(fields);
+    if (candidateFinalId !== rec.videoId) {
+      const existing = await ctx.repo.findByFinalId(candidateFinalId);
+      if (existing && existing.id !== rec.id) {
+        showToast(`${candidateFinalId} is already used by ${existing.consignorName}`);
+        return;
+      }
+    }
+    const { collision } = await ctx.repo.setVideoIdFields(rec.id, fields, 'Staff', { forceSuffix: suffixNum });
+    if (collision) {
+      showToast(`Video ID already exists: ${collision.videoId}`);
+      return;
+    }
+    showToast(suffixNum ? `Suffix set to -${suffixNum}` : 'Suffix removed');
+    editingSuffix = false;
+    ctx.refresh();
+    paint(ctx);
+  });
 }
 
 function wireCattleSection(root, rec, ctx) {
@@ -469,7 +554,7 @@ function wireCattleSection(root, rec, ctx) {
             <button class="btn btn-sm btn-primary" id="cattle-suffix-collision" type="button">Create Separate (assign suffix)</button>
           </div>
         </div>`;
-      feedback.querySelector('#cattle-open-collision').addEventListener('click', () => { closeDrawer(); openDrawer(collision.id, ctx); });
+      feedback.querySelector('#cattle-open-collision').addEventListener('click', () => ctx.openDrawer(collision.id));
       feedback.querySelector('#cattle-suffix-collision').addEventListener('click', async () => {
         const suffix = await ctx.repo.nextSuffixFor(buildBaseId(fields));
         await ctx.repo.setVideoIdFields(rec.id, fields, 'Staff', { forceSuffix: suffix });
@@ -533,6 +618,7 @@ function publishingSectionHtml(rec) {
       <div class="vm-drawer-section-title">Publishing</div>
       ${rec.youtubeUrl ? `
         <div class="vm-pub-row">
+          <span class="vm-pub-icon vm-pub-icon-youtube">${PUB_ICONS.youtube}</span>
           <div class="vm-pub-main">
             <div class="vm-pub-label">YouTube</div>
             <div class="vm-pub-value" title="${escapeHtml(ytUrl)}">${escapeHtml(truncateMiddle(ytUrl))}</div>
@@ -545,6 +631,7 @@ function publishingSectionHtml(rec) {
         </div>
         <div id="d-change-yt-panel"></div>
         <div class="vm-pub-row">
+          <span class="vm-pub-icon vm-pub-icon-embed">${PUB_ICONS.embed}</span>
           <div class="vm-pub-main">
             <div class="vm-pub-label">Embed</div>
             <div class="vm-pub-value" title="${escapeHtml(rec.embedUrl)}">${escapeHtml(truncateMiddle(rec.embedUrl))}</div>
@@ -557,7 +644,10 @@ function publishingSectionHtml(rec) {
         ${canvaRowHtml(rec)}
         ${previousVersionsHtml(rec)}
       ` : `
-        <div class="vm-link-row"><input type="text" id="d-yt-input" placeholder="Paste YouTube link…" /><button class="btn btn-sm btn-primary" id="d-yt-save" type="button">Save</button></div>
+        <div class="field" style="margin-top:2px;">
+          <label><span class="vm-pub-icon vm-pub-icon-youtube vm-pub-icon-inline">${PUB_ICONS.youtube}</span>YouTube</label>
+          <div class="vm-link-row"><input type="text" id="d-yt-input" placeholder="Paste YouTube link…" /><button class="btn btn-sm btn-primary" id="d-yt-save" type="button">Save</button></div>
+        </div>
         ${canvaRowHtml(rec)}
       `}
     </div>`;
@@ -567,6 +657,7 @@ function canvaRowHtml(rec) {
   if (rec.canvaLink) {
     return `
       <div class="vm-pub-row">
+        <span class="vm-pub-icon vm-pub-icon-canva">${PUB_ICONS.canva}</span>
         <div class="vm-pub-main">
           <div class="vm-pub-label">Canva Design</div>
           <div class="vm-pub-value" title="${escapeHtml(rec.canvaLink)}">${escapeHtml(truncateMiddle(rec.canvaLink))}</div>
@@ -583,7 +674,7 @@ function canvaRowHtml(rec) {
   // so it's obvious at a glance that this one still needs a Canva link.
   return `
     <div class="field" style="margin-top:2px;">
-      <label>Canva Design</label>
+      <label><span class="vm-pub-icon vm-pub-icon-canva vm-pub-icon-inline">${PUB_ICONS.canva}</span>Canva Design</label>
       <div class="vm-link-row">
         <input type="text" id="d-canva-input" placeholder="Paste Canva design link…" />
         <button class="btn btn-sm btn-primary" id="d-canva-save" type="button">Save</button>
@@ -849,14 +940,14 @@ function clipCardHtml(c, index, isPlaying) {
   return `
     <div class="vm-clip-card2 ${isPlaying ? 'is-playing' : ''}" data-clip-id="${c.id}">
       <div class="vm-clip-card2-label">Clip ${index + 1}</div>
-      <div class="vm-clip-thumb">
+      <div class="vm-clip-thumb" ${c.downloadUrl && !isPlaying ? `data-play-clip2="${c.id}" role="button" tabindex="0"` : ''}>
         ${c.downloadUrl
-          ? `<video preload="metadata" muted playsinline ${isPlaying ? 'controls autoplay' : ''} src="${escapeHtml(c.downloadUrl)}#t=0.5"></video>`
+          ? `<video preload="metadata" muted playsinline data-clip-video="${c.id}" ${isPlaying ? 'controls autoplay' : ''} src="${escapeHtml(c.downloadUrl)}#t=0.5"></video>`
           : `<div class="vm-clip-thumb-empty">No file yet</div>`}
         ${c.downloadUrl && !isPlaying ? `
-          <button class="vm-clip-play-btn" data-play-clip2="${c.id}" type="button" title="Play">
+          <div class="vm-clip-play-btn" title="Play">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>
-          </button>` : ''}
+          </div>` : ''}
       </div>
       <div class="vm-clip-meta-row">
         <span>${formatDuration(c.durationSec)}</span>
@@ -886,7 +977,27 @@ function setPreviewClip(rec, clipId) {
   previewClipId = clipId;
 }
 
+/* Force a real decoded frame to paint as the thumbnail. The `#t=0.5`
+ * URL fragment alone isn't reliably honored as a poster frame across
+ * browsers (some just show black until playback starts), so explicitly
+ * seek once metadata is ready. Also swap in a "couldn't load" state on
+ * error instead of leaving a blank/broken video box. */
+function wireClipThumbnails(root) {
+  root.querySelectorAll('[data-clip-video]').forEach(video => {
+    video.addEventListener('loadedmetadata', () => {
+      if (video.currentTime < 0.1) {
+        try { video.currentTime = Math.min(0.5, (video.duration || 1) / 4); } catch { /* ignore */ }
+      }
+    }, { once: true });
+    video.addEventListener('error', () => {
+      const thumb = video.closest('.vm-clip-thumb');
+      if (thumb) thumb.innerHTML = `<div class="vm-clip-thumb-empty vm-clip-thumb-error">Couldn't load preview</div>`;
+    }, { once: true });
+  });
+}
+
 function wireClipsTab(root, rec, ctx) {
+  wireClipThumbnails(root);
   const addBtn = root.querySelector('#c-add-clips');
   if (addBtn) addBtn.addEventListener('click', () => {
     const input = document.createElement('input');
@@ -919,16 +1030,25 @@ function wireClipsTab(root, rec, ctx) {
   });
 
   const downloadAllBtn = root.querySelector('#c-download-all');
-  if (downloadAllBtn) downloadAllBtn.addEventListener('click', () => downloadClips(rec.clips));
+  if (downloadAllBtn) downloadAllBtn.addEventListener('click', () => downloadClips(rec.clips, `${rec.videoId}-clips.zip`));
 
   root.querySelectorAll('[data-download-clip2]').forEach(btn => btn.addEventListener('click', () => {
     const clip = rec.clips.find(c => c.id === btn.dataset.downloadClip2);
     downloadClips(clip ? [clip] : []);
   }));
-  root.querySelectorAll('[data-play-clip2]').forEach(btn => btn.addEventListener('click', () => {
-    setPreviewClip(rec, btn.dataset.playClip2);
-    paint(ctx);
-  }));
+  root.querySelectorAll('[data-play-clip2]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      setPreviewClip(rec, btn.dataset.playClip2);
+      paint(ctx);
+    });
+    btn.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setPreviewClip(rec, btn.dataset.playClip2);
+        paint(ctx);
+      }
+    });
+  });
   root.querySelectorAll('[data-clip-more]').forEach(btn => btn.addEventListener('click', e => {
     e.stopPropagation();
     const menu = root.querySelector(`#clip-menu-${btn.dataset.clipMore}`);
@@ -940,10 +1060,22 @@ function wireClipsTab(root, rec, ctx) {
   }));
 }
 
-function downloadClips(clips) {
+/** A single file just opens directly; two or more get bundled into one ZIP so "Download All" produces one file instead of a pile of browser tabs. */
+async function downloadClips(clips, zipFilename) {
   const real = clips.filter(c => c.downloadUrl);
   if (!real.length) { showToast('No files to download yet'); return; }
-  real.forEach(c => window.open(c.downloadUrl, '_blank', 'noopener'));
+  if (real.length === 1) {
+    window.open(real[0].downloadUrl, '_blank', 'noopener');
+    return;
+  }
+  showToast(`Zipping ${real.length} files…`);
+  try {
+    await downloadFilesAsZip(real, zipFilename || 'clips.zip');
+    showToast('Download ready');
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;
+    showToast(`Zip failed: ${err.message}`);
+  }
 }
 
 /* =============================================================
@@ -994,6 +1126,6 @@ function wireFooter(root, rec, ctx) {
   });
   const deleteBtn = root.querySelector('#d-footer-delete');
   if (deleteBtn) deleteBtn.addEventListener('click', () => {
-    openDeleteConfirmModal(rec, ctx, () => { closeDrawer(); ctx.refresh(); });
+    openDeleteConfirmModal(rec, ctx, () => { ctx.closeDrawer(); ctx.refresh(); });
   });
 }

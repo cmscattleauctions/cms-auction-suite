@@ -17,6 +17,7 @@ import { showToast, copyToClipboard } from './toast.js';
 import { handleIdEntryLoop } from './ui-modals.js';
 import { openCompareModal } from './ui-compare.js';
 import * as StorageData from './storage-data.js';
+import { downloadFilesAsZip } from './zip.js';
 
 let addRowOpen = false;
 const compareSelection = new Map(); // id -> record snapshot, so the compare bar/modal work across tabs
@@ -44,32 +45,9 @@ export function renderTable(container, records, ctx) {
   const tbody = container.querySelector('#vm-table-body');
   tbody.innerHTML = records.map(r => (isCreated ? createdRowHtml(r, ctx) : readyRowHtml(r, ctx, showWorkingOn))).join('') + addRowHtml(colspan);
 
-  wireThumbnailFallbacks(tbody);
   wireRows(tbody, ctx);
   wireAddRow(tbody, ctx);
   paintCompareBar(ctx);
-}
-
-/**
- * YouTube's thumbnail CDN doesn't 404 for a nonexistent video id — it
- * serves a generic "unavailable" placeholder (always exactly 120x90, vs a
- * real thumbnail's larger real dimensions) with an HTTP 200. Swap those
- * out for our own neutral icon instead of showing YouTube's broken-looking
- * gray box. Cheap: these are plain lazy-loaded <img> tags, no video
- * elements, safe at 600+ rows.
- */
-function wireThumbnailFallbacks(tbody) {
-  tbody.querySelectorAll('[data-yt-thumb]').forEach(img => {
-    const swap = () => {
-      const wrap = img.closest('.vm-identity-thumb');
-      if (wrap) wrap.classList.add('is-placeholder');
-      img.remove();
-    };
-    img.addEventListener('error', swap, { once: true });
-    img.addEventListener('load', () => {
-      if (img.naturalWidth === 120 && img.naturalHeight === 90) swap();
-    }, { once: true });
-  });
 }
 
 /* =============================================================
@@ -141,22 +119,6 @@ function rowExceptionClass(r, context) {
   return flags.some(f => f.severity === 'bad') ? 'has-exception is-bad-row' : 'has-exception';
 }
 
-const PLACEHOLDER_THUMB_ICON = `<svg viewBox="0 0 24 24" fill="none"><path d="M4 6h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.4"/><path d="M17 10.5 22 8v8l-5-2.5" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
-
-/** A small landscape thumbnail — the real YouTube one when published, a neutral placeholder otherwise. Static <img>, lazy-loaded, never a <video> element: cheap at 600+ rows. */
-function thumbnailHtml(r) {
-  const dur = r.clips[0]?.durationSec;
-  const durBadge = dur != null ? `<span class="vm-thumb-dur">${formatDuration(dur)}</span>` : '';
-  if (r.youtubeId) {
-    return `
-      <div class="vm-identity-thumb">
-        <img src="https://img.youtube.com/vi/${encodeURIComponent(r.youtubeId)}/mqdefault.jpg" loading="lazy" alt="" data-yt-thumb />
-        ${durBadge}
-      </div>`;
-  }
-  return `<div class="vm-identity-thumb is-placeholder">${PLACEHOLDER_THUMB_ICON}${durBadge}</div>`;
-}
-
 /** "Bryson Murray" -> "BM" — never hardcoded, always derived from whatever staff name is actually on the record. */
 function initialsFor(name) {
   if (!name) return '';
@@ -174,7 +136,6 @@ function initialsFor(name) {
 function identityCell(r, context) {
   return `
     <div class="vm-identity-cell">
-      ${thumbnailHtml(r)}
       <div class="vm-identity-text">
         <div class="vm-identity-primary">${exceptionDot(r, context)}${escapeHtml(r.consignorName)}</div>
         <div class="vm-identity-secondary">${escapeHtml(r.baseVideoId)}${r.suffix ? `<span class="suffix">-${r.suffix}</span>` : ''}</div>
@@ -240,7 +201,7 @@ function publishedCell(r) {
 }
 
 function addedCell(r) {
-  const initials = initialsFor(r.createdBy || r.videoMaker);
+  const initials = initialsFor(r.videoMaker || r.createdBy);
   return `
     <div class="vm-added-cell">
       <div>${formatDateShort(r.dateAdded)}</div>
@@ -628,5 +589,16 @@ async function downloadAll(id, ctx) {
     showToast('No files to download yet');
     return;
   }
-  real.forEach(c => window.open(c.downloadUrl, '_blank', 'noopener'));
+  if (real.length === 1) {
+    window.open(real[0].downloadUrl, '_blank', 'noopener');
+    return;
+  }
+  showToast(`Zipping ${real.length} files…`);
+  try {
+    await downloadFilesAsZip(real, `${rec.videoId}-clips.zip`);
+    showToast('Download ready');
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;
+    showToast(`Zip failed: ${err.message}`);
+  }
 }

@@ -6,11 +6,11 @@
  * mock-data.js directly — everything goes through repository.js.
  * ============================================================= */
 
-import { VideoRepository, ReferenceDataRepository, UsageRepository, NotificationRepository } from './repository.js';
+import { VideoRepository, ReferenceDataRepository, UsageRepository } from './repository.js';
 import { renderTable } from './ui-table.js';
 import { renderGrid } from './ui-grid.js';
 import { openDrawer, closeDrawer } from './ui-drawer.js';
-import { openUploadModal, openCsvImportModal, openNotificationsModal, openVideoIdManagerModal, openTrashModal } from './ui-modals.js';
+import { openUploadModal, openCsvImportModal, openVideoIdManagerModal, openTrashModal } from './ui-modals.js';
 
 const state = {
   statusTab: 'created', // "Completed" — the default view staff actually want first
@@ -18,7 +18,7 @@ const state = {
   search: '',
   filters: {},
   draftsOnly: false,
-  sort: 'updated-desc',
+  sort: 'added-desc',
   selectedId: null,
 };
 
@@ -70,7 +70,6 @@ export const ctx = {
   repo: VideoRepository,
   ref: ReferenceDataRepository,
   usage: UsageRepository,
-  notifications: NotificationRepository,
   refresh,
   getCurrentList: () => currentList,
   openDrawer: id => { state.selectedId = id; paintSelectedRow(); openDrawer(id, ctx); },
@@ -244,7 +243,6 @@ function wireToolbar() {
   const closeTools = () => { toolsMenu.hidden = true; toolsBtn.setAttribute('aria-expanded', 'false'); };
   document.getElementById('vm-btn-idmanager').addEventListener('click', () => { closeTools(); openVideoIdManagerModal(ctx); });
   document.getElementById('vm-btn-import-csv').addEventListener('click', () => { closeTools(); openCsvImportModal(ctx); });
-  document.getElementById('vm-btn-notifications').addEventListener('click', () => { closeTools(); openNotificationsModal(ctx); });
   document.getElementById('vm-btn-trash').addEventListener('click', () => { closeTools(); openTrashModal(ctx); });
 }
 

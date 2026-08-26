@@ -84,9 +84,10 @@ function cardHtml(r, ctx) {
         <div class="vm-card-id">${escapeHtml(r.videoId)}${r.isDraft ? '<span class="vm-row-flag draft">Draft</span>' : ''}</div>
         <div class="vm-card-consignor">${escapeHtml(r.consignorName)}</div>
         <div class="vm-card-cattle">${escapeHtml(cattle)}</div>
+        ${r.videoFormat && r.videoFormat !== 'unknown' ? `
         <div class="vm-card-foot">
           <span class="format-pill ${FORMAT_BADGE_CLASS[r.videoFormat] || ''}" title="${escapeHtml(formatMeta ? formatMeta.desc : '')}">${escapeHtml(formatMeta ? formatMeta.short : r.videoFormat)}</span>
-        </div>
+        </div>` : ''}
       </div>
     </div>`;
 }
