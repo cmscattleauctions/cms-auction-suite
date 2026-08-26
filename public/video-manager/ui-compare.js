@@ -25,18 +25,36 @@ export function openCompareModal(records, ctx) {
   function close() { backdrop.remove(); }
   const modal = backdrop.querySelector('.vm-modal');
 
+  /* Ruling one video out must not disturb the others — re-rendering the
+   * whole grid via innerHTML would recreate every remaining <iframe>,
+   * restarting playback on videos the user hadn't touched. Instead, only
+   * the one panel is removed from the DOM directly; the rest keep running. */
+  function updateHeaderCount() {
+    const h2 = modal.querySelector('.vm-modal-header h2');
+    if (h2) h2.textContent = `Compare ${active.length} Video${active.length === 1 ? '' : 's'}`;
+  }
+
+  function wirePanel(panelEl, r) {
+    panelEl.querySelector('[data-use-video]').addEventListener('click', () => {
+      close();
+      ctx.openDrawer(r.id);
+    });
+    panelEl.querySelector('[data-rule-out]').addEventListener('click', () => {
+      active = active.filter(x => x.id !== r.id);
+      panelEl.remove();
+      if (!active.length) { close(); return; }
+      updateHeaderCount();
+    });
+  }
+
   function paint() {
     modal.innerHTML = panelShellHtml(active.length);
     modal.querySelector('.vm-modal-close').addEventListener('click', close);
-    modal.querySelectorAll('[data-use-video]').forEach(btn => btn.addEventListener('click', () => {
-      close();
-      ctx.openDrawer(btn.dataset.useVideo);
-    }));
-    modal.querySelectorAll('[data-rule-out]').forEach(btn => btn.addEventListener('click', () => {
-      active = active.filter(r => r.id !== btn.dataset.ruleOut);
-      if (!active.length) { close(); return; }
-      paint();
-    }));
+    const grid = modal.querySelector('.vm-compare-grid');
+    active.forEach(r => {
+      const panelEl = grid.querySelector(`[data-panel-id="${r.id}"]`);
+      if (panelEl) wirePanel(panelEl, r);
+    });
   }
 
   function panelShellHtml(count) {
@@ -64,7 +82,7 @@ export function openCompareModal(records, ctx) {
     const statusWord = r.status === 'created' ? 'Created' : r.status === 'hold' ? 'On Hold' : 'Ready to Make';
 
     return `
-      <div class="vm-compare-panel">
+      <div class="vm-compare-panel" data-panel-id="${r.id}">
         <button class="vm-compare-rule-out" data-rule-out="${r.id}" type="button" title="Rule out — remove from comparison">&times;</button>
         <div class="vm-compare-media">
           ${r.embedUrl

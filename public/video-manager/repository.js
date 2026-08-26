@@ -250,17 +250,6 @@ export const ReferenceDataRepository = {
 };
 
 /* =============================================================
- * NotificationRepository
- * ============================================================= */
-export const NotificationRepository = {
-  getWatchList() { return STAFF.map(s => ({ ...s })); },
-  setWatch(id, watch) {
-    const s = STAFF.find(s => s.id === id);
-    if (s) { s.watch = watch; emitter.emit({ type: 'notifications-changed' }); }
-  },
-};
-
-/* =============================================================
  * UsageRepository
  * ============================================================= */
 let importHistory = [];
