@@ -331,9 +331,20 @@
 
   function extractYoutubeId(link) {
     if (!link) return null;
-    const m = link.match(/(?:youtu\.be\/|v=|embed\/)([a-zA-Z0-9_-]{5,})/);
+    const trimmed = link.trim();
+    // Anchored to the START of the field, and length-capped — items that
+    // haven't been made yet sometimes carry Monday's own boilerplate help
+    // text in this column instead of a real link (e.g. "To convert YouTube
+    // embed links, paste the original link here... youtu.be/xxxxx"). A
+    // substring search would find that example id buried in the
+    // instructions, and since the boilerplate is identical on every such
+    // item, every one of them would get tagged with the same fake id. A
+    // real per-item link is just a URL, not a paragraph, so requiring the
+    // match to start the (trimmed) field rules out the instructional case.
+    if (trimmed.length > 100) return null;
+    const m = trimmed.match(/^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{5,})/i);
     if (m) return m[1];
-    if (/^[a-zA-Z0-9_-]{5,}$/.test(link)) return link;
+    if (/^[a-zA-Z0-9_-]{5,}$/.test(trimmed)) return trimmed;
     return null;
   }
 
