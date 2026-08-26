@@ -184,6 +184,7 @@ label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spa
   background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg); padding: 4px; display: flex; flex-direction: column;
 }
+.vm-sort-menu[hidden] { display: none; }
 .vm-sort-option {
   display: block; width: 100%; text-align: left; padding: 8px 10px; font-size: 12.5px; font-weight: 500;
   color: var(--text-primary); background: none; border: none; border-radius: 5px;
@@ -559,7 +560,10 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 .vm-copied-flash { color: var(--success); font-size: 11px; font-weight: 700; margin-left: 4px; }
 
 /* ----- Publishing: read-first summary rows ----- */
-.vm-pub-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; }
+/* Grid, not flex — the icon column is a fixed 22px on every row
+   regardless of content length, so the icon and label start position
+   can't drift row to row the way flex sizing could. */
+.vm-pub-row { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 10px; padding: 7px 0; }
 .vm-pub-main { min-width: 0; }
 .vm-pub-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
 .vm-pub-value { font-size: 12.5px; color: var(--text-primary); font-weight: 500; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -621,30 +625,31 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 /* ----- Clips tab — one card per clip, real video thumbnail ----- */
 .vm-clips-tab-actions { display: flex; gap: 8px; margin-bottom: 12px; }
 .vm-clip-list2 {
-  display: flex; flex-direction: column; gap: 14px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
   max-height: 60vh; overflow-y: auto; padding-right: 2px;
 }
 .vm-clip-card2 { border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; background: var(--bg-surface); flex-shrink: 0; }
-.vm-clip-card2.is-playing { border-color: var(--accent); }
-.vm-clip-card2-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; padding: 8px 10px 0; }
-.vm-clip-thumb { position: relative; aspect-ratio: 16/9; background: #000; margin-top: 6px; }
+.vm-clip-card2.is-playing { grid-column: 1 / -1; border-color: var(--accent); }
+.vm-clip-card2-label { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; padding: 6px 8px 0; }
+.vm-clip-thumb { position: relative; aspect-ratio: 16/9; background: #000; margin-top: 5px; }
 .vm-clip-thumb[data-play-clip2] { cursor: pointer; }
 .vm-clip-thumb video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
-.vm-clip-thumb-empty { height: 100%; display: grid; place-items: center; color: #9aa1ab; font-size: 12px; background: var(--bg-muted); text-align: center; padding: 0 8px; }
+.vm-clip-thumb-empty { height: 100%; display: grid; place-items: center; color: #9aa1ab; font-size: 11px; background: var(--bg-muted); text-align: center; padding: 0 6px; }
 .vm-clip-thumb-error { color: var(--format-redo-fg); }
 .vm-clip-play-btn {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  width: 44px; height: 44px; border-radius: 50%; border: none;
+  width: 32px; height: 32px; border-radius: 50%; border: none;
   background: rgba(0, 0, 0, 0.55); color: #fff; display: flex; align-items: center; justify-content: center;
   cursor: pointer;
 }
-.vm-clip-play-btn svg { width: 20px; height: 20px; margin-left: 2px; }
+.vm-clip-play-btn svg { width: 15px; height: 15px; margin-left: 1px; }
 .vm-clip-play-btn:hover { background: var(--accent); }
 .vm-clip-meta-row {
-  display: flex; gap: 10px; padding: 8px 10px 0; font-size: 11px; color: var(--text-muted);
+  display: flex; flex-wrap: wrap; gap: 4px 8px; padding: 6px 8px 0; font-size: 10.5px; color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
-.vm-clip-card2-actions { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px 10px; }
+.vm-clip-card2-actions { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 8px; }
+.vm-clip-card2-actions .btn-sm { padding: 4px 8px; font-size: 11.5px; }
 
 /* ----- Sticky footer: one primary + an overflow menu for the rest ----- */
 .vm-drawer-footer { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border-subtle); background: var(--bg-surface); flex-shrink: 0; }

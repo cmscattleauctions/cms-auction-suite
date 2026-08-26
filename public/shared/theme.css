@@ -19,9 +19,9 @@
   --bg-muted:         #f0ece4;   /* subtle wash for dropzones, code blocks */
 
   /* ----- sidebar (dark on light layout) ----- */
-  --sidebar-bg:        #131820;
-  --sidebar-fg:        #e8eaee;
-  --sidebar-fg-muted:  #8b919c;
+  --sidebar-bg:        #040d17;
+  --sidebar-fg:        #ffffff;
+  --sidebar-fg-muted:  #ffffff;
   --sidebar-divider:   rgba(255, 255, 255, 0.08);
   --sidebar-active-bg: rgba(202, 138, 4, 0.12);
   --sidebar-active-fg: #f5d491;       /* amber text on active tab */
