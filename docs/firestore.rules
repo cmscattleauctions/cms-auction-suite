@@ -39,6 +39,12 @@ service cloud.firestore {
     match /videoRecords/{id}   { allow read, write: if isApproved(); }
     match /referenceData/{key} { allow read, write: if isApproved(); }
 
+    // ── Beta OBS Builder (Banners tab, "Automated Video Setup — Beta") ──
+    // Reads videoRecords above for YouTube ID -> CMS Video ID lookups;
+    // these two collections are its own config.
+    match /obsVerificationTags/{tagId} { allow read, write: if isApproved(); }
+    match /obsStingerConfig/{docId}    { allow read, write: if isApproved(); }
+
     // Monday clips migration — a client write here triggers the
     // transferClip Cloud Function (see functions/index.js); only that
     // function (via the Admin SDK, which bypasses these rules) is ever

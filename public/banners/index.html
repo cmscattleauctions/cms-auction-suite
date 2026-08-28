@@ -150,6 +150,7 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 }
 </style>
 <link rel="stylesheet" href="./light-theme.css">
+<link rel="stylesheet" href="./beta/beta.css">
 </head>
 <body>
 <nav>
@@ -157,6 +158,12 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
   <button class="nav-tab active" onclick="showPage('flow', this)">Builder</button>
   <button class="nav-tab" onclick="showPage('custom', this)">Custom Lots</button>
   <button class="nav-tab" onclick="showPage('admin', this)">State Library</button>
+  <button class="nav-tab" onclick="showPage('tags', this)">Verification Tags</button>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+    <span class="toggle-label">OBS Build Mode</span>
+    <button class="toggle-btn active" id="btnModeClassic" title="Behaves exactly like the production builder — no video matching, no tags, no intro.">Classic</button>
+    <button class="toggle-btn" id="btnModeBeta" title="Adds automated video matching, verification tags, and a Stinger intro. Opt-in, never required.">Automated Video Setup — Beta</button>
+  </div>
 </nav>
 
 <!-- ============================================================
@@ -263,6 +270,10 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
   <div id="panelReview" style="display:none">
     <div class="info-banner">
       <strong>Next steps:</strong> Download banners first, then drop them into <code>/Users/brysonmurray/Library/CloudStorage/Dropbox/Auction OBS/Lot Banners/</code> — keep the filenames exactly as exported. Then download the OBS JSON and import it in OBS (<em>Scene Collection → Import</em>).
+    </div>
+
+    <div id="betaReviewWrap" style="display:none;margin-bottom:24px;">
+      <div id="betaReviewSection"></div>
     </div>
 
     <div id="statsRow" class="stats-row" style="display:none">
@@ -453,6 +464,19 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
       </div>
     </div>
   </div>
+</div>
+
+<!-- ============================================================
+     VERIFICATION TAGS — Beta-only settings page (Firebase-backed)
+     Always reachable from the nav; entirely inert if Beta mode is
+     never turned on, since Classic never reads this collection.
+     ============================================================ -->
+<div class="page" id="page-tags">
+  <div class="info-banner" id="tagsPageIntro">
+    Verification tags configured here are only used when <strong>OBS Build Mode</strong> is set to
+    <strong>Automated Video Setup — Beta</strong>. They have no effect on the Classic workflow.
+  </div>
+  <div id="tagManagerRoot"><p class="helper">Loading…</p></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1132,6 +1156,13 @@ function parseWorkingOnCSV(text) {
     lot:       findKey(/^lot\s*number$/i),
     consignor: findKey(/^consignor$/i),
     location:  findKey(/^location$/i),
+    // Beta-only columns. Classic never reads lotRow.description /
+    // .explicitVideoId / .youtubeUrl below, so capturing them here is
+    // behaviorally inert for Classic — see beta/beta-main.js.
+    description:  findKey(/^description$/i),
+    video:        findKey(/^video$/i),
+    previewLink:  findKey(/^preview\s*video\s*link$/i),
+    embedLink:    findKey(/^automated\s*embedded\s*link$/i),
   };
   if (!K.lot) throw new Error('Could not find "Lot Number" column in CSV.');
 
@@ -1190,6 +1221,10 @@ function parseWorkingOnCSV(text) {
       city: loc.city,
       stateAbbr: finalState,
       locationDisplay: loc.city && finalState ? `${loc.city}, ${finalState}` : (loc.city || finalState || locationRaw),
+      // Beta-only — see K.description/.video/.previewLink/.embedLink above.
+      description: cleanCell(row[K.description] || ''),
+      explicitVideoId: cleanCell(row[K.video] || ''),
+      youtubeUrl: cleanCell(row[K.previewLink] || '') || cleanCell(row[K.embedLink] || ''),
     };
 
     // Dedupe — if same lot appears twice, ignore later occurrence
@@ -1761,6 +1796,9 @@ async function generateAndReview() {
   updateDownloadGates();
   document.getElementById('statsRow').style.display = 'flex';
   document.getElementById('ctrlRow').style.display = 'flex';
+  // Beta hook — no-op unless OBS Build Mode is set to Beta. See the
+  // <script type="module"> block near the end of this file.
+  await window.CMSBetaHooks?.afterGenerateAndReview?.(parsedCsvState);
 }
 
 async function renderAllBanners() {
@@ -1934,12 +1972,22 @@ async function dlObsJson() {
     if (!templateResp.ok) throw new Error('Could not load template.json.');
     const templateData = await templateResp.json();
     const output = buildObsJson(templateData, parsedCsvState);
-    const blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'CMS_Auction_Scene_Collection.json'; a.click();
-    URL.revokeObjectURL(url);
-    showToast('OBS scene collection downloaded');
+
+    // Beta hook — when OBS Build Mode is Beta, augment Classic's own
+    // (unmodified) output with video/tag/stinger scene items and export
+    // the full auction package instead of the bare JSON. Classic's own
+    // `output` above is never mutated in place — see beta-obs-augment.js.
+    if (window.CMSBetaHooks?.isBeta?.()) {
+      await window.CMSBetaHooks.buildAndExportBeta(output, CANVAS_W, CANVAS_H);
+      showToast('Beta auction OBS package downloaded');
+    } else {
+      const blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'CMS_Auction_Scene_Collection.json'; a.click();
+      URL.revokeObjectURL(url);
+      showToast('OBS scene collection downloaded');
+    }
   } catch (err) {
     console.error(err);
     showToast(err.message, true);
@@ -2379,6 +2427,116 @@ window.pickOptionStyle = pickOptionStyle;
   // "Demo mode". Re-check once it's ready so they show the real status.
   getCMSData().then(() => { updateRepoStatus(); updateTokenStatus(); });
 })();
+</script>
+
+<!-- ============================================================
+     BETA OBS BUILDER — Automated Video Setup (opt-in)
+     -------------------------------------------------------------
+     Everything above this block is Classic, unmodified in behavior.
+     This module owns: the mode toggle, the Verification Tags settings
+     page, the pre-generate review screen, and augmenting Classic's own
+     OBS JSON output before export. It never calls into Classic's
+     internals except by reading the same `parsedCsvState`/`allBanners`
+     globals Classic already exposes on window scope implicitly (this
+     script runs in the same document, so top-level `var`/function
+     declarations from the classic <script> above are reachable here
+     too) and by wrapping window.showPage / calling the two hook points
+     Classic explicitly calls (window.CMSBetaHooks.*, see above).
+     ============================================================ -->
+<script type="module">
+  import * as Beta from './beta/beta-main.js';
+  import { renderBetaReview } from './beta/beta-review-ui.js';
+  import { initTagManagerPage } from './beta/beta-tag-manager-ui.js';
+
+  let betaCtx = null;
+  let fuzzyResolutions = {};       // cleared whenever a new CSV is parsed
+  let tagManagerInitialized = false;
+  let lastParsedForBeta = null;
+
+  function isBeta() { return Beta.State.getBuildMode() === 'beta'; }
+
+  function setModeUI(mode) {
+    document.getElementById('btnModeClassic').classList.toggle('active', mode === 'classic');
+    document.getElementById('btnModeBeta').classList.toggle('active', mode === 'beta');
+    const dlBtn = document.getElementById('btnDownloadObs');
+    if (dlBtn) {
+      const label = mode === 'beta' ? '2 · Download Auction OBS Package (ZIP)' : '2 · Download OBS Scene Collection';
+      if (dlBtn.textContent.trim().startsWith('2 ·') || dlBtn.textContent.trim().startsWith('2·')) dlBtn.textContent = label;
+    }
+    document.getElementById('betaReviewWrap').style.display = (mode === 'beta' && betaCtx) ? 'block' : 'none';
+  }
+
+  async function runBetaReviewIfNeeded() {
+    if (!isBeta() || !lastParsedForBeta) return;
+    const wrap = document.getElementById('betaReviewWrap');
+    const section = document.getElementById('betaReviewSection');
+    wrap.style.display = 'block';
+    section.innerHTML = '<p class="helper">Running Beta review — matching videos and scanning descriptions for verification tags…</p>';
+    try {
+      betaCtx = await Beta.runBetaPipeline(lastParsedForBeta, fuzzyResolutions);
+      renderReview();
+    } catch (err) {
+      console.error('[beta]', err);
+      section.innerHTML = `<div class="alert-banner" style="display:block;">Beta review failed to load: ${String(err.message || err)}. Classic mode is unaffected — you can still switch back to Classic and build normally.</div>`;
+    }
+  }
+
+  function renderReview() {
+    const section = document.getElementById('betaReviewSection');
+    renderBetaReview(section, betaCtx, {
+      onChooseFile: (lot, file) => Beta.resolveWithChosenFile(betaCtx, lot, file),
+      onSkip: lot => Beta.resolveWithSkip(betaCtx, lot),
+      onFuzzyUse: async group => { fuzzyResolutions[group.foundText.toLowerCase()] = 'use'; await runBetaReviewIfNeeded(); },
+      onFuzzyIgnore: async group => { fuzzyResolutions[group.foundText.toLowerCase()] = 'ignore'; await runBetaReviewIfNeeded(); },
+      onFuzzyRemember: async group => {
+        await Beta.rememberFuzzyAlias(group.suggestedTagId, group.foundText);
+        fuzzyResolutions[group.foundText.toLowerCase()] = 'use';
+        await runBetaReviewIfNeeded();
+      },
+      onConfirmRemember: lot => Beta.confirmRememberMapping(betaCtx, lot),
+      onDismissRemember: lot => Beta.dismissRememberOffer(betaCtx, lot),
+      onRerender: () => renderReview(),
+      showToast,
+    });
+  }
+
+  window.CMSBetaHooks = {
+    isBeta,
+    afterGenerateAndReview: async (parsedCsvState) => {
+      lastParsedForBeta = parsedCsvState;
+      if (isBeta()) await runBetaReviewIfNeeded();
+    },
+    buildAndExportBeta: async (classicOutput, canvasW, canvasH) => {
+      if (!betaCtx) throw new Error('Beta review has not finished running yet — wait a moment and try again.');
+      await Beta.buildAndExportBeta(betaCtx, classicOutput, canvasW, canvasH);
+    },
+  };
+
+  document.getElementById('btnModeClassic').addEventListener('click', () => {
+    Beta.State.setBuildMode('classic');
+    setModeUI('classic');
+  });
+  document.getElementById('btnModeBeta').addEventListener('click', async () => {
+    Beta.State.setBuildMode('beta');
+    setModeUI('beta');
+    if (lastParsedForBeta) await runBetaReviewIfNeeded();
+  });
+
+  // Wrap (not replace) Classic's own showPage so the Verification Tags
+  // settings page lazy-initializes on first visit.
+  const originalShowPage = window.showPage;
+  window.showPage = function (id, btn) {
+    originalShowPage(id, btn);
+    if (id === 'tags' && !tagManagerInitialized) {
+      tagManagerInitialized = true;
+      initTagManagerPage(document.getElementById('tagManagerRoot'), { showToast }).catch(err => {
+        console.error('[beta]', err);
+        document.getElementById('tagManagerRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load Verification Tags: ${String(err.message || err)}</div>`;
+      });
+    }
+  };
+
+  setModeUI(Beta.State.getBuildMode());
 </script>
 </body>
 </html>

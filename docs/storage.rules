@@ -27,5 +27,22 @@ service firebase.storage {
                    && request.resource.size < 2 * 1024 * 1024 * 1024
                    && request.resource.contentType.matches('video/.*');
     }
+
+    // Beta OBS Builder — verification tag images (small, PNG/SVG).
+    match /obs-verification-tags/{tagId}/{fileName} {
+      allow read: if isApproved();
+      allow write: if isApproved()
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/(png|svg\\+xml)');
+    }
+
+    // Beta OBS Builder — the CMS Stinger video asset (must be a video —
+    // see beta-stinger-data.js for why a static image isn't supported).
+    match /obs-stinger/{fileName} {
+      allow read: if isApproved();
+      allow write: if isApproved()
+                   && request.resource.size < 50 * 1024 * 1024
+                   && request.resource.contentType.matches('video/(mp4|quicktime)');
+    }
   }
 }

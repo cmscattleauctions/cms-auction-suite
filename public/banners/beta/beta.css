@@ -1,0 +1,55 @@
+/* =============================================================
+ * Beta OBS Builder — additional styles
+ * -------------------------------------------------------------
+ * Purely additive: only selectors that don't exist in index.html's
+ * inline Classic stylesheet. Reuses Classic's design tokens (--blue,
+ * --surface, --border, --muted, etc.) which are declared on :root in
+ * index.html, so this file never needs to redefine them.
+ * ============================================================= */
+
+.beta-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.beta-stat-line {
+  font-size: 13px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.beta-warning-list, .beta-fuzzy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.beta-warning-row, .beta-fuzzy-row {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.beta-badge-classic, .beta-badge-beta {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+.beta-badge-classic { background: rgba(122,149,184,0.18); color: var(--muted); }
+.beta-badge-beta { background: rgba(217,164,65,0.18); color: var(--yellow); }
