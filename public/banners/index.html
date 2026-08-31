@@ -159,6 +159,8 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
   <button class="nav-tab" onclick="showPage('custom', this)">Custom Lots</button>
   <button class="nav-tab" onclick="showPage('admin', this)">State Library</button>
   <button class="nav-tab" onclick="showPage('tags', this)">Verification Tags</button>
+  <button class="nav-tab" onclick="showPage('stinger', this)">Stinger Settings</button>
+  <button class="nav-tab" onclick="showPage('obs', this)">OBS Settings</button>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
     <span class="toggle-label">OBS Build Mode</span>
     <button class="toggle-btn active" id="btnModeClassic" title="Behaves exactly like the production builder — no video matching, no tags, no intro.">Classic</button>
@@ -477,6 +479,28 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
     <strong>Automated Video Setup — Beta</strong>. They have no effect on the Classic workflow.
   </div>
   <div id="tagManagerRoot"><p class="helper">Loading…</p></div>
+</div>
+
+<!-- ============================================================
+     STINGER SETTINGS — Beta-only settings page (Firebase-backed)
+     ============================================================ -->
+<div class="page" id="page-stinger">
+  <div class="info-banner" id="stingerPageIntro">
+    The Stinger configured here is only used when <strong>OBS Build Mode</strong> is set to
+    <strong>Automated Video Setup — Beta</strong>. It has no effect on the Classic workflow.
+  </div>
+  <div id="stingerRoot"><p class="helper">Loading…</p></div>
+</div>
+
+<!-- ============================================================
+     OBS SETTINGS — Beta-only settings page (local/device settings)
+     ============================================================ -->
+<div class="page" id="page-obs">
+  <div class="info-banner" id="obsPageIntro">
+    These settings are only used when <strong>OBS Build Mode</strong> is set to
+    <strong>Automated Video Setup — Beta</strong>. They have no effect on the Classic workflow.
+  </div>
+  <div id="obsSettingsRoot"><p class="helper">Loading…</p></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -2447,10 +2471,14 @@ window.pickOptionStyle = pickOptionStyle;
   import * as Beta from './beta/beta-main.js';
   import { renderBetaReview } from './beta/beta-review-ui.js';
   import { initTagManagerPage } from './beta/beta-tag-manager-ui.js';
+  import { initStingerSettingsPage } from './beta/beta-stinger-ui.js';
+  import { initObsSettingsPage } from './beta/beta-obs-settings-ui.js';
 
   let betaCtx = null;
   let fuzzyResolutions = {};       // cleared whenever a new CSV is parsed
   let tagManagerInitialized = false;
+  let stingerSettingsInitialized = false;
+  let obsSettingsInitialized = false;
   let lastParsedForBeta = null;
 
   function isBeta() { return Beta.State.getBuildMode() === 'beta'; }
@@ -2522,8 +2550,8 @@ window.pickOptionStyle = pickOptionStyle;
     if (lastParsedForBeta) await runBetaReviewIfNeeded();
   });
 
-  // Wrap (not replace) Classic's own showPage so the Verification Tags
-  // settings page lazy-initializes on first visit.
+  // Wrap (not replace) Classic's own showPage so the Beta settings pages
+  // lazy-initialize on first visit.
   const originalShowPage = window.showPage;
   window.showPage = function (id, btn) {
     originalShowPage(id, btn);
@@ -2532,6 +2560,20 @@ window.pickOptionStyle = pickOptionStyle;
       initTagManagerPage(document.getElementById('tagManagerRoot'), { showToast }).catch(err => {
         console.error('[beta]', err);
         document.getElementById('tagManagerRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load Verification Tags: ${String(err.message || err)}</div>`;
+      });
+    }
+    if (id === 'stinger' && !stingerSettingsInitialized) {
+      stingerSettingsInitialized = true;
+      initStingerSettingsPage(document.getElementById('stingerRoot'), { showToast }).catch(err => {
+        console.error('[beta]', err);
+        document.getElementById('stingerRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load Stinger Settings: ${String(err.message || err)}</div>`;
+      });
+    }
+    if (id === 'obs' && !obsSettingsInitialized) {
+      obsSettingsInitialized = true;
+      initObsSettingsPage(document.getElementById('obsSettingsRoot'), { showToast }).catch(err => {
+        console.error('[beta]', err);
+        document.getElementById('obsSettingsRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load OBS Settings: ${String(err.message || err)}</div>`;
       });
     }
   };
