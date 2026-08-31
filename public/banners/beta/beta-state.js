@@ -15,10 +15,14 @@ const SETTINGS_KEY = 'cms_obs_beta_settings_v1';
 export const DEFAULT_SETTINGS = {
   // Mirrors the existing hardcoded DROPBOX_BANNER_PATH convention — the
   // deterministic local root the generated auction package is meant to
-  // be unzipped into. Videos/tags/intro all live under
-  // `${auctionObsRoot}${auctionFolder}/...`.
+  // be unzipped into. Videos live under `${auctionObsRoot}${auctionFolder}/...`
+  // (genuinely per-auction — different cattle footage every time).
   auctionObsRoot: '/Users/brysonmurray/Library/CloudStorage/Dropbox/Auction OBS/Auctions/',
   auctionFolder: '',                // e.g. "2026-09-10" — set per build
+  // Tags and the stinger, unlike videos, don't change per auction — they
+  // live in the same fixed folder as the lot transition banners (which
+  // Download All Banners already downloads), not a per-auction subfolder.
+  lotBannersFolder: '/Users/brysonmurray/Library/CloudStorage/Dropbox/Auction OBS/Lot Banners/',
   videoExt: 'mp4',
   assumedVideoWidth: 1920,          // used only to compute a sane default on-canvas scale
   assumedVideoHeight: 1080,
@@ -58,9 +62,10 @@ export function saveBetaSettings(settings) {
 export function videoLocalPath(settings, cmsVideoId) {
   return `${settings.auctionObsRoot}${settings.auctionFolder}/videos/${cmsVideoId}.${settings.videoExt}`;
 }
+/** Flat — lands in the same folder as the lot banners themselves, no subfolder. */
 export function tagLocalPath(settings, tagFileName) {
-  return `${settings.auctionObsRoot}${settings.auctionFolder}/tags/${tagFileName}`;
+  return `${settings.lotBannersFolder}${tagFileName}`;
 }
 export function stingerLocalPath(settings, stingerFileName) {
-  return `${settings.auctionObsRoot}${settings.auctionFolder}/stinger/${stingerFileName}`;
+  return `${settings.lotBannersFolder}${stingerFileName}`;
 }

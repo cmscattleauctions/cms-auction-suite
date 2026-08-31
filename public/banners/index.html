@@ -1962,27 +1962,41 @@ async function dlAllBanners() {
     const c = document.querySelector(`.banner-card[data-lot="${CSS.escape(b.lot.toLowerCase())}"]`);
     return !c || c.style.display !== 'none';
   });
-  for (let i = 0; i < list.length; i++) {
-    const b = list[i];
-    const pct = Math.round((i / list.length) * 100);
-    fill.style.width = pct + '%'; ppct.textContent = pct + '%';
-    ptxt.textContent = `Generating ${b.fileName}...`;
-    await new Promise(r => setTimeout(r, 0));
-    const canvas = await drawBannerAsync(b);
-    const blob = await canvasToPNGBlob(canvas);
-    zip.file(b.fileName, blob);
+  try {
+    for (let i = 0; i < list.length; i++) {
+      const b = list[i];
+      const pct = Math.round((i / list.length) * 100);
+      fill.style.width = pct + '%'; ppct.textContent = pct + '%';
+      ptxt.textContent = `Generating ${b.fileName}...`;
+      await new Promise(r => setTimeout(r, 0));
+      const canvas = await drawBannerAsync(b);
+      const blob = await canvasToPNGBlob(canvas);
+      zip.file(b.fileName, blob);
+    }
+
+    // Beta hook — tag images + stinger video land in this same ZIP (they
+    // share the Lot Banners Folder with the banners themselves, unlike
+    // videos which get a per-auction folder) so there's one download and
+    // one folder to move everything into. No-op outside Beta mode.
+    const extras = await window.CMSBetaHooks?.getBannerZipExtras?.();
+    if (extras?.length) {
+      ptxt.textContent = 'Adding tag images and stinger...';
+      for (const { fileName, blob } of extras) zip.file(fileName, blob);
+    }
+
+    ppct.textContent = '100%'; ptxt.textContent = 'Zipping...';
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'CMS_Auction_Banners.zip'; a.click();
+    URL.revokeObjectURL(url);
+    banners_downloaded = true;
+    updateDownloadGates();
+    showToast(`${list.length} banners downloaded${extras?.length ? ` (+ ${extras.length} tag/stinger file${extras.length === 1 ? '' : 's'})` : ''} — now download the OBS scene collection`);
+  } finally {
+    wrap.classList.remove('active'); fill.style.width = '0';
+    btn.disabled = false; btn.textContent = origText;
   }
-  ppct.textContent = '100%'; ptxt.textContent = 'Zipping...';
-  const blob = await zip.generateAsync({ type: 'blob' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'CMS_Auction_Banners.zip'; a.click();
-  URL.revokeObjectURL(url);
-  wrap.classList.remove('active'); fill.style.width = '0';
-  btn.disabled = false; btn.textContent = origText;
-  banners_downloaded = true;
-  updateDownloadGates();
-  showToast(`${list.length} banners downloaded — now download the OBS scene collection`);
 }
 
 async function dlObsJson() {
@@ -2537,6 +2551,13 @@ window.pickOptionStyle = pickOptionStyle;
     buildAndExportBeta: async (classicOutput, canvasW, canvasH) => {
       if (!betaCtx) throw new Error('Beta review has not finished running yet — wait a moment and try again.');
       await Beta.buildAndExportBeta(betaCtx, classicOutput, canvasW, canvasH);
+    },
+    // Tag images + stinger video, as {fileName, blob} pairs to fold into
+    // Classic's own banner ZIP — see dlAllBanners() below. Empty when not
+    // in Beta mode or the review hasn't produced a betaCtx yet.
+    getBannerZipExtras: async () => {
+      if (!isBeta() || !betaCtx) return [];
+      return Beta.collectLotBannerAssets(betaCtx);
     },
   };
 
