@@ -19,7 +19,7 @@ import { initializeApp, getApp, getApps } from 'https://www.gstatic.com/firebase
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js';
 import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
-  query, where, serverTimestamp, orderBy,
+  query, where, serverTimestamp, orderBy, writeBatch,
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
 import {
   getStorage, ref, uploadBytes, getDownloadURL, deleteObject,
@@ -63,6 +63,6 @@ export function currentUser() {
 
 export {
   collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
-  query, where, serverTimestamp, orderBy,
+  query, where, serverTimestamp, orderBy, writeBatch,
   ref, uploadBytes, getDownloadURL, deleteObject,
 };

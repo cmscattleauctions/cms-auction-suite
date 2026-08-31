@@ -15,7 +15,7 @@
 import {
   getBetaDb, getBetaStorage, logStorageError,
   collection, doc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
-  orderBy, query, serverTimestamp,
+  orderBy, query, serverTimestamp, writeBatch,
   ref, uploadBytes, getDownloadURL, deleteObject,
 } from './beta-firebase.js';
 
@@ -78,6 +78,18 @@ export async function updateTag(id, patch) {
 
 export async function setTagEnabled(id, enabled) {
   return updateTag(id, { enabled: !!enabled });
+}
+
+/** Persists a full drag-reorder: orderedIds is every tag id in its new display order. */
+export async function reorderTags(orderedIds) {
+  const db = getBetaDb();
+  if (!db) throw new Error('Firebase is not configured.');
+  const batch = writeBatch(db);
+  orderedIds.forEach((id, index) => {
+    batch.update(doc(db, COLLECTION, id), { sortOrder: index, updatedAt: serverTimestamp() });
+  });
+  await batch.commit();
+  invalidateTagCache();
 }
 
 /** Adds `text` as a new future detection term for tag `id` (the "Use + Remember" fuzzy action). */
