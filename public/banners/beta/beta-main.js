@@ -16,7 +16,7 @@ import { resolveLotVideo, extractYoutubeId, isValidCmsVideoId, safeFileStem } fr
 import { detectTagsForLot } from './beta-tag-detect.js';
 import { getStingerConfig } from './beta-stinger-data.js';
 import { augmentObsJsonForBeta } from './beta-obs-augment.js';
-import { exportAuctionPackage, downloadRenamedVideoFile } from './beta-package-export.js';
+import { exportAuctionPackage, downloadRenamedVideoFile, fetchAsBlob } from './beta-package-export.js';
 
 export { State };
 
@@ -273,10 +273,31 @@ export async function buildAndExportBeta(ctx, classicObsJson, canvasW, canvasH) 
     lotPlans: ctx.lotPlans,
     uniqueVideoSources: ctx.uniqueVideoSources,
     tagAssets: ctx.tagAssets,
-    stingerAsset: ctx.stingerAsset,
     unmatchedLots: ctx.unmatchedLots,
     missingTagImages: ctx.missingTagImages,
   });
 
   return augmented;
+}
+
+/**
+ * Tag images + the stinger video, as {fileName, blob} pairs ready to drop
+ * into a zip alongside the lot banners — called from Classic's
+ * dlAllBanners() via window.CMSBetaHooks when Beta mode is on. These land
+ * in the same fixed Lot Banners Folder as the banners themselves (see
+ * beta-state.js tagLocalPath/stingerLocalPath), not a per-auction folder,
+ * since neither changes per auction.
+ */
+export async function collectLotBannerAssets(ctx) {
+  const assets = [];
+  for (const asset of ctx.tagAssets.values()) {
+    if (!asset.downloadUrl) continue;
+    const blob = await fetchAsBlob(asset.downloadUrl);
+    assets.push({ fileName: asset.fileName, blob });
+  }
+  if (ctx.stingerAsset && ctx.stingerAsset.downloadUrl) {
+    const blob = await fetchAsBlob(ctx.stingerAsset.downloadUrl);
+    assets.push({ fileName: ctx.stingerAsset.fileName, blob });
+  }
+  return assets;
 }

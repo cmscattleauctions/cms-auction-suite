@@ -23,6 +23,11 @@ export async function initObsSettingsPage(root, { showToast }) {
           <label class="form-label">Auction Folder (e.g. 2026-09-10)</label>
           <input type="text" class="form-input" id="auctionFolderInput" placeholder="2026-09-10">
         </div>
+        <div class="form-row">
+          <label class="form-label">Lot Banners Folder (local path)</label>
+          <input type="text" class="form-input mono" id="lotBannersFolderInput">
+          <p class="helper" style="margin-top:6px;">Tag images and the stinger video land here, flat, alongside the lot transition banners — download them together via "Download All Banners" and move everything at once. This folder doesn't change per auction, unlike Auction Folder above.</p>
+        </div>
         <div class="two-col">
           <div class="form-row">
             <label class="form-label">Tag Height (px)</label>
@@ -55,6 +60,7 @@ function refreshSettingsForm(root) {
   const s = State.getBetaSettings();
   root.querySelector('#obsRootInput').value = s.auctionObsRoot;
   root.querySelector('#auctionFolderInput').value = s.auctionFolder;
+  root.querySelector('#lotBannersFolderInput').value = s.lotBannersFolder;
   root.querySelector('#layoutHeightInput').value = s.tagLayout.tagHeight;
   root.querySelector('#layoutSpacingInput').value = s.tagLayout.spacing;
   root.querySelector('#layoutRightInput').value = s.tagLayout.rightMargin;
@@ -67,6 +73,8 @@ function wireSettings(root, showToast) {
     s.auctionObsRoot = root.querySelector('#obsRootInput').value.trim() || s.auctionObsRoot;
     if (!s.auctionObsRoot.endsWith('/')) s.auctionObsRoot += '/';
     s.auctionFolder = root.querySelector('#auctionFolderInput').value.trim();
+    s.lotBannersFolder = root.querySelector('#lotBannersFolderInput').value.trim() || s.lotBannersFolder;
+    if (!s.lotBannersFolder.endsWith('/')) s.lotBannersFolder += '/';
     s.tagLayout.tagHeight = Number(root.querySelector('#layoutHeightInput').value) || s.tagLayout.tagHeight;
     s.tagLayout.spacing = Number(root.querySelector('#layoutSpacingInput').value) || s.tagLayout.spacing;
     s.tagLayout.rightMargin = Number(root.querySelector('#layoutRightInput').value) || s.tagLayout.rightMargin;
