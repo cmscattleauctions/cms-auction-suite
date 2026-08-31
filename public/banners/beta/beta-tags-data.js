@@ -13,7 +13,7 @@
  * ============================================================= */
 
 import {
-  getBetaDb, getBetaStorage,
+  getBetaDb, getBetaStorage, logStorageError,
   collection, doc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
   orderBy, query, serverTimestamp,
   ref, uploadBytes, getDownloadURL, deleteObject,
@@ -21,6 +21,14 @@ import {
 
 const COLLECTION = 'obsVerificationTags';
 const STORAGE_ROOT = 'obs-verification-tags';
+
+// Must stay in sync with the contentType regex on obs-verification-tags/**
+// in docs/storage.rules — mismatches here surface as a generic
+// storage/unauthorized error with no hint that it was actually a
+// content-type rejection.
+const ALLOWED_CONTENT_TYPES = ['image/png', 'image/svg+xml'];
+const MIME_BY_EXT = { png: 'image/png', svg: 'image/svg+xml' };
+const MAX_BYTES = 5 * 1024 * 1024;
 
 let cache = null; // [{...tag}] — loaded once per builder session, invalidated on any write
 
@@ -101,13 +109,58 @@ export async function setTagImage(id, file) {
   const storage = getBetaStorage();
   if (!storage) throw new Error('Firebase is not configured.');
   const db = getBetaDb();
+
   const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+
+  // If the browser reports a type, it must actually match — that's what
+  // the Storage rule checks. If it doesn't report one, fall back to the
+  // extension rather than rejecting a legitimate upload outright.
+  if (file.type ? !ALLOWED_CONTENT_TYPES.includes(file.type) : !MIME_BY_EXT[ext]) {
+    throw new Error(`Tag image must be PNG or SVG (got "${file.type || `.${ext}`}").`);
+  }
+  if (file.size >= MAX_BYTES) {
+    throw new Error(`Tag image must be under ${MAX_BYTES / (1024 * 1024)}MB.`);
+  }
+  // Always upload with the canonical MIME type for the extension — an
+  // empty or off-spec stored contentType would fail the rule the same way
+  // an unsupported format does.
+  const contentType = MIME_BY_EXT[ext] || file.type;
+
   const path = `${STORAGE_ROOT}/${id}/tag.${ext}`;
   const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, file, { contentType: file.type || undefined });
-  const url = await getDownloadURL(storageRef);
+
+  // tag.png vs tag.svg means switching formats on re-upload leaves the old
+  // blob behind under a different name — clean it up so nothing orphaned
+  // accumulates under this tag's folder.
+  const tags = await listTags({ force: true });
+  const previous = tags.find(t => t.id === id);
+
+  try {
+    await uploadBytes(storageRef, file, { contentType });
+  } catch (err) {
+    logStorageError({ op: 'uploadBytes', path }, err);
+    throw err;
+  }
+
+  let url;
+  try {
+    url = await getDownloadURL(storageRef);
+  } catch (err) {
+    logStorageError({ op: 'getDownloadURL', path }, err);
+    throw err;
+  }
+
   await updateDoc(doc(db, COLLECTION, id), { storagePath: path, imageUrl: url, updatedAt: serverTimestamp() });
   invalidateTagCache();
+
+  if (previous && previous.storagePath && previous.storagePath !== path) {
+    try {
+      await deleteObject(ref(storage, previous.storagePath));
+    } catch (err) {
+      logStorageError({ op: 'deleteObject (stale asset cleanup)', path: previous.storagePath }, err);
+    }
+  }
+
   return { path, url };
 }
 

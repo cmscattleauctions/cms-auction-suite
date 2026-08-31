@@ -39,6 +39,19 @@ export const betaFirebaseReady = FIREBASE_CONFIGURED;
 
 export function getBetaDb() { return db; }
 export function getBetaStorage() { return storage; }
+export function getBetaAuth() { return auth; }
+
+/** Logs a structured diagnostic for a failed Storage op: uid, path, project, bucket, error code/message. */
+export function logStorageError({ op, path }, err) {
+  console.error('[beta-firebase] Storage operation failed', {
+    op, path,
+    uid: auth && auth.currentUser ? auth.currentUser.uid : null,
+    projectId: storage && storage.app ? storage.app.options.projectId : null,
+    bucket: storage && storage.app ? storage.app.options.storageBucket : null,
+    code: err && err.code,
+    message: err && err.message,
+  });
+}
 
 /** Resolves once with the current Firebase Auth user (or null in demo mode / signed out). */
 export function currentUser() {
