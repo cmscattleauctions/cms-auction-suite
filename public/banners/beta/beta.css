@@ -53,3 +53,9 @@
 }
 .beta-badge-classic { background: rgba(122,149,184,0.18); color: var(--muted); }
 .beta-badge-beta { background: rgba(217,164,65,0.18); color: var(--yellow); }
+
+/* Verification Tags library — drag-to-reorder. Scoped to .tag-lib-card
+   (not .state-lib-card itself) so the State Library page's identical
+   card markup, which isn't reorderable, is unaffected. */
+.tag-lib-card { cursor: grab; }
+.tag-lib-card.tag-dragging { opacity: 0.4; cursor: grabbing; }

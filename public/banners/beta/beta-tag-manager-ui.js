@@ -15,7 +15,7 @@
  * two-col, img-drop, status-chip, del-btn, ...).
  * ============================================================= */
 
-import { listTags, createTag, updateTag, setTagEnabled, deleteTag, setTagImage } from './beta-tags-data.js';
+import { listTags, createTag, updateTag, setTagEnabled, deleteTag, setTagImage, reorderTags } from './beta-tags-data.js';
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -61,12 +61,14 @@ export async function initTagManagerPage(root, { showToast }) {
 
       <div>
         <div class="section-title">Verification Tags (<span id="tagLibCount">0</span>)</div>
+        <p class="helper" style="margin-top:-6px;margin-bottom:10px;">Drag a tag to reorder — this is the order they're laid out in on the video (right-aligned, left to right).</p>
         <div class="state-library-grid" id="tagLibGrid"><p class="no-states">No verification tags configured yet.</p></div>
       </div>
     </div>
   `;
 
   wireForm(root, showToast);
+  wireReorder(root, showToast);
   await refreshTagList(root, showToast);
 }
 
@@ -77,8 +79,8 @@ async function refreshTagList(root, showToast) {
   count.textContent = tags.length;
   if (!tags.length) { grid.innerHTML = `<p class="no-states">No verification tags configured yet.</p>`; return; }
   grid.innerHTML = tags.map(t => `
-    <div class="state-lib-card" data-id="${esc(t.id)}">
-      ${t.imageUrl ? `<img src="${esc(t.imageUrl)}" alt="${esc(t.name)}">` : `<div style="height:100px;background:var(--blue);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;">No image</div>`}
+    <div class="state-lib-card tag-lib-card" draggable="true" data-id="${esc(t.id)}">
+      ${t.imageUrl ? `<img src="${esc(t.imageUrl)}" alt="${esc(t.name)}" draggable="false">` : `<div style="height:100px;background:var(--blue);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;">No image</div>`}
       <div class="state-lib-label" style="flex-direction:column;align-items:stretch;gap:6px;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <span class="state-abbr" style="font-size:13px;">${esc(t.name)}</span>
@@ -180,6 +182,47 @@ function wireForm(root, showToast) {
       console.error(err);
       msg.textContent = 'Save failed.';
       showToast(err.message, true);
+    }
+  });
+}
+
+// Native HTML5 drag-and-drop, delegated on the grid so it keeps working
+// across every refreshTagList() re-render without re-wiring per card.
+function wireReorder(root, showToast) {
+  const grid = root.querySelector('#tagLibGrid');
+  let draggedEl = null;
+
+  grid.addEventListener('dragstart', e => {
+    const card = e.target.closest('.tag-lib-card');
+    if (!card) return;
+    draggedEl = card;
+    card.classList.add('tag-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', card.dataset.id);
+  });
+
+  grid.addEventListener('dragover', e => {
+    if (!draggedEl) return;
+    e.preventDefault();
+    const target = e.target.closest('.tag-lib-card');
+    if (!target || target === draggedEl) return;
+    const rect = target.getBoundingClientRect();
+    const before = (e.clientX - rect.left) < rect.width / 2;
+    grid.insertBefore(draggedEl, before ? target : target.nextSibling);
+  });
+
+  grid.addEventListener('dragend', async () => {
+    if (!draggedEl) return;
+    draggedEl.classList.remove('tag-dragging');
+    const newOrder = Array.from(grid.querySelectorAll('.tag-lib-card')).map(c => c.dataset.id);
+    draggedEl = null;
+    try {
+      await reorderTags(newOrder);
+      showToast('Tag order saved');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to save new order — reloading.', true);
+      await refreshTagList(root, showToast);
     }
   });
 }
