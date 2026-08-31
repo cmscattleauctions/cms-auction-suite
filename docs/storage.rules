@@ -38,11 +38,14 @@ service firebase.storage {
 
     // Beta OBS Builder — the CMS Stinger video asset (must be a video —
     // see beta-stinger-data.js for why a static image isn't supported).
+    // webm is included alongside mp4/quicktime because OBS stinger clips
+    // with alpha-channel transparency are conventionally exported as
+    // VP9 webm (mp4/mov can't carry a browser-uploadable alpha track).
     match /obs-stinger/{fileName} {
       allow read: if isApproved();
       allow write: if isApproved()
                    && request.resource.size < 50 * 1024 * 1024
-                   && request.resource.contentType.matches('video/(mp4|quicktime)');
+                   && request.resource.contentType.matches('video/(mp4|quicktime|webm)');
     }
   }
 }
