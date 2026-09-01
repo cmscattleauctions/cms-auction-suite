@@ -21,10 +21,12 @@
  *     images have no playback state, so sharing is safe). Each scene's
  *     own scene item still gets independent pos/scale/visible, so
  *     hiding a tag on one lot never touches another lot.
- *   - a native OBS Stinger Transition ("CMS Stinger"), applied ONLY as
- *     a per-scene Transition Override on every "<lot> Video" scene —
- *     see buildStingerTransition()/applyStingerOverride() for the full
- *     verified mechanism and its one real limitation.
+ *   - a native OBS Stinger Transition ("CMS Stinger"), applied as a
+ *     per-scene Transition Override on every "<lot> Video" scene AND
+ *     every Transition-type scene ("<lot> Transition" plus the fixed
+ *     breed/"type" transitions) — see buildStingerTransition()/
+ *     applyStingerOverride() for the full verified mechanism and its
+ *     real limitations.
  *
  * SCHEMA NOTES (per project rule: don't invent OBS fields — everything
  * below was verified against OBS Studio's actual open-source frontend/
@@ -64,6 +66,16 @@ const STINGER_NAME = 'CMS Stinger';
 function normalizeSceneName(name) { return String(name).replace(/\s+/g, ' ').trim(); }
 function isLotVideoScene(name) { return /^\d+(-[A-Z])? Video$/i.test(normalizeSceneName(name)); }
 function lotFromVideoSceneName(name) { return normalizeSceneName(name).replace(/ Video$/i, '').trim(); }
+
+// Mirrors index.html's own isLotTransitionScene/isBreedTransitionScene
+// (Classic's scene-sequencing code) — kept in sync by hand since Classic's
+// script isn't a module Beta can import from. "Type Transition" in the
+// spec is Classic's "breed transition": a fixed interlude scene (never
+// tied to a specific lot) inserted between groups of a given breed.
+function isLotTransitionScene(name) { return /^\d+(-[A-Z])? Transition$/i.test(normalizeSceneName(name)); }
+function isBreedTransitionScene(name) {
+  return ['Charolais Transition', 'Native Transition', 'Holstein Transition'].includes(normalizeSceneName(name));
+}
 
 /**
  * Build a scene item — same shape/keys as Classic's makeBannerSceneItem,
@@ -228,8 +240,9 @@ function buildStingerTransition(localPath, transitionPointMs) {
 
 /**
  * Applies the Stinger as a per-scene Transition Override — the
- * mechanism that makes it fire ONLY entering a Video scene, never
- * leaving one, with NO scripting.
+ * mechanism used to make it fire on entering a Lot Video scene AND on
+ * entering the Transition scene right after one (both "<lot> Transition"
+ * and the fixed breed/"type" transitions), with NO scripting.
  *
  * Verified against frontend/widgets/OBSBasic_Transitions.cpp:
  *   - GetOverrideTransition(source) / GetOverrideTransitionDuration(source)
@@ -244,17 +257,27 @@ function buildStingerTransition(localPath, transitionPointMs) {
  * VERIFIED DIRECTIONAL BEHAVIOR (OBSBasic::TransitionToScene, in the
  * same file): `GetOverrideTransition(source)` is called with `source`
  * = the DESTINATION scene being entered. The engine never inspects
- * which scene you're coming FROM. Consequences, all confirmed from this
- * same call site, not assumed:
- *   - Applying the override ONLY to "<lot> Video" scenes (never to
- *     "<lot> Transition" scenes) is sufficient on its own to guarantee
- *     Stinger-in / plain-Cut-out — no extra logic needed.
+ * which scene you're coming FROM — there is no such thing as an
+ * "only when leaving X" override; OBS has no concept of a source-scene
+ * condition at all. Consequences, all confirmed from this same call
+ * site, not assumed:
+ *   - Since Classic's own scene sequence always plays a lot's Transition
+ *     scene immediately after that lot's Video scene finishes (or a
+ *     breed/type Transition immediately after the last lot of a breed
+ *     group), applying the override to both Video AND Transition-type
+ *     destination scenes reproduces "stinger on Video->Transition and
+ *     Video->next-Video" without OBS ever actually checking the source.
+ *   - That also means the override fires on the rare edges where a
+ *     Transition scene is entered from something other than a Video
+ *     scene — e.g. the very first Transition scene of the show (right
+ *     after the fixed intro scenes), or a Transition scene immediately
+ *     following an Option Lot Interlude scene. There's no way to
+ *     exclude just those cases without scripting, which this project
+ *     intentionally does not use — see the note below for the same
+ *     tradeoff on the Video side.
  *   - Jumping directly from one Video scene to another still fires the
  *     destination Video scene's own Stinger — this is inherent to OBS,
  *     not a gap in this implementation.
- *   - Jumping from any Transition scene to any Video scene (including
- *     "the wrong one") behaves identically — OBS only ever looks at the
- *     scene it's entering.
  *
  * ONE VERIFIED LIMITATION, stated plainly rather than hidden behind a
  * silent workaround (see libobs/obs-source-transition.c,
@@ -313,10 +336,20 @@ export function augmentObsJsonForBeta(baseObsJson, opts) {
     output.transitions.push(buildStingerTransition(stingerConfig.localPath, stingerConfig.transitionPointMs));
   }
 
-  // Walk every cloned "<lot> Video" scene Classic already built and append items.
+  // Walk every cloned scene Classic already built. Video scenes get the
+  // full treatment (video source + stinger override + tags); Transition
+  // scenes (both "<lot> Transition" and the fixed breed/type ones) only
+  // get the stinger override — see applyStingerOverride's comment for why
+  // that's enough to make the stinger fire on the way OUT of a Video
+  // scene too, without OBS ever inspecting the source scene.
   for (const scene of output.sources) {
     if (scene.id !== 'scene') continue;
     const name = normalizeSceneName(scene.name);
+
+    if (isLotTransitionScene(name) || isBreedTransitionScene(name)) {
+      if (stingerEnabled) applyStingerOverride(scene, stingerConfig.durationMs);
+      continue;
+    }
     if (!isLotVideoScene(name)) continue;
 
     const lot = lotFromVideoSceneName(name);

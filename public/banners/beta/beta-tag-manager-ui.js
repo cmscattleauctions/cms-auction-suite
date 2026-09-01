@@ -79,11 +79,11 @@ async function refreshTagList(root, showToast) {
   count.textContent = tags.length;
   if (!tags.length) { grid.innerHTML = `<p class="no-states">No verification tags configured yet.</p>`; return; }
   grid.innerHTML = tags.map(t => `
-    <div class="state-lib-card tag-lib-card" draggable="true" data-id="${esc(t.id)}">
+    <div class="state-lib-card tag-lib-card${t.enabled === false ? ' tag-disabled' : ''}" draggable="true" data-id="${esc(t.id)}">
       ${t.imageUrl ? `<img src="${esc(t.imageUrl)}" alt="${esc(t.name)}" draggable="false">` : `<div style="height:100px;background:var(--blue);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;">No image</div>`}
       <div class="state-lib-label" style="flex-direction:column;align-items:stretch;gap:6px;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span class="state-abbr" style="font-size:13px;">${esc(t.name)}</span>
+          <span class="state-abbr" style="font-size:13px;">${esc(t.name)}${t.enabled === false ? ' (disabled)' : ''}</span>
           <span class="status-chip ${t.enabled === false ? 'warn' : 'good'}" style="padding:2px 8px;font-size:10px;">${t.enabled === false ? 'Disabled' : 'Enabled'}</span>
         </div>
         <p class="helper" style="font-size:11px;">${(t.detectionTerms || []).map(esc).join(', ') || '(no detection terms)'}</p>

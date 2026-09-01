@@ -59,3 +59,8 @@
    card markup, which isn't reorderable, is unaffected. */
 .tag-lib-card { cursor: grab; }
 .tag-lib-card.tag-dragging { opacity: 0.4; cursor: grabbing; }
+
+/* Disabled tag — dim + desaturate the whole card so it reads as "off"
+   at a glance across a full grid, not just from the small status chip. */
+.tag-lib-card.tag-disabled { opacity: 0.5; }
+.tag-lib-card.tag-disabled img { filter: grayscale(1); }
