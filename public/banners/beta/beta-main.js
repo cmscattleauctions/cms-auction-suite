@@ -16,7 +16,7 @@ import { resolveLotVideo, extractYoutubeId, isValidCmsVideoId, safeFileStem } fr
 import { detectTagsForLot } from './beta-tag-detect.js';
 import { getStingerConfig } from './beta-stinger-data.js';
 import { augmentObsJsonForBeta } from './beta-obs-augment.js';
-import { exportAuctionPackage, downloadRenamedVideoFile, fetchAsBlob } from './beta-package-export.js';
+import { exportAuctionPackage, downloadFile, fetchAsBlob } from './beta-package-export.js';
 
 export { State };
 
@@ -178,7 +178,7 @@ export async function resolveWithChosenFile(ctx, lot, file) {
   const ext = (file.name.split('.').pop() || settings.videoExt).toLowerCase();
   const targetFileName = `${stem}.${ext}`;
 
-  downloadRenamedVideoFile(file, targetFileName);
+  downloadFile(file, targetFileName);
 
   const guessId = file.name.replace(/\.[^.]+$/, '');
   const cmsVideoId = isValidCmsVideoId(guessId) ? guessId : stem;
