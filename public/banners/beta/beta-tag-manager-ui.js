@@ -101,7 +101,7 @@ async function refreshTagList(root, showToast) {
         <div style="display:flex;gap:6px;">
           <button class="btn btn-ghost btn-sm beta-tag-edit" data-id="${esc(t.id)}">Edit</button>
           <button class="btn btn-ghost btn-sm beta-tag-toggle" data-id="${esc(t.id)}">${t.enabled === false ? 'Enable' : 'Disable'}</button>
-          ${t.imageUrl ? `<button class="btn btn-ghost btn-sm beta-tag-download" data-id="${esc(t.id)}">Download</button>` : ''}
+          ${t.imageUrl ? `<button class="tag-download-btn beta-tag-download" data-id="${esc(t.id)}" title="Download">↓</button>` : ''}
           <button class="del-btn beta-tag-delete" data-id="${esc(t.id)}" title="Delete">×</button>
         </div>
       </div>

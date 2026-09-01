@@ -64,3 +64,8 @@
    at a glance across a full grid, not just from the small status chip. */
 .tag-lib-card.tag-disabled { opacity: 0.5; }
 .tag-lib-card.tag-disabled img { filter: grayscale(1); }
+
+/* Icon-only download button — mirrors .del-btn's compact glyph treatment
+   (index.html), just neutral-colored instead of delete's red. */
+.tag-download-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 2px 4px; line-height: 1; }
+.tag-download-btn:hover { color: var(--text); }
