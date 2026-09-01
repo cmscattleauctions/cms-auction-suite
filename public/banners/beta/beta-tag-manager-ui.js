@@ -16,9 +16,18 @@
  * ============================================================= */
 
 import { listTags, createTag, updateTag, setTagEnabled, deleteTag, setTagImage, reorderTags } from './beta-tags-data.js';
+import { fetchAsBlob, downloadFile } from './beta-package-export.js';
+import { safeFileStem } from './beta-video-match.js';
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/** Extension from the tag's own storagePath (e.g. ".../tag.svg") — NOT hardcoded, since tags can be PNG or SVG. */
+function tagImageExt(tag) {
+  const path = tag.storagePath || '';
+  const ext = path.split('.').pop();
+  return ext && ext !== path ? ext.toLowerCase() : 'png';
 }
 
 let pendingTagImageFile = null;
@@ -60,6 +69,7 @@ export async function initTagManagerPage(root, { showToast }) {
       </div>
 
       <div>
+        <button class="btn btn-ghost btn-sm" id="btnDownloadAllTags" style="margin-bottom:10px;">Download All Tag Images</button>
         <div class="section-title">Verification Tags (<span id="tagLibCount">0</span>)</div>
         <p class="helper" style="margin-top:-6px;margin-bottom:10px;">Drag a tag to reorder — this is the order they're laid out in on the video (right-aligned, left to right).</p>
         <div class="state-library-grid" id="tagLibGrid"><p class="no-states">No verification tags configured yet.</p></div>
@@ -69,6 +79,7 @@ export async function initTagManagerPage(root, { showToast }) {
 
   wireForm(root, showToast);
   wireReorder(root, showToast);
+  wireDownloadAll(root, showToast);
   await refreshTagList(root, showToast);
 }
 
@@ -79,17 +90,18 @@ async function refreshTagList(root, showToast) {
   count.textContent = tags.length;
   if (!tags.length) { grid.innerHTML = `<p class="no-states">No verification tags configured yet.</p>`; return; }
   grid.innerHTML = tags.map(t => `
-    <div class="state-lib-card tag-lib-card" draggable="true" data-id="${esc(t.id)}">
+    <div class="state-lib-card tag-lib-card${t.enabled === false ? ' tag-disabled' : ''}" draggable="true" data-id="${esc(t.id)}">
       ${t.imageUrl ? `<img src="${esc(t.imageUrl)}" alt="${esc(t.name)}" draggable="false">` : `<div style="height:100px;background:var(--blue);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;">No image</div>`}
       <div class="state-lib-label" style="flex-direction:column;align-items:stretch;gap:6px;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span class="state-abbr" style="font-size:13px;">${esc(t.name)}</span>
+          <span class="state-abbr" style="font-size:13px;">${esc(t.name)}${t.enabled === false ? ' (disabled)' : ''}</span>
           <span class="status-chip ${t.enabled === false ? 'warn' : 'good'}" style="padding:2px 8px;font-size:10px;">${t.enabled === false ? 'Disabled' : 'Enabled'}</span>
         </div>
         <p class="helper" style="font-size:11px;">${(t.detectionTerms || []).map(esc).join(', ') || '(no detection terms)'}</p>
         <div style="display:flex;gap:6px;">
           <button class="btn btn-ghost btn-sm beta-tag-edit" data-id="${esc(t.id)}">Edit</button>
           <button class="btn btn-ghost btn-sm beta-tag-toggle" data-id="${esc(t.id)}">${t.enabled === false ? 'Enable' : 'Disable'}</button>
+          ${t.imageUrl ? `<button class="btn btn-ghost btn-sm beta-tag-download" data-id="${esc(t.id)}">Download</button>` : ''}
           <button class="del-btn beta-tag-delete" data-id="${esc(t.id)}" title="Delete">×</button>
         </div>
       </div>
@@ -100,6 +112,19 @@ async function refreshTagList(root, showToast) {
     const tag = tags.find(t => t.id === btn.dataset.id);
     await setTagEnabled(tag.id, tag.enabled === false);
     await refreshTagList(root, showToast);
+  }));
+  grid.querySelectorAll('.beta-tag-download').forEach(btn => btn.addEventListener('click', async () => {
+    const tag = tags.find(t => t.id === btn.dataset.id);
+    btn.disabled = true;
+    try {
+      const blob = await fetchAsBlob(tag.imageUrl);
+      downloadFile(blob, `${safeFileStem(tag.name)}.${tagImageExt(tag)}`);
+    } catch (err) {
+      console.error(err);
+      showToast(`Failed to download ${tag.name}: ${err.message}`, true);
+    } finally {
+      btn.disabled = false;
+    }
   }));
   grid.querySelectorAll('.beta-tag-delete').forEach(btn => btn.addEventListener('click', async () => {
     const tag = tags.find(t => t.id === btn.dataset.id);
@@ -223,6 +248,37 @@ function wireReorder(root, showToast) {
       console.error(err);
       showToast('Failed to save new order — reloading.', true);
       await refreshTagList(root, showToast);
+    }
+  });
+}
+
+function wireDownloadAll(root, showToast) {
+  root.querySelector('#btnDownloadAllTags').addEventListener('click', async () => {
+    const btn = root.querySelector('#btnDownloadAllTags');
+    const origText = btn.textContent;
+    btn.disabled = true;
+    try {
+      const tags = await listTags();
+      const withImage = tags.filter(t => t.imageUrl);
+      if (!withImage.length) { showToast('No tag images to download yet.', true); return; }
+
+      const zip = new JSZip();
+      for (let i = 0; i < withImage.length; i++) {
+        const t = withImage[i];
+        btn.textContent = `Downloading ${i + 1}/${withImage.length}...`;
+        const blob = await fetchAsBlob(t.imageUrl);
+        zip.file(`${safeFileStem(t.name)}.${tagImageExt(t)}`, blob);
+      }
+      btn.textContent = 'Zipping...';
+      const blob = await zip.generateAsync({ type: 'blob' });
+      downloadFile(blob, 'CMS_Verification_Tags.zip');
+      showToast(`${withImage.length} tag image${withImage.length === 1 ? '' : 's'} downloaded`);
+    } catch (err) {
+      console.error(err);
+      showToast(`Failed to download tag images: ${err.message}`, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origText;
     }
   });
 }

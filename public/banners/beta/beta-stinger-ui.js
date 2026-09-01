@@ -16,7 +16,7 @@ export async function initStingerSettingsPage(root, { showToast }) {
       <div class="card">
         <div class="section-title">CMS Video Intro / Stinger</div>
         <div class="info-banner" style="margin-bottom:14px;font-size:12px;padding:12px 14px;">
-          Implemented as a native <strong>OBS Stinger Transition</strong>, applied only as the incoming transition on every Lot Video scene — leaving a Video scene is always a plain Cut, never this Stinger. This is OBS's own built-in mechanism (no plugin, no script).<br><br>
+          Implemented as a native <strong>OBS Stinger Transition</strong>, applied as the incoming transition on every Lot Video scene AND every Transition scene that follows one (lot transitions and breed/type transitions) — so it plays going into a lot's video and again going out of it into the next transition banner. This is OBS's own built-in mechanism (no plugin, no script).<br><br>
           <strong>Known limitation:</strong> OBS activates the cattle video's Media Source (and restarts it) the instant the Stinger begins, not when it visually reveals the video — so the first fraction of a second of the cattle video plays underneath the Stinger before it's shown. Keep this clip short (well under 1 second is a reasonable target) to keep that unavoidable overlap imperceptible. A video asset is required — a static image has no natural end point for OBS to key the transition off of.
         </div>
         <div class="form-row">
@@ -43,7 +43,7 @@ export async function initStingerSettingsPage(root, { showToast }) {
           <button class="btn btn-ghost toggle-btn" id="btnIntroEnabled">Enabled: No</button>
           <button class="btn btn-primary" id="btnSaveIntro">Save Stinger Settings</button>
         </div>
-        <p id="introMsg" class="helper" style="margin-top:10px;min-height:18px;">Applies as a Transition Override on every Lot Video scene — fires only entering a Video scene, never leaving one, regardless of which scene you came from.</p>
+        <p id="introMsg" class="helper" style="margin-top:10px;min-height:18px;">Applies as a Transition Override on every Lot Video scene, and on the Transition scene right after one (lot or breed/type) — so it plays going in and coming back out. Skipped on the show's opening transition and on a lot transition right after a breed/type transition, since neither follows an actual lot video.</p>
       </div>
     </div>
   `;

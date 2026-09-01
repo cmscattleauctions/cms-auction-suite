@@ -25,8 +25,8 @@
  * at a deterministic local path (beta-state.js) that the operator's
  * existing video workflow already populates. Where the operator uses
  * "Choose File" to manually resolve one unmatched lot, that single file
- * is offered as its own direct download (see downloadRenamedVideoFile
- * below) — a light, per-file operation, not a bulk in-memory ZIP of
+ * is offered as its own direct download (see downloadFile below) — a
+ * light, per-file operation, not a bulk in-memory ZIP of
  * every video in the auction (which would risk exhausting browser
  * memory on a real auction's total video footage).
  * ============================================================= */
@@ -100,16 +100,17 @@ export async function exportAuctionPackage({ obsJson, auctionFolder, settings, l
 }
 
 /**
- * "Choose File" resolution — renames the operator's picked File to the
- * deterministic target filename and downloads it as a single file, so
- * they just move/copy it into the auction's videos/ folder. No bulk zip,
- * no assumption about File System Access API support (works everywhere).
+ * Triggers a single-file browser download of `blob` under `fileName`. No
+ * assumption about File System Access API support (works everywhere).
+ * Used for the "Choose File" video resolution (renaming the operator's
+ * picked File to the deterministic target filename) and for downloading
+ * an individual tag image from the Verification Tags library.
  */
-export function downloadRenamedVideoFile(file, targetFileName) {
-  const url = URL.createObjectURL(file);
+export function downloadFile(blob, fileName) {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = targetFileName;
+  a.download = fileName;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
