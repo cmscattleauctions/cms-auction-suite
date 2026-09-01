@@ -43,7 +43,7 @@ export async function initStingerSettingsPage(root, { showToast }) {
           <button class="btn btn-ghost toggle-btn" id="btnIntroEnabled">Enabled: No</button>
           <button class="btn btn-primary" id="btnSaveIntro">Save Stinger Settings</button>
         </div>
-        <p id="introMsg" class="helper" style="margin-top:10px;min-height:18px;">Applies as a Transition Override on every Lot Video scene and every Transition scene (lot + breed/type) — fires entering either, so it plays on the way into a lot's video and again on the way out of it.</p>
+        <p id="introMsg" class="helper" style="margin-top:10px;min-height:18px;">Applies as a Transition Override on every Lot Video scene, and on the Transition scene right after one (lot or breed/type) — so it plays going in and coming back out. Skipped on the show's opening transition and on a lot transition right after a breed/type transition, since neither follows an actual lot video.</p>
       </div>
     </div>
   `;
