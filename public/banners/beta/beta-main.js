@@ -146,21 +146,25 @@ export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}) {
     }
   }
 
-  // ---- Localize tag assets actually used anywhere in this auction ----
-  const usedTagIds = new Set();
-  for (const plan of lotPlans.values()) plan.tagIds.forEach(id => usedTagIds.add(id));
-  const tagAssets = new Map();
+  // ---- Localize every enabled tag's image — NOT just ones this auction's
+  // lots happen to trigger. Tag images are static, reusable assets (unlike
+  // videos) that get bundled into "Download All Banners" precisely so the
+  // operator's local folder always has the full set on hand; scoping this
+  // to only tags detected in the current CSV caused the recurring "tags
+  // didn't download" reports whenever an auction's descriptions didn't
+  // happen to trip every tag's detection terms. `usedTagIds` below is
+  // still tracked separately — it's what actually gets drawn onto lot
+  // scenes, which correctly IS auction-scoped.
+  const allTagAssets = new Map();
   const missingTagImages = [];
-  for (const tagId of usedTagIds) {
-    const tag = tags.find(t => t.id === tagId);
-    if (!tag) continue;
+  for (const tag of tags) {
     if (!tag.imageUrl) { missingTagImages.push(tag.name); continue; }
     const fileName = `${safeFileStem(tag.name)}.png`;
     const fallbackH = tag.defaultHeightPx || 180;
     let box = { naturalWidth: fallbackH, naturalHeight: fallbackH, contentX: 0, contentY: 0, contentWidth: fallbackH, contentHeight: fallbackH };
     try { box = await loadImageContentBox(tag.imageUrl); } catch { missingTagImages.push(tag.name); continue; }
-    tagAssets.set(tagId, {
-      id: tagId, name: tag.name, fileName,
+    allTagAssets.set(tag.id, {
+      id: tag.id, name: tag.name, fileName,
       localPath: State.tagLocalPath(settings, fileName),
       downloadUrl: tag.imageUrl,
       naturalWidth: box.naturalWidth, naturalHeight: box.naturalHeight,
@@ -172,6 +176,16 @@ export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}) {
       sizeAdjustPct: tag.sizeAdjustPct ?? 100,
       verticalOffsetPx: tag.verticalOffsetPx ?? 0,
     });
+  }
+
+  // Auction-scoped subset — this is what the scene overlay (layoutTagRow)
+  // and the OBS package MANIFEST.txt actually care about.
+  const usedTagIds = new Set();
+  for (const plan of lotPlans.values()) plan.tagIds.forEach(id => usedTagIds.add(id));
+  const tagAssets = new Map();
+  for (const tagId of usedTagIds) {
+    const asset = allTagAssets.get(tagId);
+    if (asset) tagAssets.set(tagId, asset);
   }
 
   // ---- Stinger config (native OBS Transition Override — see beta-obs-augment.js) ----
@@ -194,7 +208,7 @@ export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}) {
   return {
     settings, tags, perLotTags, fuzzyGroups,
     lotPlans, unmatchedLots, uniqueVideoSources,
-    tagAssets, missingTagImages, stingerAsset,
+    tagAssets, allTagAssets, missingTagImages, stingerAsset,
     summary: {
       totalLots: parsedCsvState.lotRows.length,
       totalUniqueVideos: uniqueVideoSources.size,
@@ -366,7 +380,7 @@ export async function collectLotBannerAssets(ctx) {
   // instead so the rest still ships.
   const assets = [];
   const failed = [];
-  for (const asset of ctx.tagAssets.values()) {
+  for (const asset of (ctx.allTagAssets || ctx.tagAssets).values()) {
     if (!asset.downloadUrl) continue;
     try {
       const blob = await fetchAsBlob(asset.downloadUrl);
