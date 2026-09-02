@@ -48,7 +48,7 @@ export async function listEnabledTags(opts) {
   return all.filter(t => t.enabled !== false);
 }
 
-export async function createTag({ name, detectionTerms, defaultHeightPx, sortOrder, imageFile }) {
+export async function createTag({ name, detectionTerms, defaultHeightPx, sortOrder, imageFile, sizeAdjustPct, verticalOffsetPx }) {
   const db = getBetaDb();
   if (!db) throw new Error('Firebase is not configured.');
   const ref0 = await addDoc(collection(db, COLLECTION), {
@@ -57,6 +57,10 @@ export async function createTag({ name, detectionTerms, defaultHeightPx, sortOrd
     detectionTerms: normalizeTerms(detectionTerms),
     defaultHeightPx: defaultHeightPx || 180,
     sortOrder: sortOrder ?? Date.now(),
+    // Manual per-tag fine-tuning on top of auto-trimmed sizing — see
+    // layoutTagRow in beta-obs-augment.js. 100/0 = no manual adjustment.
+    sizeAdjustPct: sizeAdjustPct ?? 100,
+    verticalOffsetPx: verticalOffsetPx ?? 0,
     storagePath: null,
     imageUrl: null,
     createdAt: serverTimestamp(),

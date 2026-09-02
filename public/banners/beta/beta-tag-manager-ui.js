@@ -61,6 +61,17 @@ export async function initTagManagerPage(root, { showToast }) {
             <input type="number" class="form-input" id="tagHeightInput" value="180" min="40" max="800">
           </div>
           <div class="two-col">
+            <div class="form-row">
+              <label class="form-label">Size Adjust (%)</label>
+              <input type="number" class="form-input" id="tagSizeAdjustInput" value="100" min="10" max="400">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Vertical Offset (px)</label>
+              <input type="number" class="form-input" id="tagVerticalOffsetInput" value="0" min="-500" max="500">
+            </div>
+          </div>
+          <p class="helper" style="margin-top:-4px;margin-bottom:10px;">Sizing is automatic — every tag's actual visible content (padding trimmed) is scaled to match the global Tag Height in OBS Settings. These two only matter if a tag STILL looks off after that: 100% = no manual size change; negative offset moves it up, positive moves it down.</p>
+          <div class="two-col">
             <button class="btn btn-success" id="btnSaveTag">Save Tag</button>
             <button class="btn btn-ghost" id="btnCancelEditTag" style="display:none;">Cancel Edit</button>
           </div>
@@ -143,6 +154,8 @@ function startEditTag(root, id, tags) {
   root.querySelector('#tagNameInput').value = tag.name || '';
   root.querySelector('#tagTermsInput').value = (tag.detectionTerms || []).join('\n');
   root.querySelector('#tagHeightInput').value = tag.defaultHeightPx || 180;
+  root.querySelector('#tagSizeAdjustInput').value = tag.sizeAdjustPct ?? 100;
+  root.querySelector('#tagVerticalOffsetInput').value = tag.verticalOffsetPx ?? 0;
   root.querySelector('#btnCancelEditTag').style.display = '';
   const thumb = root.querySelector('#tagImgThumb');
   if (tag.imageUrl) { thumb.src = tag.imageUrl; thumb.style.display = 'block'; }
@@ -156,6 +169,8 @@ function resetTagForm(root) {
   root.querySelector('#tagNameInput').value = '';
   root.querySelector('#tagTermsInput').value = '';
   root.querySelector('#tagHeightInput').value = 180;
+  root.querySelector('#tagSizeAdjustInput').value = 100;
+  root.querySelector('#tagVerticalOffsetInput').value = 0;
   root.querySelector('#tagImgInput').value = '';
   root.querySelector('#tagImgThumb').style.display = 'none';
   root.querySelector('#btnCancelEditTag').style.display = 'none';
@@ -188,16 +203,18 @@ function wireForm(root, showToast) {
     const name = root.querySelector('#tagNameInput').value.trim();
     const terms = root.querySelector('#tagTermsInput').value;
     const height = Number(root.querySelector('#tagHeightInput').value) || 180;
+    const sizeAdjustPct = Number(root.querySelector('#tagSizeAdjustInput').value) || 100;
+    const verticalOffsetPx = Number(root.querySelector('#tagVerticalOffsetInput').value) || 0;
     const msg = root.querySelector('#tagFormMsg');
     if (!name) { showToast('Tag name is required.', true); return; }
     msg.textContent = 'Saving...';
     try {
       if (editingTagId) {
-        await updateTag(editingTagId, { name, detectionTerms: terms, defaultHeightPx: height });
+        await updateTag(editingTagId, { name, detectionTerms: terms, defaultHeightPx: height, sizeAdjustPct, verticalOffsetPx });
         if (pendingTagImageFile) await setTagImage(editingTagId, pendingTagImageFile);
         showToast(`${name} updated`);
       } else {
-        await createTag({ name, detectionTerms: terms, defaultHeightPx: height, imageFile: pendingTagImageFile });
+        await createTag({ name, detectionTerms: terms, defaultHeightPx: height, sizeAdjustPct, verticalOffsetPx, imageFile: pendingTagImageFile });
         showToast(`${name} created`);
       }
       resetTagForm(root);

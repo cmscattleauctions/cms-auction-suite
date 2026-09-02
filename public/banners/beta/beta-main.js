@@ -20,11 +20,58 @@ import { exportAuctionPackage, downloadFile, fetchAsBlob } from './beta-package-
 
 export { State };
 
-function loadImageDims(url) {
+/**
+ * Loads a tag image and finds its actual VISIBLE content bounding box —
+ * not just the raw PNG/SVG canvas dimensions. Source tag images are
+ * supplied externally and often carry wildly inconsistent transparent
+ * padding (a checkmark badge cropped tight vs. a logo with 25% empty
+ * space above/below) — scaling by naturalHeight alone (the old
+ * behavior) made those render at very different visual sizes for the
+ * same "Tag Height" setting, even though the setting was identical.
+ * Scanning for the actual opaque pixels and using THAT for scale/
+ * position math (see layoutTagRow in beta-obs-augment.js) makes tags
+ * come out visually consistent regardless of how much padding their
+ * source file happens to carry.
+ *
+ * Requires the image to be readable via canvas (crossOrigin + the
+ * Storage bucket's CORS policy — see docs/storage-cors.json); falls
+ * back to the full image bounds (old behavior) if that's blocked for
+ * any reason, rather than failing the whole tag.
+ */
+function loadImageContentBox(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onload = () => {
+      const naturalWidth = img.naturalWidth, naturalHeight = img.naturalHeight;
+      const fullBox = { naturalWidth, naturalHeight, contentX: 0, contentY: 0, contentWidth: naturalWidth, contentHeight: naturalHeight };
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = naturalWidth;
+        canvas.height = naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const { data } = ctx.getImageData(0, 0, naturalWidth, naturalHeight);
+        const ALPHA_THRESHOLD = 10; // ignore near-fully-transparent anti-aliasing noise at edges
+        let minX = naturalWidth, minY = naturalHeight, maxX = -1, maxY = -1;
+        for (let y = 0; y < naturalHeight; y++) {
+          const rowBase = y * naturalWidth;
+          for (let x = 0; x < naturalWidth; x++) {
+            if (data[(rowBase + x) * 4 + 3] > ALPHA_THRESHOLD) {
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+        if (maxX < 0) { resolve(fullBox); return; } // fully transparent — nothing to trim to
+        resolve({ naturalWidth, naturalHeight, contentX: minX, contentY: minY, contentWidth: maxX - minX + 1, contentHeight: maxY - minY + 1 });
+      } catch (err) {
+        console.warn(`[beta] Could not read pixel data for ${url} (falling back to untrimmed bounds):`, err);
+        resolve(fullBox);
+      }
+    };
     img.onerror = () => reject(new Error(`Could not load image: ${url}`));
     img.src = url;
   });
@@ -93,14 +140,21 @@ export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}) {
     if (!tag) continue;
     if (!tag.imageUrl) { missingTagImages.push(tag.name); continue; }
     const fileName = `${safeFileStem(tag.name)}.png`;
-    let dims = { width: tag.defaultHeightPx || 180, height: tag.defaultHeightPx || 180 };
-    try { dims = await loadImageDims(tag.imageUrl); } catch { missingTagImages.push(tag.name); continue; }
+    const fallbackH = tag.defaultHeightPx || 180;
+    let box = { naturalWidth: fallbackH, naturalHeight: fallbackH, contentX: 0, contentY: 0, contentWidth: fallbackH, contentHeight: fallbackH };
+    try { box = await loadImageContentBox(tag.imageUrl); } catch { missingTagImages.push(tag.name); continue; }
     tagAssets.set(tagId, {
       id: tagId, name: tag.name, fileName,
       localPath: State.tagLocalPath(settings, fileName),
       downloadUrl: tag.imageUrl,
-      naturalWidth: dims.width, naturalHeight: dims.height,
+      naturalWidth: box.naturalWidth, naturalHeight: box.naturalHeight,
+      contentX: box.contentX, contentY: box.contentY,
+      contentWidth: box.contentWidth, contentHeight: box.contentHeight,
       sortOrder: tag.sortOrder ?? 0,
+      // Manual per-tag fine-tuning on top of the auto-trimmed size —
+      // most tags need neither; see beta-obs-augment.js's layoutTagRow.
+      sizeAdjustPct: tag.sizeAdjustPct ?? 100,
+      verticalOffsetPx: tag.verticalOffsetPx ?? 0,
     });
   }
 
