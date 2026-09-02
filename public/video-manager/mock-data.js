@@ -144,12 +144,15 @@ export const VIDEO_FORMATS = [
 ];
 
 
+// Seed data only — Firestore (referenceData/staff) is the real source of
+// truth once ensureReferenceLoaded() runs; see repository.js. Edit who
+// can claim a video to build via Tools -> Manage Staff, not here.
 export const STAFF = [
-  { id: 'hayden', name: 'Hayden Hollis',            role: 'staff', watch: true  },
-  { id: 'bryson', name: 'Bryson Murray',            role: 'staff', watch: false },
-  { id: 'repA',   name: 'Rep — Colt Reagan',        role: 'rep',   watch: true  },
-  { id: 'repB',   name: 'Rep — Dusty Fields',       role: 'rep',   watch: true  },
-  { id: 'repC',   name: 'Rep — Reyes Martinez',     role: 'rep',   watch: false },
+  { id: 'hayden', name: 'Hayden Hollis',            role: 'staff', watch: true,  active: true },
+  { id: 'bryson', name: 'Bryson Murray',            role: 'staff', watch: false, active: true },
+  { id: 'repA',   name: 'Rep — Colt Reagan',        role: 'rep',   watch: true,  active: true },
+  { id: 'repB',   name: 'Rep — Dusty Fields',       role: 'rep',   watch: true,  active: true },
+  { id: 'repC',   name: 'Rep — Reyes Martinez',     role: 'rep',   watch: false, active: true },
 ];
 
 export function labelFor(list, code) {

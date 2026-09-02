@@ -10,7 +10,7 @@ import { VideoRepository, ReferenceDataRepository, UsageRepository } from './rep
 import { renderTable } from './ui-table.js';
 import { renderGrid } from './ui-grid.js';
 import { openDrawer, closeDrawer } from './ui-drawer.js';
-import { openUploadModal, openCsvImportModal, openVideoIdManagerModal, openTrashModal } from './ui-modals.js';
+import { openUploadModal, openCsvImportModal, openVideoIdManagerModal, openStaffManagerModal, openTrashModal } from './ui-modals.js';
 
 const state = {
   statusTab: 'created', // "Completed" — the default view staff actually want first
@@ -239,6 +239,7 @@ function wireToolbar() {
   });
   const closeTools = () => { toolsMenu.hidden = true; toolsBtn.setAttribute('aria-expanded', 'false'); };
   document.getElementById('vm-btn-idmanager').addEventListener('click', () => { closeTools(); openVideoIdManagerModal(ctx); });
+  document.getElementById('vm-btn-staff').addEventListener('click', () => { closeTools(); openStaffManagerModal(ctx); });
   document.getElementById('vm-btn-import-csv').addEventListener('click', () => { closeTools(); openCsvImportModal(ctx); });
   document.getElementById('vm-btn-trash').addEventListener('click', () => { closeTools(); openTrashModal(ctx); });
 }

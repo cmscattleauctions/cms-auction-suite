@@ -195,7 +195,7 @@ export async function importVideosBatch(records, onProgress) {
 /**
  * Reference dictionaries (consignors, sire/dam types) — small enough to
  * live as one document per list rather than one document per item.
- * `key` is 'consignors' | 'sireTypes' | 'damTypes'.
+ * `key` is 'consignors' | 'sireTypes' | 'damTypes' | 'staff'.
  */
 export async function fetchReferenceList(key) {
   if (!db) return null;

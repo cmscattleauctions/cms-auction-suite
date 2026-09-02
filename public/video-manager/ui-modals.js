@@ -221,6 +221,108 @@ export function openVideoIdManagerModal(ctx) {
   paintTab();
 }
 
+/**
+ * Who can claim a video to build (the popover opened from the
+ * "Who's Building" column — see ui-table.js's openStaffPopover, which
+ * reads ctx.ref.getStaffList()). Separate from Video ID Manager on
+ * purpose — staff has nothing to do with how a Video ID is
+ * constructed, unlike consignor/sex/sire/dam codes.
+ */
+export function openStaffManagerModal(ctx) {
+  let editingId = null;
+
+  const { modal } = mountModal(`
+    <div class="vm-modal-header">
+      <div>
+        <h2>Manage Staff</h2>
+        <p class="field-hint">Who shows up to claim in the "Who's Building" column. Reps are listed here too but never appear in that popover — only Staff build videos.</p>
+      </div>
+      <button class="vm-modal-close" data-modal-close>&times;</button>
+    </div>
+    <div class="vm-modal-body" id="staffmgr-body"></div>
+    <div class="vm-modal-footer"><button class="btn btn-primary" data-modal-close>Done</button></div>
+  `, { wide: true });
+
+  const body = modal.querySelector('#staffmgr-body');
+
+  function paint() {
+    const rows = ctx.ref.getAllStaff();
+    body.innerHTML = `
+      <table class="vm-idmgr-table">
+        <thead><tr><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          ${rows.map(s => `
+            <tr data-id="${escapeHtml(s.id)}">
+              <td>${editingId === s.id
+                ? `<input type="text" class="staffmgr-name-input" value="${escapeHtml(s.name)}" style="max-width:240px;" />`
+                : escapeHtml(s.name)}</td>
+              <td>${editingId === s.id
+                ? `<select class="staffmgr-role-input"><option value="staff" ${s.role === 'staff' ? 'selected' : ''}>Staff</option><option value="rep" ${s.role === 'rep' ? 'selected' : ''}>Rep</option></select>`
+                : (s.role === 'staff' ? 'Staff' : 'Rep')}</td>
+              <td>${s.active === false ? '<span class="vm-idmgr-status inactive">Inactive</span>' : '<span class="vm-idmgr-status active">Active</span>'}</td>
+              <td>
+                ${editingId === s.id ? `
+                  <div style="display:flex;gap:6px;">
+                    <button class="btn btn-xs btn-primary" data-save="${escapeHtml(s.id)}" type="button">Save</button>
+                    <button class="btn btn-xs btn-ghost" data-cancel-edit type="button">Cancel</button>
+                  </div>
+                ` : `
+                  <button class="btn btn-xs" data-edit="${escapeHtml(s.id)}" type="button">Edit</button>
+                  <button class="btn btn-xs" data-toggle="${escapeHtml(s.id)}" type="button">${s.active === false ? 'Activate' : 'Deactivate'}</button>
+                `}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      <div class="field-row" style="margin-top:14px;align-items:flex-end;">
+        <div><label>Name</label><input type="text" id="staffmgr-new-name" placeholder="e.g. Jayton Hollis" /></div>
+        <div><label>Role</label>
+          <select id="staffmgr-new-role">
+            <option value="staff">Staff (can build videos)</option>
+            <option value="rep">Rep</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-ghost" id="staffmgr-add" type="button" style="margin-top:8px;">+ Add Person</button>
+    `;
+
+    body.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => { editingId = btn.dataset.edit; paint(); }));
+    body.querySelectorAll('[data-cancel-edit]').forEach(btn => btn.addEventListener('click', () => { editingId = null; paint(); }));
+    body.querySelectorAll('[data-save]').forEach(btn => btn.addEventListener('click', async () => {
+      const id = btn.dataset.save;
+      const row = body.querySelector(`tr[data-id="${CSS.escape(id)}"]`);
+      const name = row.querySelector('.staffmgr-name-input').value.trim();
+      const role = row.querySelector('.staffmgr-role-input').value;
+      if (!name) { showToast('Name cannot be empty'); return; }
+      try {
+        await ctx.ref.renameStaffMember(id, name);
+        await ctx.ref.setStaffRole(id, role);
+        showToast(`Updated ${name}`);
+        editingId = null;
+        paint();
+      } catch (err) { showToast(err.message); }
+    }));
+    body.querySelectorAll('[data-toggle]').forEach(btn => btn.addEventListener('click', async () => {
+      const id = btn.dataset.toggle;
+      const rec = ctx.ref.getAllStaff().find(s => s.id === id);
+      try { await ctx.ref.setStaffActive(id, rec.active === false); paint(); } catch (err) { showToast(err.message); }
+    }));
+    body.querySelector('#staffmgr-add').addEventListener('click', async () => {
+      const nameInput = body.querySelector('#staffmgr-new-name');
+      const name = nameInput.value.trim();
+      const role = body.querySelector('#staffmgr-new-role').value;
+      if (!name) { showToast('Name is required'); return; }
+      try {
+        await ctx.ref.addStaffMember({ name, role });
+        showToast(`Added ${name}`);
+        paint();
+      } catch (err) { showToast(err.message); }
+    });
+  }
+  paint();
+}
+
 /* ----- shared overflow-menu helper: click "⋯", pick an action ----- */
 function wireOverflowMenus(container) {
   container.querySelectorAll('.vm-overflow').forEach(wrap => {
