@@ -79,7 +79,7 @@ function touch(record, actor) {
  * first time a document doesn't exist yet — rather than reassigned,
  * since nothing outside this file imports those array bindings.
  * ============================================================= */
-const REFERENCE_LISTS = { consignors: CONSIGNORS, sireTypes: SIRE_TYPES, damTypes: DAM_TYPES };
+const REFERENCE_LISTS = { consignors: CONSIGNORS, sireTypes: SIRE_TYPES, damTypes: DAM_TYPES, staff: STAFF };
 let referenceLoadPromise = null;
 
 async function loadOrSeedReferenceList(key, arr) {
@@ -245,8 +245,50 @@ export const ReferenceDataRepository = {
   getVideoFormats() { return [...VIDEO_FORMATS]; },
   videoFormatMeta(code) { return VIDEO_FORMATS.find(f => f.code === code) || null; },
 
-  /** Staff who can claim a video to build — reps don't build videos. */
-  getStaffList() { return STAFF.filter(s => s.role === 'staff').map(s => ({ ...s })); },
+  /** Staff who can claim a video to build — reps don't build videos, and an inactive (former/removed) person drops off this list without losing their name on past videos' history. */
+  getStaffList() { return STAFF.filter(s => s.role === 'staff' && s.active !== false).map(s => ({ ...s })); },
+
+  /** Everyone (staff + reps, active + inactive) — for the Manage Staff admin UI, not the claim popover above. */
+  getAllStaff() { return [...STAFF]; },
+
+  async addStaffMember({ name, role }) {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) throw new Error('Name is required');
+    if (STAFF.some(s => s.name.toLowerCase() === trimmed.toLowerCase())) {
+      throw new Error(`${trimmed} is already on the list`);
+    }
+    const rec = { id: 'staff_' + Math.random().toString(36).slice(2, 10), name: trimmed, role: role === 'rep' ? 'rep' : 'staff', watch: true, active: true };
+    STAFF.push(rec);
+    await persistReferenceList('staff');
+    return rec;
+  },
+
+  async renameStaffMember(id, name) {
+    const rec = STAFF.find(s => s.id === id);
+    if (!rec) throw new Error('Not found');
+    const trimmed = String(name || '').trim();
+    if (!trimmed) throw new Error('Name is required');
+    rec.name = trimmed;
+    await persistReferenceList('staff');
+    return rec;
+  },
+
+  async setStaffRole(id, role) {
+    const rec = STAFF.find(s => s.id === id);
+    if (!rec) throw new Error('Not found');
+    rec.role = role === 'rep' ? 'rep' : 'staff';
+    await persistReferenceList('staff');
+    return rec;
+  },
+
+  /** Soft-delete only — a name already on past videos' workingOn/activity history should never disappear from those records. */
+  async setStaffActive(id, active) {
+    const rec = STAFF.find(s => s.id === id);
+    if (!rec) throw new Error('Not found');
+    rec.active = !!active;
+    await persistReferenceList('staff');
+    return rec;
+  },
 };
 
 /* =============================================================
