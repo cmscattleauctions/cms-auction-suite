@@ -619,6 +619,16 @@ export function openUploadModal(ctx) {
   });
 
   function addFileRow(file) {
+    // The <input accept="video/*"> only filters the OS file picker — drag
+    // and drop bypasses it entirely, so a non-video file (a photo dragged
+    // in by mistake, say) reached here with zero validation before this
+    // fix and only failed later at upload time with a bare Storage
+    // permission error that gave no hint it was actually the file type.
+    // Reject it immediately instead, with a reason.
+    if (file.type && !file.type.startsWith('video/')) {
+      showToast(`${file.name} is a ${file.type} file, not a video — skipped.`);
+      return;
+    }
     // No real record id exists yet at pick time (it may not even be
     // created until submit, e.g. the build-a-new-id path) — uploads start
     // immediately anyway under a throwaway per-file folder, since Storage

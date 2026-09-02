@@ -16,6 +16,12 @@ service firebase.storage {
       );
     }
 
+    // Anonymous session (public Cattle Video Upload page — reps are
+    // explicitly NOT approved staff; see that page's own comments).
+    function isAnon() {
+      return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
     // Video Manager clip files — videoClips/{recordId}/{fileName}.
     // Hard caps enforced here, not just in the upload UI, so a bug or a
     // bypassed client can't accidentally write something huge: 2GB max
@@ -26,6 +32,17 @@ service firebase.storage {
       allow write: if isApproved()
                    && request.resource.size < 2 * 1024 * 1024 * 1024
                    && request.resource.contentType.matches('video/.*');
+      // Public rep uploads (public/video-upload/) — no approved staff
+      // account. `recordId` here is a throwaway per-file grouping id
+      // picked client-side before the real videoRecords document even
+      // exists (uploads start immediately on file pick, same as the
+      // staff upload flow — see storage-data.js's own comment on why),
+      // so it can't be cross-checked against a Firestore doc the way
+      // isApproved() checks users/{uid}. Content-type + size are the
+      // actual boundary here, same caps as staff get.
+      allow create: if isAnon()
+                    && request.resource.size < 2 * 1024 * 1024 * 1024
+                    && request.resource.contentType.matches('video/.*');
     }
 
     // Beta OBS Builder — verification tag images (small, PNG/SVG).

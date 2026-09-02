@@ -56,12 +56,25 @@ function sanitizeFilename(name) {
  */
 export function uploadClip(recordId, file, { onProgress } = {}) {
   const s = requireStorage();
+  // Matches the hard content-type check server-side in docs/storage.rules
+  // (video/.* only) — checked here too so a non-video file (e.g. a photo
+  // dragged in by mistake) fails fast with a clear reason, not a bare
+  // "storage/unauthorized" from Storage that gives no hint it was the
+  // file type, not a permissions problem.
+  if (file.type && !file.type.startsWith('video/')) {
+    return Promise.reject(new Error(`${file.name} is a ${file.type} file, not a video — only video files can go here.`));
+  }
   if (file.size > MAX_CLIP_BYTES) {
     return Promise.reject(new Error(`${file.name} is larger than the 2GB per-file limit`));
   }
   const path = `videoClips/${recordId}/${Date.now()}-${sanitizeFilename(file.name)}`;
   const fileRef = ref(s, path);
-  const task = uploadBytesResumable(fileRef, file, { contentType: file.type || 'video/mp4' });
+  // Always send a real video/* contentType — an empty file.type (some
+  // browsers don't report one for certain video containers) would
+  // otherwise store an empty/off-spec contentType, which fails the same
+  // Storage rule the same way an actual non-video file does.
+  const contentType = file.type && file.type.startsWith('video/') ? file.type : 'video/mp4';
+  const task = uploadBytesResumable(fileRef, file, { contentType });
 
   return new Promise((resolve, reject) => {
     task.on(

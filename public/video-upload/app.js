@@ -18,7 +18,8 @@
  * ============================================================= */
 
 import { ReferenceDataRepository, VideoRepository } from '../video-manager/repository.js';
-import { buildBaseId } from '../video-manager/video-id.js';
+import { ensureAnonymousAuth, currentUid } from '../video-manager/firestore-data.js';
+import { uploadClip } from '../video-manager/storage-data.js';
 
 const main = document.getElementById('ru-main');
 
@@ -118,6 +119,7 @@ function render() {
         <button class="btn btn-primary" id="f-video-take" type="button">Take Video</button>
         <button class="btn" id="f-video-choose" type="button">Select Videos</button>
       </div>
+      <div class="ru-dropzone" id="f-video-dropzone"><strong>Or drag video files here</strong></div>
       <input type="file" id="f-video-input-take" accept="video/*" capture="environment" style="display:none" />
       <input type="file" id="f-video-input-choose" accept="video/*" multiple style="display:none" />
       <div id="f-video-list" style="margin-top:12px;"></div>
@@ -128,8 +130,6 @@ function render() {
       <h2>Notes</h2>
       <textarea id="f-notes" rows="3" placeholder="Optional — anything we should know">${escapeHtml(formState.notes)}</textarea>
     </div>
-
-    <div id="f-existing-banner"></div>
 
     <button class="btn btn-primary" id="f-submit" type="button" style="padding:16px;font-size:16px;">Submit Video</button>
   `;
@@ -196,30 +196,58 @@ function wirePhotoPicker() {
 function wireVideoPickers() {
   const takeBtn = main.querySelector('#f-video-take'), chooseBtn = main.querySelector('#f-video-choose');
   const takeInput = main.querySelector('#f-video-input-take'), chooseInput = main.querySelector('#f-video-input-choose');
+  const dropzone = main.querySelector('#f-video-dropzone');
   takeBtn.addEventListener('click', () => takeInput.click());
   chooseBtn.addEventListener('click', () => chooseInput.click());
   [takeInput, chooseInput].forEach(input => input.addEventListener('change', () => {
     [...input.files].forEach(addVideoFile);
     input.value = '';
   }));
+  // Desktop web only, in practice — mobile browsers have no drag source
+  // for this. "Select Videos" above stays the primary path on phones.
+  dropzone.addEventListener('click', () => chooseInput.click());
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('drag-over');
+    [...(e.dataTransfer?.files || [])].forEach(addVideoFile);
+  });
 }
 
 function addVideoFile(file) {
-  const entry = { file, progress: 0, status: 'uploading' };
+  // The <input accept="video/*"> only filters the OS/photo picker — drag
+  // and drop, and some pickers' "All Files" fallback, bypass it, so
+  // check explicitly rather than letting a non-video file reach Storage
+  // and fail there with a bare permission error.
+  if (file.type && !file.type.startsWith('video/')) {
+    showToast(`${file.name} is a ${file.type} file, not a video — skipped.`);
+    return;
+  }
+  const entry = { file, progress: 0, status: 'uploading', storagePath: null, downloadUrl: null, error: null, uploadId: crypto.randomUUID() };
   files.push(entry);
   renderVideoList();
-  simulateUpload(entry);
+  startUpload(entry);
 }
 
-function simulateUpload(entry) {
-  const willFail = Math.random() < 0.15 && entry.progress === 0;
-  const timer = setInterval(() => {
-    if (entry.status !== 'uploading') { clearInterval(timer); return; }
-    entry.progress += 6 + Math.random() * 10;
-    if (willFail && entry.progress > 40) { entry.status = 'failed'; entry.progress = 40; clearInterval(timer); }
-    else if (entry.progress >= 100) { entry.progress = 100; entry.status = 'complete'; clearInterval(timer); }
-    renderVideoList();
-  }, 260);
+async function startUpload(entry) {
+  entry.status = 'uploading';
+  entry.progress = 0;
+  entry.error = null;
+  renderVideoList();
+  try {
+    const result = await uploadClip(entry.uploadId, entry.file, {
+      onProgress: pct => { entry.progress = pct; renderVideoList(); },
+    });
+    entry.status = 'complete';
+    entry.progress = 100;
+    entry.storagePath = result.storagePath;
+    entry.downloadUrl = result.downloadUrl;
+  } catch (err) {
+    entry.status = 'failed';
+    entry.error = err.message;
+  }
+  renderVideoList();
 }
 
 function renderVideoList() {
@@ -231,15 +259,13 @@ function renderVideoList() {
       <div class="ru-file-info">
         <div class="ru-file-name">${escapeHtml(entry.file.name)} · ${formatBytes(entry.file.size)}</div>
         <div class="ru-progress-bar"><div class="ru-progress-fill ${entry.status === 'failed' ? 'failed' : entry.status === 'complete' ? 'complete' : ''}" style="width:${entry.progress}%"></div></div>
-        <div class="ru-file-status">${entry.status === 'uploading' ? `Uploading… ${Math.round(entry.progress)}% ${navigator.onLine === false ? '(waiting for signal)' : ''}` : entry.status === 'complete' ? 'Uploaded' : 'Failed — will resume when signal improves'}</div>
+        <div class="ru-file-status">${entry.status === 'uploading' ? `Uploading… ${Math.round(entry.progress)}% ${navigator.onLine === false ? '(waiting for signal)' : ''}` : entry.status === 'complete' ? 'Uploaded' : `Failed — ${escapeHtml(entry.error || 'upload error')}`}</div>
       </div>
       ${entry.status === 'failed' ? `<button class="btn btn-sm" data-retry="${i}">Retry</button>` : `<button class="btn btn-sm btn-ghost" data-remove="${i}">✕</button>`}
     </div>
   `).join('');
   list.querySelectorAll('[data-retry]').forEach(b => b.addEventListener('click', () => {
-    const entry = files[Number(b.dataset.retry)];
-    entry.status = 'uploading'; entry.progress = 0;
-    simulateUpload(entry);
+    startUpload(files[Number(b.dataset.retry)]);
   }));
   list.querySelectorAll('[data-remove]').forEach(b => b.addEventListener('click', () => {
     files.splice(Number(b.dataset.remove), 1);
@@ -257,7 +283,15 @@ function renderVideoList() {
 }
 
 /* =============================================================
- * Submit + plain-English collision handling
+ * Submit
+ * -------------------------------------------------------------
+ * No collision/"does this already exist" lookup here — that would
+ * need read access to the whole videoRecords collection, which an
+ * anonymous rep session deliberately doesn't have (real business
+ * data — see docs/firestore.rules). Every public submission just
+ * creates a fresh record; it's flagged needsReview so staff catch and
+ * merge any actual duplicate via the Video Manager's own existing
+ * duplicate-id detection.
  * ============================================================= */
 async function onSubmit() {
   const { consignorCode, sexCode, sireCode, damCode, weight, monthYear } = formState;
@@ -265,36 +299,23 @@ async function onSubmit() {
     showToast('Fill in consignor, sex, sire, dam, weight and month/year');
     return;
   }
+  if (files.some(f => f.status === 'uploading')) {
+    showToast('Still uploading — wait for videos to finish before submitting');
+    return;
+  }
   if (!files.some(f => f.status === 'complete') && files.length) {
     showToast('Wait for at least one video to finish uploading');
     return;
   }
 
-  const baseId = buildBaseId({ consignorCode, sexCode, sireCode, damCode, weight, monthYear });
-  const existing = await VideoRepository.findByFinalId(baseId);
-
   const clips = files.filter(f => f.status === 'complete').map(f => ({
     id: 'clip_' + Math.random().toString(36).slice(2, 10),
     filename: f.file.name, swatch: Math.floor(Math.random() * 8), durationSec: null,
     sizeBytes: f.file.size, uploader: 'Rep', uploadedAt: new Date().toISOString(),
-    isOriginal: true, fileHandle: f.file,
+    isOriginal: true, storagePath: f.storagePath, downloadUrl: f.downloadUrl,
   }));
 
-  if (existing) {
-    renderExistingBanner(existing, async choice => {
-      if (choice === 'add') {
-        await VideoRepository.addClips(existing.id, clips, 'Rep');
-        showSuccess(`Added to the existing video record for these cattle.`);
-      } else {
-        const suffix = await VideoRepository.nextSuffixFor(baseId);
-        const rec = await createRecord({ consignorCode, sexCode, sireCode, damCode, weight, monthYear, suffix }, clips);
-        showSuccess(`Created a new video record.`);
-      }
-    });
-    return;
-  }
-
-  await createRecord({ consignorCode, sexCode, sireCode, damCode, weight, monthYear, suffix: null }, clips);
+  await createRecord({ consignorCode, sexCode, sireCode, damCode, weight, monthYear, suffix: null, submittedByUid: currentUid() }, clips);
   showSuccess(`Thanks! Your video was submitted for review.`);
 }
 
@@ -303,22 +324,6 @@ async function createRecord(fields, clips) {
     ...fields, status: 'ready', isDraft: clips.length === 0,
     notes: formState.notes.trim(), clips, listingImageUrl: formState.listingImageDataUrl,
   }, 'Rep');
-}
-
-function renderExistingBanner(existing, onChoice) {
-  const banner = main.querySelector('#f-existing-banner');
-  banner.innerHTML = `
-    <div class="ru-existing-banner">
-      <p>A video record already exists for these cattle details (${escapeHtml(existing.consignorName)}, ${existing.weight} lbs, ${existing.clips.length} clip${existing.clips.length === 1 ? '' : 's'} already on file).</p>
-      <div class="btn-row">
-        <button class="btn btn-primary btn-sm" id="ex-add">Add Videos to Existing</button>
-        <button class="btn btn-sm" id="ex-new">Create New Video</button>
-      </div>
-    </div>
-  `;
-  banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  banner.querySelector('#ex-add').addEventListener('click', () => onChoice('add'));
-  banner.querySelector('#ex-new').addEventListener('click', () => onChoice('new'));
 }
 
 function showSuccess(message) {
@@ -338,4 +343,19 @@ function showSuccess(message) {
   });
 }
 
-render();
+async function boot() {
+  // Reps aren't approved staff (see this file's own header comment) —
+  // sign in anonymously so Firestore/Storage rules have a real (if
+  // anonymous) auth.uid to check against. A no-op if a real session is
+  // already present (e.g. staff previewing this page in the same
+  // browser as the main suite) — see ensureAnonymousAuth's own comment.
+  main.innerHTML = `<div class="ru-card"><p class="hint">Loading…</p></div>`;
+  try {
+    await ensureAnonymousAuth();
+  } catch (err) {
+    main.innerHTML = `<div class="ru-card"><p class="hint">Could not start a session (${escapeHtml(err.message)}). Please reload the page.</p></div>`;
+    return;
+  }
+  render();
+}
+boot();

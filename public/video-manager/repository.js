@@ -497,7 +497,13 @@ export const VideoRepository = {
       weight: Number(fields.weight), monthYear: fields.monthYear,
       status: fields.status || 'ready',
       isDraft: fields.isDraft || false,
-      needsReview: (consignor && consignor.flaggedNew) || false,
+      // A public rep submission always needs a staff look — the public
+      // page can't check for an existing record with the same Video ID
+      // itself (that would need read access to this whole collection,
+      // which anonymous sessions deliberately don't have — see
+      // docs/firestore.rules), so any duplicate only surfaces here, via
+      // the Video Manager's own existing duplicate-id detection.
+      needsReview: !!((consignor && consignor.flaggedNew) || actor === 'Rep'),
       videoMaker: fields.videoMaker || actor,
       createdBy: actor,
       dateAdded: now, lastUpdated: now,
@@ -505,6 +511,10 @@ export const VideoRepository = {
       canvaLink: fields.canvaLink || null,
       clips: fields.clips || [],
       listingImageUrl: fields.listingImageUrl || null,
+      // Public rep-upload page only (see public/video-upload/app.js) —
+      // ties every submission back to a real (if anonymous) Firebase
+      // UID, matching what docs/firestore.rules' create rule requires.
+      submittedByUid: fields.submittedByUid || null,
       youtubeId: null, youtubeUrl: null, embedUrl: null, embedCode: null,
       previousYouTubeVideos: [],
       // New-video policy: everything created from here forward is
