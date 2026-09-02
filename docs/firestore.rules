@@ -20,6 +20,12 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // Anonymous session (public Cattle Video Upload page — reps are
+    // explicitly NOT approved staff; see that page's own comments).
+    function isAnon() {
+      return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
     // Each person can read and create only their OWN approval record,
     // and only with approved:false. Flipping it to true happens in the
     // Firebase Console (or Admin SDK), which bypasses these rules.
@@ -36,8 +42,34 @@ service cloud.firestore {
     match /appSettings/{key}       { allow read, write: if isApproved(); }
 
     // ── Video Manager ───────────────────────────────────────────
-    match /videoRecords/{id}   { allow read, write: if isApproved(); }
-    match /referenceData/{key} { allow read, write: if isApproved(); }
+    match /videoRecords/{id} {
+      // Deliberately NOT readable by isAnon(): these documents carry
+      // real business data (consignor names, internal notes, activity
+      // log) — an anonymous rep session must never be able to list or
+      // read this collection, only add to it. That also means the
+      // public upload page can't do its own collision lookup (it would
+      // need to read the collection to search it) — it always creates
+      // fresh; staff already have duplicate-id detection built into the
+      // Video Manager to catch and merge these after the fact.
+      allow read:  if isApproved();
+      allow write: if isApproved();
+      // Public rep uploads (public/video-upload/, no approved staff
+      // account) can only CREATE a new record, never update/delete one —
+      // Firestore rules can't cheaply validate "only the clips array
+      // grew, nothing else changed" the way a real update would need.
+      // submittedByUid ties every public submission back to a real (if
+      // anonymous) Firebase UID for traceability.
+      allow create: if isAnon()
+                    && request.resource.data.createdBy == 'Rep'
+                    && request.resource.data.submittedByUid == request.auth.uid;
+    }
+    // Just names/labels for the public form's dropdowns (consignor
+    // names, sire/dam type labels) — no business-sensitive data, and
+    // required for the public page to even render its form.
+    match /referenceData/{key} {
+      allow read:  if isApproved() || isAnon();
+      allow write: if isApproved();
+    }
 
     // ── Beta OBS Builder (Banners tab, "Automated Video Setup — Beta") ──
     // Reads videoRecords above for YouTube ID -> CMS Video ID lookups;

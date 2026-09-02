@@ -29,7 +29,7 @@
  * ============================================================= */
 
 import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 import {
   getFirestore, collection, doc,
   getDoc, getDocs, setDoc, deleteDoc, writeBatch,
@@ -60,6 +60,26 @@ export const configured = FIREBASE_CONFIGURED;
 function requireDb() {
   if (!db) throw new Error('Video Manager needs Firebase configured to load real data (see shared/firebase-config.js).');
   return db;
+}
+
+/**
+ * ONLY the public Cattle Video Upload page (public/video-upload/) should
+ * ever call this — never the internal Video Manager, which relies on the
+ * shell's real (approved-staff) session already being present via
+ * shared IndexedDB, per this file's header comment. Resolves once
+ * signed in, anonymous or otherwise (a no-op if already signed in —
+ * e.g. an approved staffer testing the public page in the same browser
+ * keeps their real session, never gets silently downgraded to anon).
+ */
+export async function ensureAnonymousAuth() {
+  if (!auth) throw new Error('Firebase is not configured.');
+  if (auth.currentUser) return auth.currentUser;
+  const cred = await signInAnonymously(auth);
+  return cred.user;
+}
+
+export function currentUid() {
+  return (auth && auth.currentUser && auth.currentUser.uid) || null;
 }
 
 export function isSignedIn() {
