@@ -397,13 +397,24 @@ export function augmentObsJsonForBeta(baseObsJson, opts) {
     // 1. Cattle video — bottom layer. INDEPENDENT ffmpeg_source per lot,
     //    even when two lots share the same physical file (see file
     //    header — this is the one non-negotiable architectural point).
+    //
+    //    unshift, not push: `items` may already hold a scene item Classic
+    //    itself added when it built this scene (the Option banner, for a
+    //    Video scene that's part of an option group — see index.html's
+    //    own "Is this a Video scene that should get an option banner?"
+    //    pass, which runs before Beta ever touches this JSON). Later
+    //    items render ON TOP in OBS's items array (same convention the
+    //    tags below rely on to stay above the video) — pushing the video
+    //    would land it over whatever Classic already placed, hiding the
+    //    option banner behind it. unshift puts the video at index 0,
+    //    genuinely the bottom layer under anything already there.
     if (plan.cmsVideoId) {
       const localPath = uniqueVideoSources.get(plan.cmsVideoId);
       if (localPath) {
         const vsrc = makeMediaSource(localPath, `VIDEO - ${lot}`);
         newSources.push(vsrc);
         const scale = plan.videoScale || 1;
-        items.push(makeSourceItem({
+        items.unshift(makeSourceItem({
           sourceName: vsrc.name, sourceUuid: vsrc.uuid, itemId: nextId++,
           canvasW, canvasH, posX: 0, posY: 0, scaleX: scale, scaleY: scale,
         }));
