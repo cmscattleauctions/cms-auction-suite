@@ -104,7 +104,7 @@ function loadImageContentBox(url) {
  * across re-runs within one build session (cleared on new CSV upload).
  */
 export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}) {
-  const settings = State.getBetaSettings();
+  const settings = await State.getBetaSettings();
   const tags = await listEnabledTags();
 
   // ---- Tag detection (Description is the sole source of truth) ----

@@ -3,9 +3,10 @@
  * -------------------------------------------------------------
  * Split out from beta-tag-manager-ui.js so the local-path and tag
  * layout settings have their own nav tab instead of sharing a page
- * with Verification Tags and the Stinger. Persists to beta-state.js
- * (localStorage — device-local build settings, not shared Firebase
- * state like tags/stinger).
+ * with Verification Tags and the Stinger. Persists via beta-state.js
+ * to a shared Firestore doc (obsBetaSettings/default) — same as tags
+ * and the stinger, so settings survive a cleared browser or a switch
+ * to a different machine instead of being stuck on one device.
  * ============================================================= */
 
 import * as State from './beta-state.js';
@@ -67,11 +68,18 @@ export async function initObsSettingsPage(root, { showToast }) {
   `;
 
   wireSettings(root, showToast);
-  refreshSettingsForm(root);
+  await refreshSettingsForm(root, showToast);
 }
 
-function refreshSettingsForm(root) {
-  const s = State.getBetaSettings();
+async function refreshSettingsForm(root, showToast) {
+  let s;
+  try {
+    s = await State.getBetaSettings();
+  } catch (err) {
+    console.error(err);
+    showToast(`Could not load OBS Settings: ${err.message}`, true);
+    return;
+  }
   root.querySelector('#obsRootInput').value = s.auctionObsRoot;
   root.querySelector('#auctionFolderInput').value = s.auctionFolder;
   root.querySelector('#lotVideosFolderInput').value = s.lotVideosFolder;
@@ -83,20 +91,32 @@ function refreshSettingsForm(root) {
 }
 
 function wireSettings(root, showToast) {
-  root.querySelector('#btnSaveBetaSettings').addEventListener('click', () => {
-    const s = State.getBetaSettings();
-    s.auctionObsRoot = root.querySelector('#obsRootInput').value.trim() || s.auctionObsRoot;
-    if (!s.auctionObsRoot.endsWith('/')) s.auctionObsRoot += '/';
-    s.auctionFolder = root.querySelector('#auctionFolderInput').value.trim();
-    s.lotVideosFolder = root.querySelector('#lotVideosFolderInput').value.trim();
-    if (s.lotVideosFolder && !s.lotVideosFolder.endsWith('/')) s.lotVideosFolder += '/';
-    s.lotBannersFolder = root.querySelector('#lotBannersFolderInput').value.trim() || s.lotBannersFolder;
-    if (!s.lotBannersFolder.endsWith('/')) s.lotBannersFolder += '/';
-    s.tagLayout.tagHeight = Number(root.querySelector('#layoutHeightInput').value) || s.tagLayout.tagHeight;
-    s.tagLayout.spacing = Number(root.querySelector('#layoutSpacingInput').value) || s.tagLayout.spacing;
-    s.tagLayout.rightMargin = Number(root.querySelector('#layoutRightInput').value) || s.tagLayout.rightMargin;
-    s.tagLayout.bottomMargin = Number(root.querySelector('#layoutBottomInput').value) || s.tagLayout.bottomMargin;
-    State.saveBetaSettings(s);
-    showToast('Beta settings saved');
+  root.querySelector('#btnSaveBetaSettings').addEventListener('click', async () => {
+    const btn = root.querySelector('#btnSaveBetaSettings');
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    try {
+      const s = await State.getBetaSettings();
+      s.auctionObsRoot = root.querySelector('#obsRootInput').value.trim() || s.auctionObsRoot;
+      if (!s.auctionObsRoot.endsWith('/')) s.auctionObsRoot += '/';
+      s.auctionFolder = root.querySelector('#auctionFolderInput').value.trim();
+      s.lotVideosFolder = root.querySelector('#lotVideosFolderInput').value.trim();
+      if (s.lotVideosFolder && !s.lotVideosFolder.endsWith('/')) s.lotVideosFolder += '/';
+      s.lotBannersFolder = root.querySelector('#lotBannersFolderInput').value.trim() || s.lotBannersFolder;
+      if (!s.lotBannersFolder.endsWith('/')) s.lotBannersFolder += '/';
+      s.tagLayout.tagHeight = Number(root.querySelector('#layoutHeightInput').value) || s.tagLayout.tagHeight;
+      s.tagLayout.spacing = Number(root.querySelector('#layoutSpacingInput').value) || s.tagLayout.spacing;
+      s.tagLayout.rightMargin = Number(root.querySelector('#layoutRightInput').value) || s.tagLayout.rightMargin;
+      s.tagLayout.bottomMargin = Number(root.querySelector('#layoutBottomInput').value) || s.tagLayout.bottomMargin;
+      await State.saveBetaSettings(s);
+      showToast('Beta settings saved — shared with every operator');
+    } catch (err) {
+      console.error(err);
+      showToast(`Failed to save OBS Settings: ${err.message}`, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origText;
+    }
   });
 }

@@ -1,16 +1,35 @@
 /* =============================================================
  * Beta OBS Builder — mode + settings state
  * -------------------------------------------------------------
- * Small, dependency-free state module. Mirrors the localStorage
- * pattern Classic already uses for GitHub repo settings (same file,
- * top of the <script> block) rather than inventing a new persistence
- * mechanism — these are per-workstation operator preferences, not
- * team-shared config (team-shared config — tags, stinger — lives in
- * Firestore; see beta-tags-data.js / beta-stinger-data.js).
+ * Build mode (Classic vs Beta) stays in localStorage — a genuine
+ * per-browser UI preference, not shared config.
+ *
+ * OBS Settings (the local-path fields + tag layout) live in Firestore
+ * now, ONE SHARED singleton doc (obsBetaSettings/default) — same
+ * pattern as obsStingerConfig/default in beta-stinger-data.js. These
+ * used to be localStorage-only on the theory that local filesystem
+ * paths are inherently per-workstation, but in practice there's
+ * effectively one active operator, and losing every setting on a
+ * cleared browser/new machine was worse than the (accepted) tradeoff
+ * that a shared doc means whoever saves last wins for everyone.
+ *
+ * getBetaSettings()/saveBetaSettings() also mirror into the SAME
+ * localStorage key this used to be the source of truth in, purely as
+ * a synchronous local cache — index.html's Classic script
+ * (getDropboxBannerPath()) reads that key directly rather than taking
+ * on its own async Firestore dependency. Firestore is the real source
+ * of truth; the cache just means Classic doesn't need to change. Key
+ * name must stay in sync with that read if it's ever renamed.
  * ============================================================= */
 
+import {
+  getBetaDb,
+  doc, getDoc, setDoc, serverTimestamp,
+} from './beta-firebase.js';
+
 const MODE_KEY = 'cms_obs_build_mode_v1';         // 'classic' | 'beta'
-const SETTINGS_KEY = 'cms_obs_beta_settings_v1';
+const SETTINGS_DOC_PATH = ['obsBetaSettings', 'default'];
+const SETTINGS_CACHE_KEY = 'cms_obs_beta_settings_v1';
 
 export const DEFAULT_SETTINGS = {
   // Mirrors the existing hardcoded DROPBOX_BANNER_PATH convention — the
@@ -58,20 +77,45 @@ export function setBuildMode(mode) {
   localStorage.setItem(MODE_KEY, mode === 'beta' ? 'beta' : 'classic');
 }
 
-export function getBetaSettings() {
+function mergeWithDefaults(saved) {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...saved,
+    tagLayout: { ...DEFAULT_SETTINGS.tagLayout, ...(saved.tagLayout || {}) },
+  };
+}
+
+function readLocalCache() {
   try {
-    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-    return {
-      ...DEFAULT_SETTINGS,
-      ...saved,
-      tagLayout: { ...DEFAULT_SETTINGS.tagLayout, ...(saved.tagLayout || {}) },
-    };
+    return mergeWithDefaults(JSON.parse(localStorage.getItem(SETTINGS_CACHE_KEY) || '{}'));
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
 }
-export function saveBetaSettings(settings) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+
+function writeLocalCache(settings) {
+  try { localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(settings)); } catch { /* best-effort cache only */ }
+}
+
+export async function getBetaSettings() {
+  const db = getBetaDb();
+  if (!db) return readLocalCache();
+  try {
+    const snap = await getDoc(doc(db, ...SETTINGS_DOC_PATH));
+    const merged = mergeWithDefaults(snap.exists() ? snap.data() : {});
+    writeLocalCache(merged);
+    return merged;
+  } catch (err) {
+    console.warn('[beta] Could not load shared OBS Settings from Firestore — using local cache:', err);
+    return readLocalCache();
+  }
+}
+
+export async function saveBetaSettings(settings) {
+  const db = getBetaDb();
+  if (!db) throw new Error('Firebase is not configured.');
+  await setDoc(doc(db, ...SETTINGS_DOC_PATH), { ...settings, updatedAt: serverTimestamp() }, { merge: true });
+  writeLocalCache(settings);
 }
 
 /** Deterministic local path an auto-matched/skip-and-later-dropped video is expected at. */
