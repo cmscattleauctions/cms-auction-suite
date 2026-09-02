@@ -33,6 +33,11 @@ export const DEFAULT_SETTINGS = {
   // Tags and the stinger, unlike videos, don't change per auction — they
   // live in the same fixed folder as the lot transition banners (which
   // Download All Banners already downloads), not a per-auction subfolder.
+  // index.html's Classic script (getDropboxBannerPath()) reads this exact
+  // field straight out of localStorage too, for its own transition/option
+  // banner image paths — same real-world folder, one setting instead of
+  // two. If SETTINGS_KEY or this field name ever changes, update that
+  // read too.
   lotBannersFolder: '/Users/brysonmurray/Library/CloudStorage/Dropbox/Auction OBS/Lot Banners/',
   videoExt: 'mp4',
   assumedVideoWidth: 1920,          // used only to compute a sane default on-canvas scale
