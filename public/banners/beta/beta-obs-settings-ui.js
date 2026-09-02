@@ -15,24 +15,33 @@ export async function initObsSettingsPage(root, { showToast }) {
     <div style="max-width:640px;">
       <div class="card">
         <div class="section-title">OBS Beta Settings</div>
-        <div class="form-row">
-          <label class="form-label">Auction OBS Root (local path)</label>
-          <input type="text" class="form-input mono" id="obsRootInput">
-        </div>
-        <div class="form-row">
-          <label class="form-label">Auction Folder (e.g. 2026-09-10)</label>
-          <input type="text" class="form-input" id="auctionFolderInput" placeholder="2026-09-10">
-        </div>
-        <div class="form-row">
-          <label class="form-label">Lot Videos Folder (optional local path — overrides the above)</label>
-          <input type="text" class="form-input mono" id="lotVideosFolderInput" placeholder="Leave blank to use Auction OBS Root / Auction Folder above">
-          <p class="helper" style="margin-top:6px;">If you keep ONE flat video folder and just replace its files each month, instead of a fresh dated folder per auction, set this and leave it set — videos are then looked up directly here (no "/videos/" subfolder, no Auction Folder needed). Leave blank to use Auction OBS Root + Auction Folder above instead.</p>
-        </div>
+
         <div class="form-row">
           <label class="form-label">Lot Banners Folder (local path)</label>
           <input type="text" class="form-input mono" id="lotBannersFolderInput">
-          <p class="helper" style="margin-top:6px;">Tag images and the stinger video land here, flat, alongside the lot transition banners — download them together via "Download All Banners" and move everything at once. This folder doesn't change per auction, unlike Auction Folder above.</p>
+          <p class="helper" style="margin-top:6px;">Where banners, tag images, and the stinger video all land — download them together via "Download All Banners" and move everything here at once. Fixed; doesn't change per auction.</p>
         </div>
+        <div class="form-row">
+          <label class="form-label">Lot Videos Folder (local path)</label>
+          <input type="text" class="form-input mono" id="lotVideosFolderInput" placeholder="e.g. .../Auction OBS/Lot Videos/">
+          <p class="helper" style="margin-top:6px;">Where cattle videos live. Also fixed — if you replace this folder's contents each month rather than using a fresh dated folder per auction (the common case), this is the only video setting you need; leave "Per-auction video folders" below untouched.</p>
+        </div>
+
+        <details style="margin:4px 0 20px;">
+          <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);">Per-auction video folders (advanced — only if you use a fresh dated folder per auction instead of Lot Videos Folder above)</summary>
+          <div style="margin-top:14px;">
+            <div class="form-row">
+              <label class="form-label">Auction OBS Root (local path)</label>
+              <input type="text" class="form-input mono" id="obsRootInput">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Auction Folder (e.g. 2026-09-10)</label>
+              <input type="text" class="form-input" id="auctionFolderInput" placeholder="2026-09-10">
+            </div>
+            <p class="helper" style="margin-top:-4px;">Only used when Lot Videos Folder above is blank. Videos are then expected at Auction OBS Root/Auction Folder/videos/&lt;id&gt;.mp4 — a fresh dated subfolder set per build.</p>
+          </div>
+        </details>
+
         <div class="two-col">
           <div class="form-row">
             <label class="form-label">Tag Height (px)</label>

@@ -271,7 +271,7 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
   <!-- Panel 3: Review & Download -->
   <div id="panelReview" style="display:none">
     <div class="info-banner">
-      <strong>Next steps:</strong> Download banners first, then drop them into <code>/Users/brysonmurray/Library/CloudStorage/Dropbox/Auction OBS/Lot Banners/</code> — keep the filenames exactly as exported. Then download the OBS JSON and import it in OBS (<em>Scene Collection → Import</em>).
+      <strong>Next steps:</strong> Download banners first, then drop them into <code id="nextStepsBannerPath"></code> — keep the filenames exactly as exported. Then download the OBS JSON and import it in OBS (<em>Scene Collection → Import</em>).
     </div>
 
     <div id="betaReviewWrap" style="display:none;margin-bottom:24px;">
@@ -620,7 +620,7 @@ function showPanel(name) {
   document.getElementById('panelReview').style.display  = (name === 'review'  ? '' : 'none');
   if (name === 'upload') setFlowStep(1);
   if (name === 'styles') setFlowStep(2);
-  if (name === 'review') setFlowStep(3);
+  if (name === 'review') { setFlowStep(3); document.getElementById('nextStepsBannerPath').textContent = getDropboxBannerPath(); }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1699,6 +1699,29 @@ function buildObsJson(templateData, parsed) {
       const items = (src.settings && src.settings.items) || [];
       for (const it of items) {
         if (it && it.name === OLD_NAME) it.name = NEW_NAME;
+      }
+    }
+  }
+
+  // ── Rewrite hardcoded /Users/brysonmurray/.../Random/ branding-asset
+  // paths (CMS logo, "now selling" breed banners, the anniversary
+  // slide) to this operator's own equivalent. These are fixed assets
+  // baked into template.json's own image_source objects — unlike
+  // transition banners, which already get a fresh image_source built
+  // dynamically per build (see makeBannerImageSource/
+  // getDropboxBannerPath above), so a path baked into the template
+  // file itself can't be dynamic on its own without this rewrite.
+  // Random/ is a sibling of Lot Banners Folder under the same Auction
+  // OBS root on every machine actually set up this way, so it's
+  // derived from that same setting rather than needing its own.
+  {
+    const OLD_RANDOM_PREFIX = '/Users/brysonmurray/Library/CloudStorage/Dropbox/Auction OBS/Random/';
+    const bannerPath = getDropboxBannerPath(); // e.g. ".../Auction OBS/Lot Banners/"
+    const trimmed = bannerPath.replace(/\/+$/, '');
+    const randomFolderPath = trimmed.slice(0, trimmed.lastIndexOf('/') + 1) + 'Random/';
+    for (const src of output.sources) {
+      if (src && src.settings && typeof src.settings.file === 'string' && src.settings.file.startsWith(OLD_RANDOM_PREFIX)) {
+        src.settings.file = randomFolderPath + src.settings.file.slice(OLD_RANDOM_PREFIX.length);
       }
     }
   }
