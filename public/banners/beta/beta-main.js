@@ -33,44 +33,60 @@ export { State };
  * come out visually consistent regardless of how much padding their
  * source file happens to carry.
  *
- * Requires the image to be readable via canvas (crossOrigin + the
- * Storage bucket's CORS policy — see docs/storage-cors.json); falls
- * back to the full image bounds (old behavior) if that's blocked for
- * any reason, rather than failing the whole tag.
+ * Loads the image TWICE, deliberately: once plain (no crossOrigin —
+ * exactly how this worked before content-trimming existed, and the
+ * ONLY thing that determines whether this tag is usable at all), then
+ * again WITH crossOrigin purely to attempt reading canvas pixel data
+ * for the trim. A canvas read needs CORS or it throws; earlier this
+ * function set crossOrigin on the single, only image load, which meant
+ * any CORS hiccup made the ENTIRE tag fail to load (pushed into
+ * missingTagImages, silently dropped from every download) instead of
+ * just losing the trim — the single point of failure this second load
+ * exists to remove. The trim stays a pure best-effort enhancement that
+ * can never cause a tag to be dropped.
  */
 function loadImageContentBox(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
     img.onload = () => {
       const naturalWidth = img.naturalWidth, naturalHeight = img.naturalHeight;
       const fullBox = { naturalWidth, naturalHeight, contentX: 0, contentY: 0, contentWidth: naturalWidth, contentHeight: naturalHeight };
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = naturalWidth;
-        canvas.height = naturalHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const { data } = ctx.getImageData(0, 0, naturalWidth, naturalHeight);
-        const ALPHA_THRESHOLD = 10; // ignore near-fully-transparent anti-aliasing noise at edges
-        let minX = naturalWidth, minY = naturalHeight, maxX = -1, maxY = -1;
-        for (let y = 0; y < naturalHeight; y++) {
-          const rowBase = y * naturalWidth;
-          for (let x = 0; x < naturalWidth; x++) {
-            if (data[(rowBase + x) * 4 + 3] > ALPHA_THRESHOLD) {
-              if (x < minX) minX = x;
-              if (x > maxX) maxX = x;
-              if (y < minY) minY = y;
-              if (y > maxY) maxY = y;
+
+      const cimg = new Image();
+      cimg.crossOrigin = 'anonymous';
+      cimg.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = naturalWidth;
+          canvas.height = naturalHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(cimg, 0, 0);
+          const { data } = ctx.getImageData(0, 0, naturalWidth, naturalHeight);
+          const ALPHA_THRESHOLD = 10; // ignore near-fully-transparent anti-aliasing noise at edges
+          let minX = naturalWidth, minY = naturalHeight, maxX = -1, maxY = -1;
+          for (let y = 0; y < naturalHeight; y++) {
+            const rowBase = y * naturalWidth;
+            for (let x = 0; x < naturalWidth; x++) {
+              if (data[(rowBase + x) * 4 + 3] > ALPHA_THRESHOLD) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+              }
             }
           }
+          if (maxX < 0) { resolve(fullBox); return; } // fully transparent — nothing to trim to
+          resolve({ naturalWidth, naturalHeight, contentX: minX, contentY: minY, contentWidth: maxX - minX + 1, contentHeight: maxY - minY + 1 });
+        } catch (err) {
+          console.warn(`[beta] Could not read pixel data for ${url} (using untrimmed bounds):`, err);
+          resolve(fullBox);
         }
-        if (maxX < 0) { resolve(fullBox); return; } // fully transparent — nothing to trim to
-        resolve({ naturalWidth, naturalHeight, contentX: minX, contentY: minY, contentWidth: maxX - minX + 1, contentHeight: maxY - minY + 1 });
-      } catch (err) {
-        console.warn(`[beta] Could not read pixel data for ${url} (falling back to untrimmed bounds):`, err);
+      };
+      cimg.onerror = () => {
+        console.warn(`[beta] Could not CORS-load ${url} for content trimming — tag still usable, just untrimmed.`);
         resolve(fullBox);
-      }
+      };
+      cimg.src = url;
     };
     img.onerror = () => reject(new Error(`Could not load image: ${url}`));
     img.src = url;
