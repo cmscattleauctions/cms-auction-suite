@@ -2038,9 +2038,14 @@ async function dlAllBanners() {
     // videos which get a per-auction folder) so there's one download and
     // one folder to move everything into. No-op outside Beta mode.
     const extras = await window.CMSBetaHooks?.getBannerZipExtras?.();
-    if (extras?.length) {
+    const extraAssets = extras?.assets || [];
+    const extraFailed = extras?.failed || [];
+    if (extraAssets.length) {
       ptxt.textContent = 'Adding tag images and stinger...';
-      for (const { fileName, blob } of extras) zip.file(fileName, blob);
+      for (const { fileName, blob } of extraAssets) zip.file(fileName, blob);
+    }
+    if (extraFailed.length) {
+      console.warn('[beta] Skipped from banner ZIP (see warnings above for why):', extraFailed);
     }
 
     ppct.textContent = '100%'; ptxt.textContent = 'Zipping...';
@@ -2051,7 +2056,9 @@ async function dlAllBanners() {
     URL.revokeObjectURL(url);
     banners_downloaded = true;
     updateDownloadGates();
-    showToast(`${list.length} banners downloaded${extras?.length ? ` (+ ${extras.length} tag/stinger file${extras.length === 1 ? '' : 's'})` : ''} — now download the OBS scene collection`);
+    const extrasNote = extraAssets.length ? ` (+ ${extraAssets.length} tag/stinger file${extraAssets.length === 1 ? '' : 's'})` : '';
+    const failedNote = extraFailed.length ? ` — ${extraFailed.length} tag/stinger file${extraFailed.length === 1 ? '' : 's'} FAILED to download, see console` : '';
+    showToast(`${list.length} banners downloaded${extrasNote}${failedNote} — now download the OBS scene collection`, !!extraFailed.length);
   } finally {
     wrap.classList.remove('active'); fill.style.width = '0';
     btn.disabled = false; btn.textContent = origText;
@@ -2615,7 +2622,7 @@ window.pickOptionStyle = pickOptionStyle;
     // Classic's own banner ZIP — see dlAllBanners() below. Empty when not
     // in Beta mode or the review hasn't produced a betaCtx yet.
     getBannerZipExtras: async () => {
-      if (!isBeta() || !betaCtx) return [];
+      if (!isBeta() || !betaCtx) return { assets: [], failed: [] };
       return Beta.collectLotBannerAssets(betaCtx);
     },
   };

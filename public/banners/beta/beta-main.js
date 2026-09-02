@@ -359,15 +359,31 @@ export async function buildAndExportBeta(ctx, classicObsJson, canvasW, canvasH) 
  * since neither changes per auction.
  */
 export async function collectLotBannerAssets(ctx) {
+  // One bad asset (a flaky fetch, an expired/CORS-blocked URL, a 404) must
+  // not sink the whole batch — that used to throw out of this function and
+  // abort dlAllBanners() entirely, discarding the lot banners that had
+  // already rendered along with every other tag/stinger. Collect failures
+  // instead so the rest still ships.
   const assets = [];
+  const failed = [];
   for (const asset of ctx.tagAssets.values()) {
     if (!asset.downloadUrl) continue;
-    const blob = await fetchAsBlob(asset.downloadUrl);
-    assets.push({ fileName: asset.fileName, blob });
+    try {
+      const blob = await fetchAsBlob(asset.downloadUrl);
+      assets.push({ fileName: asset.fileName, blob });
+    } catch (err) {
+      console.warn(`[beta] Could not download tag image ${asset.fileName} for the banner ZIP:`, err);
+      failed.push(asset.fileName);
+    }
   }
   if (ctx.stingerAsset && ctx.stingerAsset.downloadUrl) {
-    const blob = await fetchAsBlob(ctx.stingerAsset.downloadUrl);
-    assets.push({ fileName: ctx.stingerAsset.fileName, blob });
+    try {
+      const blob = await fetchAsBlob(ctx.stingerAsset.downloadUrl);
+      assets.push({ fileName: ctx.stingerAsset.fileName, blob });
+    } catch (err) {
+      console.warn(`[beta] Could not download stinger ${ctx.stingerAsset.fileName} for the banner ZIP:`, err);
+      failed.push(ctx.stingerAsset.fileName);
+    }
   }
-  return assets;
+  return { assets, failed };
 }
