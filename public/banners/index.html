@@ -1169,18 +1169,31 @@ function normalizeLotFromField(rawLot, rawOption) {
   if (/\d+\.\d+\.\d+\.\d+/.test(lot)) return null;
   lot = lot.replace(/,/g, '').trim();
   if (/^\d+\.0+$/.test(lot)) lot = lot.replace(/\.0+$/, '');
-  // Match: "401A", "401-A", "401 A", or "401"
-  const match = lot.match(/^(\d+)\s*[- ]?\s*([A-Za-z])?$/);
+  // Match: "401A", "401-A", "401 A", "401", or with a leading letter
+  // prefix like "S872" — some consignors' lot numbers carry a prefix
+  // that's part of the lot's own identity (not the A/B/C option-GROUP
+  // suffix system below — those are two independent, unrelated things,
+  // e.g. a "S872" row's own Option column can separately read "S" too,
+  // but that's not a shared base number with any other lot). The
+  // prefix is kept as-is; it's just part of the lot ID from here on.
+  const match = lot.match(/^([A-Za-z])?\s*[- ]?\s*(\d+)\s*[- ]?\s*([A-Za-z])?$/);
   if (!match) return null;
-  const num = match[1];
-  let suffix = match[2] ? match[2].toUpperCase() : '';
-  // Fallback: if Option column has a letter and lot number has none, use Option column
-  if (!suffix && rawOption) {
+  const prefix = match[1] ? match[1].toUpperCase() : '';
+  const num = match[2];
+  let suffix = match[3] ? match[3].toUpperCase() : '';
+  // Fallback: if Option column has a letter and lot number has none, use
+  // Option column — but not when the lot number already carries a
+  // prefix (S872's own Option column separately reads "S" too; that's
+  // the SAME letter already captured as the prefix above, not a
+  // distinct option-group suffix — using it again here would produce
+  // "S872-S").
+  if (!suffix && !prefix && rawOption) {
     const opt = cleanCell(rawOption).toUpperCase();
     if (/^[A-Z]$/.test(opt)) suffix = opt;
   }
   if (!num || num === '0') return null;
-  return suffix ? `${num}-${suffix}` : num;
+  const lotId = prefix ? `${prefix}${num}` : num;
+  return suffix ? `${lotId}-${suffix}` : lotId;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1246,8 +1259,10 @@ function parseWorkingOnCSV(text) {
     const override = getLocationOverride(locationRaw);
     const finalState = override || loc.stateAbbr;
 
-    // Detect whether this lot is an option lot (has "-X" suffix)
-    const optMatch = lot.match(/^(\d+)-([A-Z])$/);
+    // Detect whether this lot is an option lot (has "-X" suffix). Kept
+    // in sync with isOptionLot/getOptionBase above — [A-Za-z]? for the
+    // same optional lot-id prefix (e.g. "S872").
+    const optMatch = lot.match(/^([A-Za-z]?\d+)-([A-Z])$/);
     const isOption = !!optMatch;
     const optionBase = isOption ? optMatch[1] : null;
     const optionLetter = isOption ? optMatch[2] : null;
@@ -1351,11 +1366,14 @@ function buildBanners(parsed) {
 // then adds banner image sources and scene items.
 // ═══════════════════════════════════════════════════════════════
 function normalizeSceneName(name) { return String(name).replace(/\s+/g, ' ').trim(); }
-function isLotTransitionScene(name) { return /^\d+(-[A-Z])? Transition$/i.test(normalizeSceneName(name)); }
-function isLotVideoScene(name) { return /^\d+(-[A-Z])? Video$/i.test(normalizeSceneName(name)); }
-function isOptionLot(lot) { return /^\d+-[A-Z]$/i.test(String(lot).trim()); }
+// Lot ids can carry a single leading letter prefix (e.g. "S872" — see
+// normalizeLotFromField's own comment for why); [A-Za-z]? here keeps
+// that matching everywhere a lot-derived scene/id is recognized.
+function isLotTransitionScene(name) { return /^[A-Za-z]?\d+(-[A-Z])? Transition$/i.test(normalizeSceneName(name)); }
+function isLotVideoScene(name) { return /^[A-Za-z]?\d+(-[A-Z])? Video$/i.test(normalizeSceneName(name)); }
+function isOptionLot(lot) { return /^[A-Za-z]?\d+-[A-Z]$/i.test(String(lot).trim()); }
 function getOptionBase(lot) {
-  const m = String(lot).trim().toUpperCase().match(/^(\d+)-[A-Z]$/);
+  const m = String(lot).trim().toUpperCase().match(/^([A-Za-z]?\d+)-[A-Z]$/);
   return m ? m[1] : null;
 }
 function isBreedTransitionScene(name) {

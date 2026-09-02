@@ -68,7 +68,10 @@ function uuidv4() {
 const STINGER_NAME = 'CMS Stinger';
 
 function normalizeSceneName(name) { return String(name).replace(/\s+/g, ' ').trim(); }
-function isLotVideoScene(name) { return /^\d+(-[A-Z])? Video$/i.test(normalizeSceneName(name)); }
+// Lot ids can carry a single leading letter prefix (e.g. "S872" — see
+// index.html's normalizeLotFromField for why); [A-Za-z]? here keeps
+// this in sync with that.
+function isLotVideoScene(name) { return /^[A-Za-z]?\d+(-[A-Z])? Video$/i.test(normalizeSceneName(name)); }
 function lotFromVideoSceneName(name) { return normalizeSceneName(name).replace(/ Video$/i, '').trim(); }
 
 // Mirrors index.html's own isLotTransitionScene/isBreedTransitionScene
@@ -76,7 +79,7 @@ function lotFromVideoSceneName(name) { return normalizeSceneName(name).replace(/
 // script isn't a module Beta can import from. "Type Transition" in the
 // spec is Classic's "breed transition": a fixed interlude scene (never
 // tied to a specific lot) inserted between groups of a given breed.
-function isLotTransitionScene(name) { return /^\d+(-[A-Z])? Transition$/i.test(normalizeSceneName(name)); }
+function isLotTransitionScene(name) { return /^[A-Za-z]?\d+(-[A-Z])? Transition$/i.test(normalizeSceneName(name)); }
 function isBreedTransitionScene(name) {
   return ['Charolais Transition', 'Native Transition', 'Holstein Transition'].includes(normalizeSceneName(name));
 }
