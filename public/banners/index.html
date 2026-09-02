@@ -521,8 +521,26 @@ const TOKEN_KEY = 'cms_github_pat_session_v1';
 const PIN_KEY = 'cms_admin_pin_ok_v1';
 const LOCATION_OVERRIDE_KEY = 'cms_location_state_overrides_v1';
 
-// Dropbox path banners will live at (hardcoded per user request)
-const DROPBOX_BANNER_PATH = '/Users/brysonmurray/Library/CloudStorage/Dropbox/Auction OBS/Lot Banners/';
+// Dropbox path transition/option banners will live at. This is the SAME
+// real-world folder as Beta's "Lot Banners Folder" setting (beta-state.js
+// DEFAULT_SETTINGS.lotBannersFolder — tags/stinger already live "alongside
+// the lot transition banners" there, by that setting's own definition),
+// so rather than a second independent hardcoded/configurable path here,
+// Classic reads that same setting directly out of localStorage. This is
+// a soft coupling via a shared storage key only (Classic's script never
+// imports beta-state.js or calls into it) — but the key name
+// 'cms_obs_beta_settings_v1' and the lotBannersFolder field name must
+// stay in sync with beta-state.js's SETTINGS_KEY/DEFAULT_SETTINGS if
+// either ever changes.
+const DEFAULT_DROPBOX_BANNER_PATH = '/Users/brysonmurray/Library/CloudStorage/Dropbox/Auction OBS/Lot Banners/';
+function getDropboxBannerPath() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('cms_obs_beta_settings_v1') || '{}');
+    return saved.lotBannersFolder || DEFAULT_DROPBOX_BANNER_PATH;
+  } catch {
+    return DEFAULT_DROPBOX_BANNER_PATH;
+  }
+}
 
 // OBS canvas (4K)
 const CANVAS_W = 3840, CANVAS_H = 2160;
@@ -1455,7 +1473,7 @@ function makeBannerImageSource(fileName, sourceName) {
     uuid: uuidv4(),
     id: 'image_source',
     versioned_id: 'image_source',
-    settings: { file: DROPBOX_BANNER_PATH + fileName },
+    settings: { file: getDropboxBannerPath() + fileName },
     mixers: 0,
     sync: 0,
     flags: 0,

@@ -46,7 +46,7 @@ function buildManifest({ auctionFolder, settings, lotPlans, uniqueVideoSources, 
   lines.push('HOW TO USE');
   lines.push('----------');
   lines.push(`1. Place the cattle video files listed below into:`);
-  lines.push(`   ${settings.auctionObsRoot}${auctionFolder}/videos/`);
+  lines.push(`   ${settings.lotVideosFolder || `${settings.auctionObsRoot}${auctionFolder}/videos/`}`);
   lines.push(`   using the EXACT filenames shown — these are already baked into the OBS JSON.`);
   lines.push(`2. Tag images and the stinger video are NOT in this package — they're bundled`);
   lines.push(`   into "Download All Banners" instead (alongside the lot transition banners),`);

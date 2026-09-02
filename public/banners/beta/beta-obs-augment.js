@@ -177,8 +177,20 @@ function makeMediaSource(localFilePath, sourceName) {
 /**
  * Compute bottom-right positions for a lot's active tags, left-to-right
  * in ascending sortOrder, right-aligned as a group against the margins.
- * `tagAssets` entries need naturalWidth/naturalHeight (read from the
- * localized PNG once per build) so height-locked scaling doesn't distort.
+ *
+ * Scales/positions by each tag's actual VISIBLE content bounding box
+ * (contentX/contentY/contentWidth/contentHeight — computed once per build
+ * in beta-main.js's loadImageContentBox), not the raw source file's full
+ * dimensions. Source tag images carry wildly inconsistent transparent
+ * padding, so scaling by naturalHeight alone made tags with more padding
+ * render visibly smaller than tags with less, even at the same Tag Height
+ * setting. Placing content bounding boxes at a consistent row height/
+ * baseline fixes that for every tag automatically.
+ *
+ * `sizeAdjustPct` (default 100) and `verticalOffsetPx` (default 0) are
+ * optional PER-TAG manual fine-tuning on top of that automatic sizing —
+ * most tags need neither once auto-trim is in place; they're an escape
+ * hatch for the rare tag that still needs a manual nudge.
  */
 export function layoutTagRow(activeTagIds, tagAssets, layout, canvasW, canvasH) {
   const items = activeTagIds
@@ -187,18 +199,27 @@ export function layoutTagRow(activeTagIds, tagAssets, layout, canvasW, canvasH) 
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
   const placed = items.map(t => {
-    const scale = layout.tagHeight / (t.naturalHeight || layout.tagHeight);
-    const w = Math.round((t.naturalWidth || layout.tagHeight) * scale);
-    return { ...t, scale, width: w };
+    const contentH = t.contentHeight || t.naturalHeight || layout.tagHeight;
+    const contentW = t.contentWidth || t.naturalWidth || layout.tagHeight;
+    const sizeMultiplier = (t.sizeAdjustPct ?? 100) / 100;
+    const scale = (layout.tagHeight / contentH) * sizeMultiplier;
+    const width = Math.round(contentW * scale);
+    return { ...t, scale, width };
   });
 
   const totalWidth = placed.reduce((sum, t) => sum + t.width, 0) + layout.spacing * Math.max(0, placed.length - 1);
-  let x = canvasW - layout.rightMargin - totalWidth;
-  const y = canvasH - layout.bottomMargin - layout.tagHeight;
+  let rowX = canvasW - layout.rightMargin - totalWidth;          // left edge of the next tag's VISIBLE content
+  const rowY = canvasH - layout.bottomMargin - layout.tagHeight; // top edge of every tag's VISIBLE content
 
   return placed.map(t => {
+    // pos is the SOURCE IMAGE's own top-left corner (what OBS actually
+    // positions, padding included) — back out the scaled content offset
+    // so the visible content itself, not the raw file's edges, lands at
+    // (rowX, rowY), then apply the manual vertical offset on top.
+    const x = rowX - (t.contentX || 0) * t.scale;
+    const y = rowY - (t.contentY || 0) * t.scale + (t.verticalOffsetPx || 0);
     const pos = { tagId: t.id, name: t.name, x, y, scale: t.scale };
-    x += t.width + layout.spacing;
+    rowX += t.width + layout.spacing;
     return pos;
   });
 }
@@ -299,7 +320,7 @@ function applyStingerOverride(scene, transitionDurationMs) {
  * @param opts.canvasW/canvasH  must match Classic's CANVAS_W/CANVAS_H
  * @param opts.lotPlans  Map<lotId, { cmsVideoId: string|null, videoScale, tagIds: string[] }>
  * @param opts.uniqueVideoSources  Map<cmsVideoId, localPath>  (FILE dedup for the local-path lookup only — never source sharing, see header)
- * @param opts.tagAssets  Map<tagId, { id, name, localPath, naturalWidth, naturalHeight, sortOrder }>
+ * @param opts.tagAssets  Map<tagId, { id, name, localPath, naturalWidth, naturalHeight, contentX, contentY, contentWidth, contentHeight, sortOrder, sizeAdjustPct, verticalOffsetPx }>
  * @param opts.tagLayout  { rightMargin, bottomMargin, spacing, tagHeight }
  * @param opts.stingerConfig  { enabled, localPath, durationMs, transitionPointMs } | null
  */

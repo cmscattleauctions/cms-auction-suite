@@ -66,6 +66,9 @@
 .tag-lib-card.tag-disabled img { filter: grayscale(1); }
 
 /* Icon-only download button — mirrors .del-btn's compact glyph treatment
-   (index.html), just neutral-colored instead of delete's red. */
-.tag-download-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 2px 4px; line-height: 1; }
+   (index.html), just neutral-colored instead of delete's red. Its svg
+   isn't inside .upload-icon/.img-drop (index.html's existing scoped
+   icon-sizing rules), so it needs its own stroke/size here. */
+.tag-download-btn { background: none; border: none; color: var(--muted); cursor: pointer; padding: 2px 4px; line-height: 1; display: inline-flex; align-items: center; }
 .tag-download-btn:hover { color: var(--text); }
+.tag-download-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }

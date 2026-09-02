@@ -24,6 +24,11 @@ export async function initObsSettingsPage(root, { showToast }) {
           <input type="text" class="form-input" id="auctionFolderInput" placeholder="2026-09-10">
         </div>
         <div class="form-row">
+          <label class="form-label">Lot Videos Folder (optional local path — overrides the above)</label>
+          <input type="text" class="form-input mono" id="lotVideosFolderInput" placeholder="Leave blank to use Auction OBS Root / Auction Folder above">
+          <p class="helper" style="margin-top:6px;">If you keep ONE flat video folder and just replace its files each month, instead of a fresh dated folder per auction, set this and leave it set — videos are then looked up directly here (no "/videos/" subfolder, no Auction Folder needed). Leave blank to use Auction OBS Root + Auction Folder above instead.</p>
+        </div>
+        <div class="form-row">
           <label class="form-label">Lot Banners Folder (local path)</label>
           <input type="text" class="form-input mono" id="lotBannersFolderInput">
           <p class="helper" style="margin-top:6px;">Tag images and the stinger video land here, flat, alongside the lot transition banners — download them together via "Download All Banners" and move everything at once. This folder doesn't change per auction, unlike Auction Folder above.</p>
@@ -60,6 +65,7 @@ function refreshSettingsForm(root) {
   const s = State.getBetaSettings();
   root.querySelector('#obsRootInput').value = s.auctionObsRoot;
   root.querySelector('#auctionFolderInput').value = s.auctionFolder;
+  root.querySelector('#lotVideosFolderInput').value = s.lotVideosFolder;
   root.querySelector('#lotBannersFolderInput').value = s.lotBannersFolder;
   root.querySelector('#layoutHeightInput').value = s.tagLayout.tagHeight;
   root.querySelector('#layoutSpacingInput').value = s.tagLayout.spacing;
@@ -73,6 +79,8 @@ function wireSettings(root, showToast) {
     s.auctionObsRoot = root.querySelector('#obsRootInput').value.trim() || s.auctionObsRoot;
     if (!s.auctionObsRoot.endsWith('/')) s.auctionObsRoot += '/';
     s.auctionFolder = root.querySelector('#auctionFolderInput').value.trim();
+    s.lotVideosFolder = root.querySelector('#lotVideosFolderInput').value.trim();
+    if (s.lotVideosFolder && !s.lotVideosFolder.endsWith('/')) s.lotVideosFolder += '/';
     s.lotBannersFolder = root.querySelector('#lotBannersFolderInput').value.trim() || s.lotBannersFolder;
     if (!s.lotBannersFolder.endsWith('/')) s.lotBannersFolder += '/';
     s.tagLayout.tagHeight = Number(root.querySelector('#layoutHeightInput').value) || s.tagLayout.tagHeight;
