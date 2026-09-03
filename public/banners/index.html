@@ -89,6 +89,25 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 .search-box:focus, .form-input:focus, .form-textarea:focus { outline: none; border-color: var(--blue-light); }
 .count-label { font-size: 12px; color: var(--muted); margin-left: auto; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(600px, 1fr)); gap: 14px; }
+
+/* Review & Download — results toolbar, Build Summary, banner sections */
+.review-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.build-summary-card { margin-bottom: 16px; }
+.build-issues-summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--yellow); list-style: none; }
+.build-issues-summary::-webkit-details-marker { display: none; }
+.build-issues-summary::before { content: '▸ '; }
+details[open] .build-issues-summary::before { content: '▾ '; }
+.build-issues-list { list-style: none; display: grid; gap: 6px; }
+.build-issues-list li { font-size: 13px; color: var(--text); padding-left: 2px; }
+.build-issues-list li::before { content: '▸ '; color: var(--yellow); }
+.results-toolbar { position: sticky; top: 56px; z-index: 90; background: var(--bg); padding: 12px 0; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+.results-filter-group { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 3px; }
+.results-filter-btn { padding: 6px 12px; border-radius: 5px; border: none; background: none; color: var(--muted); font-family: 'Barlow', sans-serif; font-weight: 600; font-size: 12px; cursor: pointer; }
+.results-filter-btn:hover { color: var(--text); }
+.results-filter-btn.active { background: var(--blue); color: #fff; }
+.banner-section { margin-bottom: 26px; }
+.banner-section-heading { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0.3px; margin-bottom: 12px; }
+.banner-section-count { color: var(--muted); font-weight: 500; }
 .banner-card { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
 .banner-preview-shell { background: #0e1620; padding: 14px; }
 .banner-canvas-wrap { width: 100%; position: relative; border-radius: 3px; overflow: hidden; }
@@ -136,7 +155,8 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 .flow-steps { display:flex; align-items:center; gap:10px; margin-bottom:28px; flex-wrap:wrap; }
 .flow-step { display:flex; align-items:center; gap:10px; padding:8px 14px; border-radius:999px; background:var(--surface); border:1px solid var(--border); font-size:12px; font-weight:600; color:var(--muted); }
 .flow-step.active { border-color: var(--blue-light); color: var(--blue-light); background: rgba(67,133,200,0.10); }
-.flow-step.done { border-color: var(--green); color: #4fd080; background: rgba(46,168,90,0.10); }
+.flow-step.done { border-color: var(--green); color: #4fd080; background: rgba(46,168,90,0.10); cursor: pointer; }
+.flow-step.done:hover { background: rgba(46,168,90,0.18); }
 .flow-step .step-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:var(--surface2); font-family:'Barlow Condensed', sans-serif; font-weight:800; font-size:12px; color:inherit; border:1px solid currentColor; }
 .flow-arrow { color: var(--border); font-size: 16px; }
 .style-pick-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top:14px; }
@@ -231,9 +251,9 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
   <div id="buildAuctionView">
 
   <div class="flow-steps">
-    <div class="flow-step active" id="flowStep1"><span class="step-num">1</span> Upload CSV</div>
+    <div class="flow-step active" id="flowStep1" onclick="if(this.classList.contains('done'))showPanel('upload')"><span class="step-num">1</span> Upload CSV</div>
     <span class="flow-arrow">→</span>
-    <div class="flow-step" id="flowStep2"><span class="step-num">2</span> Design</div>
+    <div class="flow-step" id="flowStep2" onclick="if(this.classList.contains('done'))showPanel('styles')"><span class="step-num">2</span> Design</div>
     <span class="flow-arrow">→</span>
     <div class="flow-step" id="flowStep3"><span class="step-num">3</span> Review &amp; Download</div>
   </div>
@@ -333,20 +353,18 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 
   <!-- Panel 3: Review & Download -->
   <div id="panelReview" style="display:none">
-    <div class="info-banner">
-      <strong>Next steps:</strong> Download banners first, then drop them into <code id="nextStepsBannerPath"></code> — keep the filenames exactly as exported. Then download the OBS JSON and import it in OBS (<em>Scene Collection → Import</em>).
+
+    <div class="review-header-row">
+      <div>
+        <div class="section-title" style="margin-bottom:2px;">Review &amp; Download</div>
+        <p class="helper">Download banners into <code id="nextStepsBannerPath"></code>, then the OBS scene collection — import it in OBS (<em>Scene Collection → Import</em>).</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btnBackToStyles" title="Change the transition/option style and regenerate">← Change Styles</button>
+      <button class="btn btn-ghost btn-sm" id="btnResetAll">New Build</button>
     </div>
 
     <div id="betaReviewWrap" style="display:none;margin-bottom:24px;">
       <div id="betaReviewSection"></div>
-    </div>
-
-    <div id="statsRow" class="stats-row" style="display:none">
-      <div class="stat"><div class="stat-num" id="sBanners">0</div><div class="stat-label">Banners</div></div>
-      <div class="stat"><div class="stat-num" id="sTransitions">0</div><div class="stat-label">Transition Banners</div></div>
-      <div class="stat"><div class="stat-num" id="sOptionBanners">0</div><div class="stat-label">Option Banners</div></div>
-      <div class="stat"><div class="stat-num" id="sStates">0</div><div class="stat-label">States</div></div>
-      <div class="stat"><div class="stat-num" id="sMissing" style="color:#ffaa44">0</div><div class="stat-label">Missing State Images</div></div>
     </div>
 
     <div class="progress-wrap" id="progressWrap">
@@ -354,25 +372,53 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
       <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
     </div>
 
-    <div class="alert-banner" id="missingAlert"></div>
-
-    <div id="ctrlRow" class="controls-row" style="display:none">
-      <button class="btn btn-success btn-lg" id="btnZip">1 · Download All Banners (ZIP)</button>
-      <button class="btn btn-primary btn-lg" id="btnDownloadObs" disabled title="Download banners first">2 · Download OBS Scene Collection</button>
-      <div class="divider"></div>
-      <button class="btn btn-ghost" id="btnBackToStyles">← Change Styles</button>
-      <button class="btn btn-ghost" id="btnResetAll">Start Over</button>
-      <input type="text" class="search-box" id="searchBox" placeholder="Search lot, consignor, state...">
-      <span class="count-label" id="countLabel"></span>
+    <div class="card build-summary-card" id="buildSummaryCard" style="display:none;">
+      <div class="section-title" style="margin-bottom:12px;">Build Summary</div>
+      <div class="stats-row" style="margin-bottom:0;">
+        <div class="stat"><div class="stat-num" id="sBanners">0</div><div class="stat-label">Banners</div></div>
+        <div class="stat"><div class="stat-num" id="sTransitions">0</div><div class="stat-label">Transition Banners</div></div>
+        <div class="stat"><div class="stat-num" id="sOptionBanners">0</div><div class="stat-label">Option Banners</div></div>
+        <div class="stat"><div class="stat-num" id="sStates">0</div><div class="stat-label">States</div></div>
+        <div class="stat"><div class="stat-num" id="sMissing" style="color:#ffaa44">0</div><div class="stat-label">Missing State Images</div></div>
+      </div>
+      <div id="buildIssuesWrap" style="display:none;margin-top:16px;">
+        <details id="buildIssuesDetails">
+          <summary class="build-issues-summary">Build Issues — <span id="buildIssuesCount">0</span> item(s) need attention</summary>
+          <ul class="build-issues-list" id="buildIssuesList"></ul>
+        </details>
+      </div>
     </div>
 
-    <div class="grid" id="bannerGrid">
-      <div class="empty">
-        <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
-        </svg>
-        <p>No banners yet</p>
+    <div class="results-toolbar" id="resultsToolbar" style="display:none;">
+      <input type="text" class="search-box" id="searchBox" placeholder="Search lot, consignor, state...">
+      <div class="results-filter-group">
+        <button class="results-filter-btn active" data-filter="all" type="button" onclick="setResultsFilter('all')">All</button>
+        <button class="results-filter-btn" data-filter="transition" type="button" onclick="setResultsFilter('transition')">Transition</button>
+        <button class="results-filter-btn" data-filter="option" type="button" onclick="setResultsFilter('option')">Option</button>
       </div>
+      <span class="count-label" id="countLabel"></span>
+      <div style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-success" id="btnZip">Download All Banners (ZIP)</button>
+        <button class="btn btn-primary" id="btnDownloadObs" disabled title="Download banners first">Download OBS Scene Collection</button>
+      </div>
+    </div>
+
+    <div id="resultsSections" style="display:none;">
+      <section class="banner-section" id="transitionSection">
+        <div class="banner-section-heading">Transition Banners <span class="banner-section-count" id="transitionCount">(0)</span></div>
+        <div class="grid" id="transitionGrid"></div>
+      </section>
+      <section class="banner-section" id="optionSection">
+        <div class="banner-section-heading">Option Banners <span class="banner-section-count" id="optionCount">(0)</span></div>
+        <div class="grid" id="optionGrid"></div>
+      </section>
+    </div>
+
+    <div class="empty" id="reviewEmptyState">
+      <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+      </svg>
+      <p>No banners yet</p>
     </div>
   </div>
 
@@ -1930,8 +1976,6 @@ async function generateAndReview() {
   updateStats();
   banners_downloaded = false;
   updateDownloadGates();
-  document.getElementById('statsRow').style.display = 'flex';
-  document.getElementById('ctrlRow').style.display = 'flex';
   // Beta hook — no-op unless OBS Build Mode is set to Beta. See the
   // <script type="module"> block near the end of this file.
   await window.CMSBetaHooks?.afterGenerateAndReview?.(parsedCsvState);
@@ -1939,28 +1983,49 @@ async function generateAndReview() {
 
 async function renderAllBanners() {
   const wrap = document.getElementById('progressWrap');
+  const summaryCard = document.getElementById('buildSummaryCard');
+  const toolbar = document.getElementById('resultsToolbar');
+  const sections = document.getElementById('resultsSections');
+  const empty = document.getElementById('reviewEmptyState');
+  const transitionGrid = document.getElementById('transitionGrid');
+  const optionGrid = document.getElementById('optionGrid');
+  transitionGrid.innerHTML = '';
+  optionGrid.innerHTML = '';
+
+  if (!allBanners.length) {
+    summaryCard.style.display = 'none';
+    toolbar.style.display = 'none';
+    sections.style.display = 'none';
+    empty.style.display = '';
+    wrap.classList.remove('active');
+    document.getElementById('progressFill').style.width = '0';
+    return;
+  }
+
+  summaryCard.style.display = '';
+  toolbar.style.display = 'flex';
+  sections.style.display = '';
+  empty.style.display = 'none';
+
   wrap.classList.add('active');
   const fill = document.getElementById('progressFill');
   const ptxt = document.getElementById('progressText');
   const ppct = document.getElementById('progressPct');
-  const grid = document.getElementById('bannerGrid');
-  grid.innerHTML = '';
-  if (!allBanners.length) {
-    grid.innerHTML = `<div class="empty"><p>No banners to render</p></div>`;
-    wrap.classList.remove('active'); fill.style.width = '0';
-    return;
-  }
   for (let i = 0; i < allBanners.length; i++) {
     const b = allBanners[i];
     const pct = Math.round((i / allBanners.length) * 100);
     fill.style.width = pct + '%'; ppct.textContent = pct + '%';
     ptxt.textContent = `Rendering ${b.fileName}...`;
     await new Promise(r => setTimeout(r, 0));
-    grid.appendChild(await makeCard(b));
+    const card = await makeCard(b);
+    (b.kind === 'option' ? optionGrid : transitionGrid).appendChild(card);
   }
   fill.style.width = '100%'; ppct.textContent = '100%'; ptxt.textContent = 'Done';
   setTimeout(() => { wrap.classList.remove('active'); fill.style.width = '0'; }, 250);
-  updateCountLabel(allBanners.length);
+
+  document.getElementById('transitionCount').textContent = `(${transitionGrid.children.length})`;
+  document.getElementById('optionCount').textContent = `(${optionGrid.children.length})`;
+  setResultsFilter(resultsFilter); // re-applies the current filter + search to the freshly rendered cards
 }
 
 async function makeCard(banner) {
@@ -2002,12 +2067,21 @@ function updateStats() {
   document.getElementById('sOptionBanners').textContent = options.length;
   document.getElementById('sStates').textContent = new Set(transitions.map(b => b.stateAbbr).filter(Boolean)).size;
   document.getElementById('sMissing').textContent = missing.length;
-  const el = document.getElementById('missingAlert');
+
+  // Build Issues — consolidated list of whatever the existing build logic
+  // actually flags. Missing state images is the only such warning today;
+  // this list format is written to accommodate more without restructuring
+  // if the build logic ever grows another one, not to invent one now.
+  const issuesWrap = document.getElementById('buildIssuesWrap');
+  const issuesList = document.getElementById('buildIssuesList');
+  const issuesCount = document.getElementById('buildIssuesCount');
   if (missing.length > 0) {
-    el.style.display = 'block';
-    el.innerHTML = `<strong>Missing state images:</strong> ${missing.join(', ')} — upload these in the State Library tab before downloading.`;
+    issuesWrap.style.display = 'block';
+    issuesCount.textContent = missing.length;
+    issuesList.innerHTML = missing.map(s => `<li>Missing state image: ${esc(s)} — upload it in Assets → State Images before downloading.</li>`).join('');
   } else {
-    el.style.display = 'none';
+    issuesWrap.style.display = 'none';
+    issuesList.innerHTML = '';
   }
 }
 
@@ -2015,11 +2089,26 @@ function updateCountLabel(n) {
   document.getElementById('countLabel').textContent = `${n} banner${n !== 1 ? 's' : ''}`;
 }
 
+// 'all' | 'transition' | 'option' — which banner section(s) are visible.
+// Persists across a re-render (renderAllBanners re-applies it) so
+// switching Design and regenerating doesn't silently reset the filter.
+let resultsFilter = 'all';
+
+function setResultsFilter(kind) {
+  resultsFilter = kind;
+  document.querySelectorAll('.results-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === kind));
+  document.getElementById('transitionSection').style.display = (kind === 'all' || kind === 'transition') ? '' : 'none';
+  document.getElementById('optionSection').style.display = (kind === 'all' || kind === 'option') ? '' : 'none';
+  applySearch();
+}
+
 function applySearch() {
   const q = document.getElementById('searchBox').value.toLowerCase();
   let vis = 0;
   document.querySelectorAll('.banner-card').forEach(c => {
-    const match = !q || c.dataset.lot.includes(q) || c.dataset.consignor.includes(q) || c.dataset.state.includes(q);
+    const kindOk = resultsFilter === 'all' || c.dataset.kind === resultsFilter;
+    const textOk = !q || c.dataset.lot.includes(q) || c.dataset.consignor.includes(q) || c.dataset.state.includes(q);
+    const match = kindOk && textOk;
     c.style.display = match ? '' : 'none';
     if (match) vis++;
   });
@@ -2167,10 +2256,14 @@ function resetUpload() {
 }
 function resetAll() {
   resetUpload();
-  document.getElementById('bannerGrid').innerHTML = `<div class="empty"><p>No banners yet</p></div>`;
-  document.getElementById('statsRow').style.display = 'none';
-  document.getElementById('ctrlRow').style.display = 'none';
-  document.getElementById('missingAlert').style.display = 'none';
+  resultsFilter = 'all';
+  document.getElementById('transitionGrid').innerHTML = '';
+  document.getElementById('optionGrid').innerHTML = '';
+  document.getElementById('buildSummaryCard').style.display = 'none';
+  document.getElementById('resultsToolbar').style.display = 'none';
+  document.getElementById('resultsSections').style.display = 'none';
+  document.getElementById('reviewEmptyState').style.display = '';
+  document.getElementById('buildIssuesWrap').style.display = 'none';
   showPanel('upload');
 }
 
@@ -2343,7 +2436,12 @@ document.getElementById('btnBackToUpload').addEventListener('click', () => showP
 document.getElementById('btnGenerate').addEventListener('click', () => generateAndReview().catch(err => showToast(err.message, true)));
 
 document.getElementById('btnBackToStyles').addEventListener('click', () => showPanel('styles'));
-document.getElementById('btnResetAll').addEventListener('click', resetAll);
+document.getElementById('btnResetAll').addEventListener('click', () => {
+  // Only ask for confirmation when there's actually generated state to
+  // lose — an empty/not-yet-generated build resets silently.
+  if (allBanners.length && !confirm('Start a new build? This clears the current generated banners from this screen (anything already downloaded is unaffected).')) return;
+  resetAll();
+});
 document.getElementById('btnZip').addEventListener('click', () => dlAllBanners().catch(err => showToast(err.message, true)));
 document.getElementById('btnDownloadObs').addEventListener('click', () => dlObsJson().catch(err => showToast(err.message, true)));
 document.getElementById('searchBox').addEventListener('input', applySearch);
@@ -2592,6 +2690,7 @@ window.showBuildView = showBuildView;
 window.openStateImageDrawer = openStateImageDrawer;
 window.pickStandardStyle = pickStandardStyle;
 window.pickOptionStyle = pickOptionStyle;
+window.setResultsFilter = setResultsFilter;
 
 // ═══════════════════════════════════════════════════════════════
 // INITIALIZE
@@ -2658,8 +2757,13 @@ window.pickOptionStyle = pickOptionStyle;
     if (settingsBeta) settingsBeta.checked = (mode === 'beta');
     const dlBtn = document.getElementById('btnDownloadObs');
     if (dlBtn) {
-      const dlLabel = mode === 'beta' ? '2 · Download Auction OBS Package (ZIP)' : '2 · Download OBS Scene Collection';
-      if (dlBtn.textContent.trim().startsWith('2 ·') || dlBtn.textContent.trim().startsWith('2·')) dlBtn.textContent = dlLabel;
+      // Only swap the label when it's currently one of the two static
+      // labels below (not, e.g., "Building OBS JSON..." mid-download) —
+      // same guard as before, just no longer keyed off a numeric prefix
+      // now that the toolbar dropped the "1 ·"/"2 ·" step numbers.
+      const STATIC_LABELS = ['Download OBS Scene Collection', 'Download Auction OBS Package (ZIP)'];
+      const dlLabel = mode === 'beta' ? 'Download Auction OBS Package (ZIP)' : 'Download OBS Scene Collection';
+      if (STATIC_LABELS.includes(dlBtn.textContent.trim())) dlBtn.textContent = dlLabel;
     }
     document.getElementById('betaReviewWrap').style.display = (mode === 'beta' && betaCtx) ? 'block' : 'none';
   }
@@ -2690,8 +2794,9 @@ window.pickOptionStyle = pickOptionStyle;
       progressPct.textContent = pct + '%';
       if (label) progressText.textContent = label;
     };
-    // ctrlRow (Download All Banners) is already visible by the time this
-    // runs — Classic reveals it right after its own banners render, before
+    // The results toolbar (Download All Banners) is already visible by the
+    // time this runs — Classic reveals it right after its own banners
+    // render, before
     // awaiting this hook. Without this gate, clicking Download All Banners
     // while this pipeline is still fetching tag/video data silently ships
     // a ZIP with zero tags/stinger: getBannerZipExtras() below returns
