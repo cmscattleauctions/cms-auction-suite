@@ -2045,7 +2045,7 @@ async function dlAllBanners() {
       for (const { fileName, blob } of extraAssets) zip.file(fileName, blob);
     }
     if (extraFailed.length) {
-      console.warn('[beta] Skipped from banner ZIP (see warnings above for why):', extraFailed);
+      console.warn('[BETA-ZIP-02/03] Skipped from banner ZIP (see warnings above for why):', extraFailed);
     }
 
     ppct.textContent = '100%'; ptxt.textContent = 'Zipping...';
@@ -2579,7 +2579,18 @@ window.pickOptionStyle = pickOptionStyle;
     const wrap = document.getElementById('betaReviewWrap');
     const section = document.getElementById('betaReviewSection');
     wrap.style.display = 'block';
-    section.innerHTML = '<p class="helper">Running Beta review — matching videos and scanning descriptions for verification tags…</p>';
+    section.innerHTML = `
+      <div class="progress-header"><span id="betaProgressText">Starting Beta review…</span><span id="betaProgressPct">0%</span></div>
+      <div class="progress-track"><div class="progress-fill" id="betaProgressFill" style="width:0"></div></div>
+    `;
+    const progressText = document.getElementById('betaProgressText');
+    const progressFill = document.getElementById('betaProgressFill');
+    const progressPct = document.getElementById('betaProgressPct');
+    const onProgress = (pct, label) => {
+      progressFill.style.width = pct + '%';
+      progressPct.textContent = pct + '%';
+      if (label) progressText.textContent = label;
+    };
     // ctrlRow (Download All Banners) is already visible by the time this
     // runs — Classic reveals it right after its own banners render, before
     // awaiting this hook. Without this gate, clicking Download All Banners
@@ -2592,11 +2603,11 @@ window.pickOptionStyle = pickOptionStyle;
     zipBtn.disabled = true;
     zipBtn.title = 'Beta review is still running (matching videos, loading tag images) — one moment…';
     try {
-      betaCtx = await Beta.runBetaPipeline(lastParsedForBeta, fuzzyResolutions);
+      betaCtx = await Beta.runBetaPipeline(lastParsedForBeta, fuzzyResolutions, onProgress);
       renderReview();
     } catch (err) {
-      console.error('[beta]', err);
-      section.innerHTML = `<div class="alert-banner" style="display:block;">Beta review failed to load: ${String(err.message || err)}. Classic mode is unaffected — you can still switch back to Classic and build normally.</div>`;
+      console.error('[BETA-REVIEW-01]', err);
+      section.innerHTML = `<div class="alert-banner" style="display:block;"><strong>[BETA-REVIEW-01]</strong> Beta review failed to load: ${esc(String(err.message || err))}. Classic mode is unaffected — you can still switch back to Classic and build normally.</div>`;
     } finally {
       zipBtn.disabled = zipBtnWasDisabled;
       zipBtn.title = zipBtnOrigTitle;
@@ -2638,7 +2649,7 @@ window.pickOptionStyle = pickOptionStyle;
     getBannerZipExtras: async () => {
       if (!isBeta()) return { assets: [], failed: [] };
       if (!betaCtx) {
-        console.warn('[beta] Download All Banners was clicked before Beta review finished — tag images and stinger were skipped this time. Wait for the "Beta Review" panel to finish loading, then click Download All Banners again.');
+        console.warn('[BETA-ZIP-01] Download All Banners was clicked before Beta review finished — tag images and stinger were skipped this time. Wait for the "Beta Review" panel to finish loading, then click Download All Banners again.');
         return { assets: [], failed: [] };
       }
       return Beta.collectLotBannerAssets(betaCtx);

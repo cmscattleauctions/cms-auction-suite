@@ -37,7 +37,7 @@ export async function fetchAsBlob(url) {
   return res.blob();
 }
 
-function buildManifest({ auctionFolder, settings, lotPlans, uniqueVideoSources, tagAssets, unmatchedLots, missingTagImages }) {
+function buildManifest({ auctionFolder, settings, lotPlans, uniqueVideoSources, tagAssets, unmatchedLots, missingTagImages, droppedTagWarnings }) {
   const lines = [];
   lines.push('CMS Auction OBS Package — Automated Video Setup (Beta)');
   lines.push(`Auction folder: ${auctionFolder}`);
@@ -73,6 +73,12 @@ function buildManifest({ auctionFolder, settings, lotPlans, uniqueVideoSources, 
     missingTagImages.forEach(t => lines.push(`  ${t} — configure an image for this tag in Verification Tags before the build.`));
     lines.push('');
   }
+  if (droppedTagWarnings && droppedTagWarnings.length) {
+    lines.push(`[BETA-TAGROW-01] WARNING — TAGS THAT DIDN'T FIT AND WERE LEFT OFF (${droppedTagWarnings.length})`);
+    lines.push('----------------------------------------------------------------------');
+    droppedTagWarnings.forEach(d => lines.push(`  Lot ${d.lot} — ${d.tagName} (too many tags for this lot to fit on screen; see OBS Settings -> Tag Layout, or disable the lowest-priority tag for this lot)`));
+    lines.push('');
+  }
   lines.push(`VERIFICATION TAG IMAGES USED IN THIS AUCTION (${tagAssets.size}) — see Download All Banners`);
   lines.push('----------------------------------------------------------------------------');
   for (const asset of tagAssets.values()) lines.push(`  ${asset.fileName}`);
@@ -85,10 +91,10 @@ function buildManifest({ auctionFolder, settings, lotPlans, uniqueVideoSources, 
  * separately — see the file header.
  * `obsJson` is the ALREADY-AUGMENTED collection (from beta-obs-augment.js).
  */
-export async function exportAuctionPackage({ obsJson, auctionFolder, settings, lotPlans, uniqueVideoSources, tagAssets, unmatchedLots, missingTagImages }) {
+export async function exportAuctionPackage({ obsJson, auctionFolder, settings, lotPlans, uniqueVideoSources, tagAssets, unmatchedLots, missingTagImages, droppedTagWarnings }) {
   const zip = new JSZip();
   zip.file('CMS_Auction_Scene_Collection.json', JSON.stringify(obsJson, null, 2));
-  zip.file('MANIFEST.txt', buildManifest({ auctionFolder, settings, lotPlans, uniqueVideoSources, tagAssets, unmatchedLots, missingTagImages }));
+  zip.file('MANIFEST.txt', buildManifest({ auctionFolder, settings, lotPlans, uniqueVideoSources, tagAssets, unmatchedLots, missingTagImages, droppedTagWarnings }));
 
   const blob = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(blob);

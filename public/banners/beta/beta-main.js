@@ -102,12 +102,21 @@ function loadImageContentBox(url) {
  *
  * `fuzzyResolutions` — Map<lowercased foundText, 'use'|'ignore'> carried
  * across re-runs within one build session (cleared on new CSV upload).
+ *
+ * `onProgress(pct, label)` — optional, called at each major step so the
+ * caller can drive a progress bar. Best-effort: percentages are step
+ * boundaries, not a measured estimate, except for the tag-image loop
+ * below which is genuinely incremental (it's usually the slowest step
+ * once an auction has more than a couple of enabled tags).
  */
-export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}) {
+export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}, onProgress = () => {}) {
+  onProgress(2, 'Loading settings…');
   const settings = await State.getBetaSettings();
+  onProgress(8, 'Loading verification tag library…');
   const tags = await listEnabledTags();
 
   // ---- Tag detection (Description is the sole source of truth) ----
+  onProgress(15, 'Scanning lot descriptions for tags…');
   const perLotTags = new Map();   // lot -> { applied: [...], pendingFuzzy: [...] }
   for (const row of parsedCsvState.lotRows) {
     perLotTags.set(row.lot, detectTagsForLot(row.description, tags, fuzzyResolutions));
@@ -115,11 +124,13 @@ export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}) {
   const fuzzyGroups = groupFuzzySuggestions(perLotTags);
 
   // ---- Video matching (batched YouTube ID lookup) ----
+  onProgress(25, `Matching videos for ${parsedCsvState.lotRows.length} lot(s)…`);
   const youtubeIds = parsedCsvState.lotRows
     .map(r => extractYoutubeId(r.youtubeUrl))
     .filter(Boolean);
   const youtubeMap = await batchLookupByYoutubeId(youtubeIds);
   const lookupFn = id => youtubeMap.get(id) || null;
+  onProgress(50, 'Videos matched — loading tag images…');
 
   const lotPlans = new Map();
   const unmatchedLots = [];
@@ -157,7 +168,9 @@ export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}) {
   // scenes, which correctly IS auction-scoped.
   const allTagAssets = new Map();
   const missingTagImages = [];
-  for (const tag of tags) {
+  for (let i = 0; i < tags.length; i++) {
+    const tag = tags[i];
+    onProgress(50 + Math.round(40 * (i + 1) / Math.max(1, tags.length)), `Loading tag images (${i + 1}/${tags.length})…`);
     if (!tag.imageUrl) { missingTagImages.push(tag.name); continue; }
     const fileName = `${safeFileStem(tag.name)}.png`;
     const fallbackH = tag.defaultHeightPx || 180;
@@ -189,6 +202,7 @@ export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}) {
   }
 
   // ---- Stinger config (native OBS Transition Override — see beta-obs-augment.js) ----
+  onProgress(92, 'Loading stinger config…');
   const stingerConfigDoc = await getStingerConfig();
   let stingerAsset = null;
   if (stingerConfigDoc.enabled && stingerConfigDoc.videoUrl) {
@@ -205,6 +219,7 @@ export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}) {
   const totalTagSources = [...perLotTags.values()].reduce((sum, r) => sum + r.applied.length, 0);
   const lotsWithTags = [...perLotTags.values()].filter(r => r.applied.length > 0).length;
 
+  onProgress(100, 'Beta review complete.');
   return {
     settings, tags, perLotTags, fuzzyGroups,
     lotPlans, unmatchedLots, uniqueVideoSources,
@@ -341,7 +356,7 @@ export async function buildAndExportBeta(ctx, classicObsJson, canvasW, canvasH) 
     });
   }
 
-  const augmented = augmentObsJsonForBeta(classicObsJson, {
+  const { output: augmented, droppedTagWarnings } = augmentObsJsonForBeta(classicObsJson, {
     canvasW, canvasH,
     lotPlans: lotPlansForAugment,
     uniqueVideoSources: ctx.uniqueVideoSources,
@@ -349,6 +364,10 @@ export async function buildAndExportBeta(ctx, classicObsJson, canvasW, canvasH) 
     tagLayout: ctx.settings.tagLayout,
     stingerConfig: ctx.stingerAsset,
   });
+
+  if (droppedTagWarnings.length) {
+    console.warn(`[BETA-TAGROW-01] ${droppedTagWarnings.length} tag(s) didn't fit their lot's tag row and were left off:`, droppedTagWarnings);
+  }
 
   await exportAuctionPackage({
     obsJson: augmented,
@@ -359,6 +378,7 @@ export async function buildAndExportBeta(ctx, classicObsJson, canvasW, canvasH) 
     tagAssets: ctx.tagAssets,
     unmatchedLots: ctx.unmatchedLots,
     missingTagImages: ctx.missingTagImages,
+    droppedTagWarnings,
   });
 
   return augmented;
@@ -386,7 +406,7 @@ export async function collectLotBannerAssets(ctx) {
       const blob = await fetchAsBlob(asset.downloadUrl);
       assets.push({ fileName: asset.fileName, blob });
     } catch (err) {
-      console.warn(`[beta] Could not download tag image ${asset.fileName} for the banner ZIP:`, err);
+      console.warn(`[BETA-ZIP-02] Could not download tag image ${asset.fileName} for the banner ZIP:`, err);
       failed.push(asset.fileName);
     }
   }
@@ -395,7 +415,7 @@ export async function collectLotBannerAssets(ctx) {
       const blob = await fetchAsBlob(ctx.stingerAsset.downloadUrl);
       assets.push({ fileName: ctx.stingerAsset.fileName, blob });
     } catch (err) {
-      console.warn(`[beta] Could not download stinger ${ctx.stingerAsset.fileName} for the banner ZIP:`, err);
+      console.warn(`[BETA-ZIP-03] Could not download stinger ${ctx.stingerAsset.fileName} for the banner ZIP:`, err);
       failed.push(ctx.stingerAsset.fileName);
     }
   }
