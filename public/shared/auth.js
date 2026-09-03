@@ -108,6 +108,24 @@ export async function resetPassword(email) {
   await sendPasswordResetEmail(auth, email);
 }
 
+/**
+ * The signed-in user's own users/{uid} doc — same doc checkApproved()
+ * reads, exposed here so the shell can also read allowedTabs/role (set
+ * via Admin Settings) to decide which tabs to show. Every signed-in
+ * user can read their own doc (see docs/firestore.rules), so this
+ * needs no special privilege.
+ */
+export async function getMyProfile(user) {
+  if (!user || !db) return null;
+  try {
+    const snap = await getDoc(doc(db, 'users', user.uid));
+    return snap.exists() ? snap.data() : null;
+  } catch (err) {
+    console.error('[auth] Failed to read profile doc:', err);
+    return null;
+  }
+}
+
 /* =============================================================
  * Internal: check approved doc
  * -------------------------------------------------------------

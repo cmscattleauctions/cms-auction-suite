@@ -39,6 +39,7 @@ admin.initializeApp();
 setGlobalOptions({ region: 'us-central1' });
 
 const MAX_CLIP_BYTES = 2 * 1024 * 1024 * 1024; // matches docs/storage.rules' own cap
+const SUITE_ADMIN_EMAIL = 'jayton.h@cmslivestock.com'; // matches docs/firestore.rules' isSuiteAdmin()
 
 function sanitizeFilename(name) {
   return String(name || 'clip').replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -124,5 +125,82 @@ exports.transferClip = onDocumentCreated(
       sizeBytes: bytesWritten,
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+  }
+);
+
+/* =============================================================
+ * Admin Settings — user management
+ * -------------------------------------------------------------
+ * Two operations that genuinely need the Admin SDK and can't be done
+ * from the client: creating a Firebase Auth account (doing that from
+ * the client would sign the admin's own session OUT and into the new
+ * account — a well-known Auth SDK quirk) and setting another user's
+ * password directly (the client SDK can only change the CURRENTLY
+ * signed-in user's own password). Everything else Admin Settings does
+ * (approve, role, allowedTabs, listing users) is a plain Firestore
+ * read/write gated by isSuiteAdmin() in docs/firestore.rules — no
+ * function needed for those.
+ *
+ * Same Firestore-trigger job pattern as transferClip above, for the
+ * same reason documented in this file's header: onCall/onRequest
+ * functions need the "Cloud Run Invoker" role granted to allUsers to
+ * be reachable from a browser at all, which this Workspace org's
+ * Domain Restricted Sharing policy blocks outright. A Firestore write
+ * (already gated by security rules, same as every other write in this
+ * app) triggering a function server-side sidesteps that entirely.
+ * ============================================================= */
+exports.adminRunJob = onDocumentCreated(
+  { document: 'adminJobs/{jobId}', timeoutSeconds: 60 },
+  async event => {
+    const snap = event.data;
+    if (!snap) return;
+    const job = snap.data();
+    const jobRef = snap.ref;
+
+    const fail = message =>
+      jobRef.update({ status: 'error', error: message, completedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+    // Defense in depth beyond docs/firestore.rules — the rules already
+    // restrict who can create a job document at all, but this function
+    // runs with the Admin SDK (which bypasses rules entirely), so it
+    // re-checks the requester's actual Auth record directly rather than
+    // trusting a client-supplied email field.
+    let requester;
+    try {
+      requester = await admin.auth().getUser(job.requestedBy);
+    } catch {
+      await fail('Could not verify the requesting account.');
+      return;
+    }
+    if ((requester.email || '').toLowerCase() !== SUITE_ADMIN_EMAIL) {
+      await fail('Not authorized for admin operations.');
+      return;
+    }
+
+    try {
+      if (job.op === 'createUser') {
+        const { email, password, role, allowedTabs } = job.params || {};
+        if (!email || !password) { await fail('Email and password are required.'); return; }
+        const userRecord = await admin.auth().createUser({ email, password });
+        await admin.firestore().doc(`users/${userRecord.uid}`).set({
+          email: userRecord.email,
+          approved: true, // an admin explicitly creating an account is the approval — no separate pending step
+          role: role || '',
+          allowedTabs: Array.isArray(allowedTabs) ? allowedTabs : null, // null = every tab
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdBy: requester.email,
+        });
+        await jobRef.update({ status: 'done', result: { uid: userRecord.uid }, completedAt: admin.firestore.FieldValue.serverTimestamp() });
+      } else if (job.op === 'setPassword') {
+        const { uid, password } = job.params || {};
+        if (!uid || !password) { await fail('uid and password are required.'); return; }
+        await admin.auth().updateUser(uid, { password });
+        await jobRef.update({ status: 'done', completedAt: admin.firestore.FieldValue.serverTimestamp() });
+      } else {
+        await fail(`Unknown op "${job.op}".`);
+      }
+    } catch (err) {
+      await fail(err.message || String(err));
+    }
   }
 );

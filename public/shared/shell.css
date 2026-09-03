@@ -317,3 +317,60 @@
   border-top: 1px solid var(--sidebar-divider);
 }
 .nav-section-title:first-child { border-top: 0; margin-top: 0; }
+
+/* =============================================================
+ * Admin Settings — sidebar entry point + modal
+ * Only rendered/reachable for the one suite admin (see shell.js /
+ * admin-panel.js) — isSuiteAdmin() in the security rules is the real
+ * boundary, this is just where the button lives.
+ * ============================================================= */
+.admin-settings-btn {
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--accent-soft);
+  border: 1px solid var(--sidebar-divider);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.admin-settings-btn:hover { background: rgba(255, 255, 255, 0.06); }
+
+.admin-panel-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(4, 13, 23, 0.5);
+  display: none; align-items: flex-start; justify-content: center;
+  padding: 40px 20px; overflow-y: auto;
+}
+.admin-panel-overlay.open { display: flex; }
+.admin-panel {
+  background: var(--bg-canvas);
+  border-radius: var(--radius-lg);
+  width: 100%; max-width: 720px;
+  max-height: calc(100vh - 80px);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.admin-panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+.admin-panel-header h2 { font-size: 16px; }
+.admin-panel-close {
+  background: none; border: none; font-size: 22px; line-height: 1;
+  color: var(--text-muted); cursor: pointer; padding: 2px 6px;
+}
+.admin-panel-close:hover { color: var(--text-primary); }
+.admin-panel-body { padding: var(--space-5); overflow-y: auto; }
+.admin-approved-chip {
+  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+  white-space: nowrap;
+}
+.admin-approved-chip.approved { background: var(--success-bg); color: var(--success); }
+.admin-approved-chip.pending  { background: var(--warning-bg); color: var(--warning); }
