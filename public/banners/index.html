@@ -216,6 +216,16 @@ details[open] .build-issues-summary::before { content: '▾ '; }
 .drawer-close:hover { color: var(--text); }
 .drawer-body { padding: 22px; display: grid; gap: 14px; }
 @media (max-width: 600px) { .drawer-panel { width: 100vw; } }
+
+/* Phone widths: nav has 3 tabs + the mode-dropdown button with no wrap
+   or shrink handling, so the dropdown's full label ("Build Mode:
+   Automated Video Setup — Beta") pushed the button past the right edge
+   of the viewport instead of truncating in place. */
+@media (max-width: 640px) {
+  nav { padding: 0 12px; overflow-x: auto; }
+  .nav-tab { padding: 0 12px; font-size: 13px; }
+  #modeDropdownLabel { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle; }
+}
 </style>
 <link rel="stylesheet" href="./light-theme.css">
 <link rel="stylesheet" href="./beta/beta.css">

@@ -233,16 +233,39 @@
   }
 
   .sidebar {
+    position: relative;
     grid-row: 2;
     flex-direction: row;
     border-right: none;
     border-top: 1px solid var(--sidebar-divider);
     overflow-x: auto;
     overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .sidebar-brand,
-  .sidebar-user {
+  /* With 8 tabs, the row is wider than any phone screen. Rather than
+     shrinking tabs down to illegible widths (flex:1 on all 8 collapses
+     labels to ~10px), let the row scroll at a readable tab size and
+     show a fade at the trailing edge so the overflow is discoverable
+     instead of a silent, unmarked scroll area. */
+  .sidebar::after {
+    content: '';
+    position: sticky;
+    top: 0;
+    right: 0;
+    margin-left: -24px;
+    width: 24px;
+    height: 100%;
+    flex-shrink: 0;
+    background: linear-gradient(to right, transparent, var(--sidebar-bg));
+    pointer-events: none;
+  }
+
+  /* Scoped to .sidebar specifically — .mobile-topbar reuses the same
+     .sidebar-brand class for its own (visible) logo, and an unscoped
+     rule here was matching that too, hiding the mobile topbar logo. */
+  .sidebar > .sidebar-brand,
+  .sidebar > .sidebar-user {
     display: none;     /* surfaced via a topbar on mobile, not bottom */
   }
 
@@ -254,13 +277,18 @@
   }
 
   .nav-item {
-    flex: 1;
+    flex: 0 0 auto;
+    /* override the desktop rule's width:100% — with flex-basis:auto,
+       a definite width wins over content sizing and forced every tab
+       to the row's full width instead of its own content width */
+    width: auto;
     flex-direction: column;
     gap: 4px;
-    padding: 8px 4px;
+    padding: 8px 10px;
     font-size: 10px;
     text-align: center;
-    min-width: 0;
+    min-width: 64px;
+    white-space: nowrap;
   }
 
   .content {
@@ -280,7 +308,16 @@
     flex-shrink: 0;
   }
 
+  .mobile-topbar .sidebar-brand {
+    flex-shrink: 0;
+  }
+
+  /* Explicit width, not 100%: inside a flex item with no defined size
+     (.sidebar-brand has no width of its own here), a replaced element
+     sized to 100% of its container creates a circular dependency and
+     collapses to 0x0 instead of rendering at 150px. */
   .mobile-topbar .sidebar-brand-logo {
+    width: 150px;
     max-width: 150px;
   }
 
