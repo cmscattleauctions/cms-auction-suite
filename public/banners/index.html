@@ -21,6 +21,11 @@ window.cmsDataReady = new Promise(function(res){
   window.CMSData = CMSData;
   window.dispatchEvent(new Event('cmsdata-ready'));
 </script>
+<!-- Shared drawer primitive (State Images, Verification Tags) — attaches
+     window.CMSDrawer for the classic script below; loaded eagerly since
+     State Images (a classic-script feature) can be the first Assets
+     sub-tab a user opens, well before any Beta module. -->
+<script type="module" src="./beta-drawer.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -38,6 +43,12 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 .nav-tab.active { color: var(--blue-light); border-bottom-color: var(--blue-light); }
 .page { display: none; padding: 32px; max-width: 1440px; margin: 0 auto; }
 .page.active { display: block; }
+.subnav { display: flex; align-items: center; gap: 4px; margin-bottom: 22px; border-bottom: 1px solid var(--border); }
+.subnav-tab { padding: 9px 4px; margin-right: 22px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; background: none; border: none; border-bottom: 2px solid transparent; font-family: 'Barlow', sans-serif; transition: all 0.15s; }
+.subnav-tab:hover { color: var(--text); }
+.subnav-tab.active { color: var(--blue-light); border-bottom-color: var(--blue-light); }
+.subpage { display: none; }
+.subpage.active { display: block; }
 .section-title { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 14px; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 24px; }
 .btn { padding: 10px 20px; border-radius: 7px; border: none; font-family: 'Barlow', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: all 0.15s; white-space: nowrap; }
@@ -78,6 +89,25 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 .search-box:focus, .form-input:focus, .form-textarea:focus { outline: none; border-color: var(--blue-light); }
 .count-label { font-size: 12px; color: var(--muted); margin-left: auto; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(600px, 1fr)); gap: 14px; }
+
+/* Review & Download — results toolbar, Build Summary, banner sections */
+.review-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.build-summary-card { margin-bottom: 16px; }
+.build-issues-summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--yellow); list-style: none; }
+.build-issues-summary::-webkit-details-marker { display: none; }
+.build-issues-summary::before { content: '▸ '; }
+details[open] .build-issues-summary::before { content: '▾ '; }
+.build-issues-list { list-style: none; display: grid; gap: 6px; }
+.build-issues-list li { font-size: 13px; color: var(--text); padding-left: 2px; }
+.build-issues-list li::before { content: '▸ '; color: var(--yellow); }
+.results-toolbar { position: sticky; top: 56px; z-index: 90; background: var(--bg); padding: 12px 0; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+.results-filter-group { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 3px; }
+.results-filter-btn { padding: 6px 12px; border-radius: 5px; border: none; background: none; color: var(--muted); font-family: 'Barlow', sans-serif; font-weight: 600; font-size: 12px; cursor: pointer; }
+.results-filter-btn:hover { color: var(--text); }
+.results-filter-btn.active { background: var(--blue); color: #fff; }
+.banner-section { margin-bottom: 26px; }
+.banner-section-heading { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0.3px; margin-bottom: 12px; }
+.banner-section-count { color: var(--muted); font-weight: 500; }
 .banner-card { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
 .banner-preview-shell { background: #0e1620; padding: 14px; }
 .banner-canvas-wrap { width: 100%; position: relative; border-radius: 3px; overflow: hidden; }
@@ -125,13 +155,15 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 .flow-steps { display:flex; align-items:center; gap:10px; margin-bottom:28px; flex-wrap:wrap; }
 .flow-step { display:flex; align-items:center; gap:10px; padding:8px 14px; border-radius:999px; background:var(--surface); border:1px solid var(--border); font-size:12px; font-weight:600; color:var(--muted); }
 .flow-step.active { border-color: var(--blue-light); color: var(--blue-light); background: rgba(67,133,200,0.10); }
-.flow-step.done { border-color: var(--green); color: #4fd080; background: rgba(46,168,90,0.10); }
+.flow-step.done { border-color: var(--green); color: #4fd080; background: rgba(46,168,90,0.10); cursor: pointer; }
+.flow-step.done:hover { background: rgba(46,168,90,0.18); }
 .flow-step .step-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:var(--surface2); font-family:'Barlow Condensed', sans-serif; font-weight:800; font-size:12px; color:inherit; border:1px solid currentColor; }
 .flow-arrow { color: var(--border); font-size: 16px; }
 .style-pick-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top:14px; }
-.style-pick-card { background: var(--surface2); border: 2px solid var(--border); border-radius: 10px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
+.style-pick-card { position: relative; background: var(--surface2); border: 2px solid var(--border); border-radius: 10px; overflow: hidden; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
 .style-pick-card:hover { border-color: var(--blue-light); }
-.style-pick-card.active { border-color: var(--blue-light); background: rgba(67,133,200,0.08); }
+.style-pick-card.active { border-color: var(--blue); border-width: 3px; background: rgba(37,99,163,0.08); }
+.style-pick-card.active::after { content: 'Selected'; position: absolute; top: 10px; right: 10px; background: var(--blue); color: #fff; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 3px 9px; border-radius: 999px; }
 .style-pick-preview { background: #0e1620; padding: 14px; }
 .style-pick-preview canvas { width:100%; height:auto; display:block; border-radius:3px; }
 .style-pick-footer { padding: 10px 14px; border-top: 1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
@@ -148,6 +180,42 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
   .grid { grid-template-columns: 1fr; }
   .style-pick-grid { grid-template-columns: 1fr; }
 }
+
+/* Compact Build Mode header control — replaces the old permanent
+   2-button toggle with a status/switcher dropdown. */
+.mode-dropdown { position: relative; }
+.mode-dropdown-btn { display: flex; align-items: center; gap: 6px; }
+.mode-dropdown-btn .caret { font-size: 10px; color: var(--muted); }
+.mode-dropdown-menu { position: absolute; top: calc(100% + 6px); right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; min-width: 260px; padding: 6px; z-index: 200; display: flex; flex-direction: column; gap: 2px; }
+.mode-dropdown-menu[hidden] { display: none; }
+.mode-dropdown-item { text-align: left; padding: 9px 12px; border-radius: 6px; border: none; background: none; color: var(--text); font-family: 'Barlow', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; }
+.mode-dropdown-item:hover { background: var(--surface2); }
+
+/* Settings page — File Locations / Tag Placement side by side. */
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 900px) { .settings-grid { grid-template-columns: 1fr; } }
+.tag-placement-preview { background: #0e1620; border-radius: 8px; padding: 10px; }
+.tag-placement-preview canvas { width: 100%; height: auto; display: block; border-radius: 3px; }
+
+/* Stinger's 16:9 preview player */
+.stinger-preview-wrap { position: relative; width: 100%; max-width: 640px; aspect-ratio: 16 / 9; background: #0e1620; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.stinger-preview-wrap video { width: 100%; height: 100%; object-fit: contain; display: block; }
+.stinger-preview-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
+
+/* Shared right-side drawer (Verification Tags, State Images) — see
+   beta-drawer.js. Flat, border-only, no box-shadow — matches the rest
+   of this app; z-index sits above nav (100) but below .toast (9999) so
+   a save-confirmation toast stays visible over an open drawer. */
+.drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); opacity: 0; pointer-events: none; transition: opacity 0.18s ease; z-index: 899; }
+.drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+.drawer-panel { position: fixed; top: 0; right: 0; height: 100vh; width: 420px; max-width: 92vw; background: var(--surface); border-left: 1px solid var(--border); transform: translateX(100%); transition: transform 0.18s ease; z-index: 900; display: flex; flex-direction: column; overflow-y: auto; }
+.drawer-panel.open { transform: translateX(0); }
+.drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); }
+.drawer-header h3 { font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 700; }
+.drawer-close { background: none; border: none; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; padding: 2px 6px; }
+.drawer-close:hover { color: var(--text); }
+.drawer-body { padding: 22px; display: grid; gap: 14px; }
+@media (max-width: 600px) { .drawer-panel { width: 100vw; } }
 </style>
 <link rel="stylesheet" href="./light-theme.css">
 <link rel="stylesheet" href="./beta/beta.css">
@@ -155,30 +223,39 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 <body>
 <nav>
   <!-- nav-brand removed in Phase 2 — suite shell owns the brand bar -->
-  <button class="nav-tab active" onclick="showPage('flow', this)">Builder</button>
-  <button class="nav-tab" onclick="showPage('custom', this)">Custom Lots</button>
-  <button class="nav-tab" onclick="showPage('admin', this)">State Library</button>
-  <button class="nav-tab" onclick="showPage('tags', this)">Verification Tags</button>
-  <button class="nav-tab" onclick="showPage('stinger', this)">Stinger Settings</button>
-  <button class="nav-tab" onclick="showPage('obs', this)">OBS Settings</button>
-  <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-    <span class="toggle-label">OBS Build Mode</span>
-    <button class="toggle-btn active" id="btnModeClassic" title="Behaves exactly like the production builder — no video matching, no tags, no intro.">Classic</button>
-    <button class="toggle-btn" id="btnModeBeta" title="Adds automated video matching, verification tags, and a Stinger intro. Opt-in, never required.">Automated Video Setup — Beta</button>
+  <button class="nav-tab active" onclick="showPage('build', this)">Build</button>
+  <button class="nav-tab" onclick="showPage('assets', this)">Assets</button>
+  <button class="nav-tab" onclick="showPage('settings', this)">Settings</button>
+  <div class="mode-dropdown" style="margin-left:auto;">
+    <button class="btn btn-ghost mode-dropdown-btn" id="btnModeDropdown" type="button">
+      <span id="modeDropdownLabel">Build Mode: Classic</span> <span class="caret">▾</span>
+    </button>
+    <div class="mode-dropdown-menu" id="modeDropdownMenu" hidden>
+      <button type="button" class="mode-dropdown-item" data-mode="classic" title="Behaves exactly like the production builder — no video matching, no tags, no intro.">Classic</button>
+      <button type="button" class="mode-dropdown-item" data-mode="beta" title="Adds automated video matching, verification tags, and a Stinger intro. Opt-in, never required.">Automated Video Setup — Beta</button>
+    </div>
   </div>
 </nav>
 
 <!-- ============================================================
-     BUILDER FLOW — 3 panels (Upload, Style Picker, Review)
+     BUILD — Build Auction (CSV → banners/OBS) + Custom Lot Builder
      ============================================================ -->
-<div class="page active" id="page-flow">
+<div class="page active" id="page-build">
+
+  <div class="subnav">
+    <button class="subnav-tab active" onclick="showBuildView('auction', this)">Build Auction</button>
+    <button class="subnav-tab" onclick="showBuildView('custom', this)">Custom Lot</button>
+  </div>
+
+  <!-- ---- Build Auction — 3 panels (Upload, Design, Review & Download) ---- -->
+  <div id="buildAuctionView">
 
   <div class="flow-steps">
-    <div class="flow-step active" id="flowStep1"><span class="step-num">1</span> Upload CSV</div>
+    <div class="flow-step active" id="flowStep1" onclick="if(this.classList.contains('done'))showPanel('upload')"><span class="step-num">1</span> Upload CSV</div>
     <span class="flow-arrow">→</span>
-    <div class="flow-step" id="flowStep2"><span class="step-num">2</span> Pick Styles</div>
+    <div class="flow-step" id="flowStep2" onclick="if(this.classList.contains('done'))showPanel('styles')"><span class="step-num">2</span> Design</div>
     <span class="flow-arrow">→</span>
-    <div class="flow-step" id="flowStep3"><span class="step-num">3</span> Download</div>
+    <div class="flow-step" id="flowStep3"><span class="step-num">3</span> Review &amp; Download</div>
   </div>
 
   <!-- Panel 1: Upload -->
@@ -212,18 +289,23 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 
     <div class="action-row" id="uploadActions" style="display:none">
       <button class="btn btn-ghost" id="btnResetUpload">Upload different CSV</button>
-      <button class="btn btn-primary btn-lg" id="btnToStyles">Continue to Style Picker →</button>
+      <button class="btn btn-primary btn-lg" id="btnToStyles">Continue to Design →</button>
+    </div>
+
+    <div class="helper" style="margin-top:18px;">
+      Building one-off banners instead? <button class="btn btn-ghost btn-sm" onclick="showBuildView('custom')">+ Create Custom Lot</button>
     </div>
   </div>
 
-  <!-- Panel 2: Style Picker -->
+  <!-- Panel 2: Design (banner style picker) -->
   <div id="panelStyles" style="display:none">
     <div class="info-banner" style="margin-bottom:24px;">
       Choose the style for your <strong>standard lot transition banners</strong> and <strong>option lot banners</strong>. Previews use data from your first option group.
     </div>
 
     <div class="card" style="margin-bottom:20px;">
-      <div class="section-title">Transition Banner Style <span style="color:var(--muted);font-weight:500;text-transform:none;letter-spacing:0;">· bottom-center on screen</span></div>
+      <div class="section-title" style="margin-bottom:2px;">Transition Banner</div>
+      <p class="helper" style="margin-bottom:14px;">Displayed bottom-center during lot changes.</p>
       <div class="style-pick-grid">
         <div class="style-pick-card active" id="pickStd1" onclick="pickStandardStyle(1)">
           <div class="style-pick-preview"><canvas id="pickStd1Canvas"></canvas></div>
@@ -243,7 +325,8 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
     </div>
 
     <div class="card" style="margin-bottom:20px;">
-      <div class="section-title">Option Banner Style <span style="color:var(--muted);font-weight:500;text-transform:none;letter-spacing:0;">· top-center on screen, shared per option group</span></div>
+      <div class="section-title" style="margin-bottom:2px;">Option Banner</div>
+      <p class="helper" style="margin-bottom:14px;">Displayed top-center for grouped option lots.</p>
       <div class="style-pick-grid">
         <div class="style-pick-card active" id="pickOpt1" onclick="pickOptionStyle(1)">
           <div class="style-pick-preview"><canvas id="pickOpt1Canvas"></canvas></div>
@@ -270,20 +353,18 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 
   <!-- Panel 3: Review & Download -->
   <div id="panelReview" style="display:none">
-    <div class="info-banner">
-      <strong>Next steps:</strong> Download banners first, then drop them into <code id="nextStepsBannerPath"></code> — keep the filenames exactly as exported. Then download the OBS JSON and import it in OBS (<em>Scene Collection → Import</em>).
+
+    <div class="review-header-row">
+      <div>
+        <div class="section-title" style="margin-bottom:2px;">Review &amp; Download</div>
+        <p class="helper">Download banners into <code id="nextStepsBannerPath"></code>, then the OBS scene collection — import it in OBS (<em>Scene Collection → Import</em>).</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btnBackToStyles" title="Change the transition/option style and regenerate">← Change Styles</button>
+      <button class="btn btn-ghost btn-sm" id="btnResetAll">New Build</button>
     </div>
 
     <div id="betaReviewWrap" style="display:none;margin-bottom:24px;">
       <div id="betaReviewSection"></div>
-    </div>
-
-    <div id="statsRow" class="stats-row" style="display:none">
-      <div class="stat"><div class="stat-num" id="sBanners">0</div><div class="stat-label">Banners</div></div>
-      <div class="stat"><div class="stat-num" id="sTransitions">0</div><div class="stat-label">Transition Banners</div></div>
-      <div class="stat"><div class="stat-num" id="sOptionBanners">0</div><div class="stat-label">Option Banners</div></div>
-      <div class="stat"><div class="stat-num" id="sStates">0</div><div class="stat-label">States</div></div>
-      <div class="stat"><div class="stat-num" id="sMissing" style="color:#ffaa44">0</div><div class="stat-label">Missing State Images</div></div>
     </div>
 
     <div class="progress-wrap" id="progressWrap">
@@ -291,37 +372,63 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
       <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
     </div>
 
-    <div class="alert-banner" id="missingAlert"></div>
-
-    <div id="ctrlRow" class="controls-row" style="display:none">
-      <button class="btn btn-success btn-lg" id="btnZip">1 · Download All Banners (ZIP)</button>
-      <button class="btn btn-primary btn-lg" id="btnDownloadObs" disabled title="Download banners first">2 · Download OBS Scene Collection</button>
-      <div class="divider"></div>
-      <button class="btn btn-ghost" id="btnBackToStyles">← Change Styles</button>
-      <button class="btn btn-ghost" id="btnResetAll">Start Over</button>
-      <input type="text" class="search-box" id="searchBox" placeholder="Search lot, consignor, state...">
-      <span class="count-label" id="countLabel"></span>
+    <div class="card build-summary-card" id="buildSummaryCard" style="display:none;">
+      <div class="section-title" style="margin-bottom:12px;">Build Summary</div>
+      <div class="stats-row" style="margin-bottom:0;">
+        <div class="stat"><div class="stat-num" id="sBanners">0</div><div class="stat-label">Banners</div></div>
+        <div class="stat"><div class="stat-num" id="sTransitions">0</div><div class="stat-label">Transition Banners</div></div>
+        <div class="stat"><div class="stat-num" id="sOptionBanners">0</div><div class="stat-label">Option Banners</div></div>
+        <div class="stat"><div class="stat-num" id="sStates">0</div><div class="stat-label">States</div></div>
+        <div class="stat"><div class="stat-num" id="sMissing" style="color:#ffaa44">0</div><div class="stat-label">Missing State Images</div></div>
+      </div>
+      <div id="buildIssuesWrap" style="display:none;margin-top:16px;">
+        <details id="buildIssuesDetails">
+          <summary class="build-issues-summary">Build Issues — <span id="buildIssuesCount">0</span> item(s) need attention</summary>
+          <ul class="build-issues-list" id="buildIssuesList"></ul>
+        </details>
+      </div>
     </div>
 
-    <div class="grid" id="bannerGrid">
-      <div class="empty">
-        <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
-        </svg>
-        <p>No banners yet</p>
+    <div class="results-toolbar" id="resultsToolbar" style="display:none;">
+      <input type="text" class="search-box" id="searchBox" placeholder="Search lot, consignor, state...">
+      <div class="results-filter-group">
+        <button class="results-filter-btn active" data-filter="all" type="button" onclick="setResultsFilter('all')">All</button>
+        <button class="results-filter-btn" data-filter="transition" type="button" onclick="setResultsFilter('transition')">Transition</button>
+        <button class="results-filter-btn" data-filter="option" type="button" onclick="setResultsFilter('option')">Option</button>
       </div>
+      <span class="count-label" id="countLabel"></span>
+      <div style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-success" id="btnZip">Download All Banners (ZIP)</button>
+        <button class="btn btn-primary" id="btnDownloadObs" disabled title="Download banners first">Download OBS Scene Collection</button>
+      </div>
+    </div>
+
+    <div id="resultsSections" style="display:none;">
+      <section class="banner-section" id="transitionSection">
+        <div class="banner-section-heading">Transition Banners <span class="banner-section-count" id="transitionCount">(0)</span></div>
+        <div class="grid" id="transitionGrid"></div>
+      </section>
+      <section class="banner-section" id="optionSection">
+        <div class="banner-section-heading">Option Banners <span class="banner-section-count" id="optionCount">(0)</span></div>
+        <div class="grid" id="optionGrid"></div>
+      </section>
+    </div>
+
+    <div class="empty" id="reviewEmptyState">
+      <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+      </svg>
+      <p>No banners yet</p>
     </div>
   </div>
 
-</div>
+  </div><!-- /#buildAuctionView -->
 
-<!-- ============================================================
-     CUSTOM LOTS PAGE — build one-off banners without a CSV
-     ============================================================ -->
-<div class="page" id="page-custom">
+  <!-- ---- Custom Lot Builder — build one-off banners without a CSV ---- -->
+  <div id="customLotView" style="display:none">
   <div class="info-banner" style="margin-bottom:20px;">
     Build one-off banners without a CSV — type a lot number and location, generate, and download.
-    Custom banners are <strong>download-only</strong>: they never change the OBS Scene Collection download on the Builder tab.
+    Custom banners are <strong>download-only</strong>: they never change the OBS Scene Collection download on the Build Auction view.
   </div>
 
   <div class="card" style="margin-bottom:20px;">
@@ -394,20 +501,25 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
     <span class="count-label" id="clCount"></span>
   </div>
 
-  <div class="grid" id="clGrid">
-    <div class="empty">
-      <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 4.5v15m7.5-7.5h-15"/>
-      </svg>
-      <p>No custom banners yet — fill in the form above and hit Generate</p>
-    </div>
-  </div>
-</div>
+  <div class="grid" id="clGrid"></div>
+
+  </div><!-- /#customLotView -->
+
+</div><!-- /#page-build -->
 
 <!-- ============================================================
-     ADMIN PAGE — State Library (unchanged from original)
+     ASSETS — State Images / Verification Tags / Stinger
      ============================================================ -->
-<div class="page" id="page-admin">
+<div class="page" id="page-assets">
+
+  <div class="subnav">
+    <button class="subnav-tab active" onclick="showSubPage('assets', 'assets-state', this)">State Images</button>
+    <button class="subnav-tab" onclick="showSubPage('assets', 'assets-tags', this)">Verification Tags</button>
+    <button class="subnav-tab" onclick="showSubPage('assets', 'assets-stinger', this)">Stinger</button>
+  </div>
+
+  <!-- ---- State Images (unchanged from original State Library) ---- -->
+  <div class="subpage active" id="assets-state">
   <div id="adminGate" class="secret-box">
     <div class="card">
       <div class="section-title">Admin Access</div>
@@ -421,85 +533,40 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
   </div>
 
   <div id="adminContent" style="display:none;">
-    <div class="admin-grid">
-      <div style="display:grid;gap:20px;">
-        <div class="card">
-          <div class="section-title">Add / Replace State Image</div>
-          <div class="form-row">
-            <label class="form-label">State Abbreviation</label>
-            <input type="text" class="form-input" id="stateAbbrInput" placeholder="TX" maxlength="2" style="text-transform:uppercase;width:90px">
-          </div>
-          <div class="form-row">
-            <label class="form-label">State Image</label>
-            <div class="img-drop" id="imgDrop">
-              <input type="file" accept=".png,.svg,image/png,image/svg+xml" id="imgInput">
-              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
-                <path d="M21 15l-5-5L5 21"/>
-              </svg>
-              <p>Drop PNG or SVG or click to browse</p>
-              <img id="imgThumb" class="img-preview-thumb">
-            </div>
-          </div>
-          <div class="two-col">
-            <button class="btn btn-success" id="btnSaveState">Upload / Replace</button>
-            <button class="btn btn-ghost" id="btnRefreshLibrary">Refresh Library</button>
-          </div>
-          <p id="adminMsg" class="helper" style="margin-top:10px;min-height:18px">PNG and SVG are supported. One file per state.</p>
-        </div>
-      </div>
-
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
       <div>
-        <div class="card" style="margin-bottom:20px;">
-          <div class="section-title">Storage</div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-            <div id="adminSessionChip" class="status-chip good">Saved to Firebase · shared with the whole team</div>
-            <button class="btn btn-ghost btn-sm" id="btnLockAdmin">Lock Admin</button>
-          </div>
-          <p class="helper" style="margin-top:10px;">Just pick a 2-letter state, drop a PNG or SVG, and click Upload. No GitHub token needed.</p>
-        </div>
-
-        <div class="section-title">State Image Library (<span id="libCount">0</span> states)</div>
-        <div class="state-library-grid" id="stateLibGrid">
-          <p class="no-states">No state images found in the repository yet.</p>
-        </div>
+        <div class="section-title" style="margin-bottom:2px;">State Images</div>
+        <p class="helper" id="stateLibCountLabel">0 states</p>
       </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div id="adminSessionChip" class="status-chip good">Saved to Firebase · shared with the whole team</div>
+        <button class="btn btn-ghost btn-sm" id="btnLockAdmin">Lock Admin</button>
+        <button class="btn btn-primary" onclick="openStateImageDrawer(null)">+ Add State Image</button>
+      </div>
+    </div>
+    <div class="state-library-grid" id="stateLibGrid">
+      <p class="no-states">No state images found in the repository yet.</p>
     </div>
   </div>
 </div>
 
-<!-- ============================================================
-     VERIFICATION TAGS — Beta-only settings page (Firebase-backed)
-     Always reachable from the nav; entirely inert if Beta mode is
-     never turned on, since Classic never reads this collection.
-     ============================================================ -->
-<div class="page" id="page-tags">
-  <div class="info-banner" id="tagsPageIntro">
-    Verification tags configured here are only used when <strong>OBS Build Mode</strong> is set to
-    <strong>Automated Video Setup — Beta</strong>. They have no effect on the Classic workflow.
+  <!-- ---- Verification Tags — Beta-only settings, entirely inert if Beta
+       mode is never turned on, since Classic never reads this collection ---- -->
+  <div class="subpage" id="assets-tags">
+    <div id="tagManagerRoot"><p class="helper">Loading…</p></div>
   </div>
-  <div id="tagManagerRoot"><p class="helper">Loading…</p></div>
-</div>
+
+  <!-- ---- Stinger — Beta-only settings page (Firebase-backed) ---- -->
+  <div class="subpage" id="assets-stinger">
+    <div id="stingerRoot"><p class="helper">Loading…</p></div>
+  </div>
+
+</div><!-- /#page-assets -->
 
 <!-- ============================================================
-     STINGER SETTINGS — Beta-only settings page (Firebase-backed)
+     SETTINGS — OBS configuration (local/device settings)
      ============================================================ -->
-<div class="page" id="page-stinger">
-  <div class="info-banner" id="stingerPageIntro">
-    The Stinger configured here is only used when <strong>OBS Build Mode</strong> is set to
-    <strong>Automated Video Setup — Beta</strong>. It has no effect on the Classic workflow.
-  </div>
-  <div id="stingerRoot"><p class="helper">Loading…</p></div>
-</div>
-
-<!-- ============================================================
-     OBS SETTINGS — Beta-only settings page (local/device settings)
-     ============================================================ -->
-<div class="page" id="page-obs">
-  <div class="info-banner" id="obsPageIntro">
-    These settings are only used when <strong>OBS Build Mode</strong> is set to
-    <strong>Automated Video Setup — Beta</strong>. They have no effect on the Classic workflow.
-  </div>
+<div class="page" id="page-settings">
   <div id="obsSettingsRoot"><p class="helper">Loading…</p></div>
 </div>
 
@@ -602,6 +669,38 @@ function showPage(id, btn) {
   if (btn) {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
+  }
+}
+
+// Sub-tab navigation within a top-level page (e.g. Assets' State Images /
+// Verification Tags / Stinger) — same classList-toggle mechanics as
+// showPage above, scoped to `#${containerId} .subpage`/`.subnav-tab`.
+// Deliberately does not reset the "current" subpage when the parent page
+// is merely re-shown (showPage only toggles .page, never touches
+// .subpage) — that's what makes Assets "remember" the last-viewed
+// sub-tab across visits, with no extra state to track.
+function showSubPage(containerId, subId, btn) {
+  const container = document.getElementById('page-' + containerId);
+  container.querySelectorAll(':scope > .subpage').forEach(p => p.classList.remove('active'));
+  document.getElementById(subId).classList.add('active');
+  if (btn) {
+    container.querySelectorAll(':scope > .subnav > .subnav-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+  }
+}
+
+// Build's own internal Build-Auction / Custom-Lot toggle — a simple
+// display:none swap (matches showPanel's existing convention below),
+// not the classList-based .subpage pattern, since these two views are
+// each a full sub-workflow rather than a small settings panel.
+function showBuildView(view, btn) {
+  document.getElementById('buildAuctionView').style.display = (view === 'auction' ? '' : 'none');
+  document.getElementById('customLotView').style.display = (view === 'custom' ? '' : 'none');
+  const nav = document.getElementById('page-build').querySelector(':scope > .subnav');
+  if (nav) {
+    nav.querySelectorAll('.subnav-tab').forEach(t => t.classList.remove('active'));
+    const tabBtn = btn || nav.querySelector(view === 'custom' ? '.subnav-tab:nth-child(2)' : '.subnav-tab:nth-child(1)');
+    if (tabBtn) tabBtn.classList.add('active');
   }
 }
 
@@ -1877,8 +1976,6 @@ async function generateAndReview() {
   updateStats();
   banners_downloaded = false;
   updateDownloadGates();
-  document.getElementById('statsRow').style.display = 'flex';
-  document.getElementById('ctrlRow').style.display = 'flex';
   // Beta hook — no-op unless OBS Build Mode is set to Beta. See the
   // <script type="module"> block near the end of this file.
   await window.CMSBetaHooks?.afterGenerateAndReview?.(parsedCsvState);
@@ -1886,28 +1983,49 @@ async function generateAndReview() {
 
 async function renderAllBanners() {
   const wrap = document.getElementById('progressWrap');
+  const summaryCard = document.getElementById('buildSummaryCard');
+  const toolbar = document.getElementById('resultsToolbar');
+  const sections = document.getElementById('resultsSections');
+  const empty = document.getElementById('reviewEmptyState');
+  const transitionGrid = document.getElementById('transitionGrid');
+  const optionGrid = document.getElementById('optionGrid');
+  transitionGrid.innerHTML = '';
+  optionGrid.innerHTML = '';
+
+  if (!allBanners.length) {
+    summaryCard.style.display = 'none';
+    toolbar.style.display = 'none';
+    sections.style.display = 'none';
+    empty.style.display = '';
+    wrap.classList.remove('active');
+    document.getElementById('progressFill').style.width = '0';
+    return;
+  }
+
+  summaryCard.style.display = '';
+  toolbar.style.display = 'flex';
+  sections.style.display = '';
+  empty.style.display = 'none';
+
   wrap.classList.add('active');
   const fill = document.getElementById('progressFill');
   const ptxt = document.getElementById('progressText');
   const ppct = document.getElementById('progressPct');
-  const grid = document.getElementById('bannerGrid');
-  grid.innerHTML = '';
-  if (!allBanners.length) {
-    grid.innerHTML = `<div class="empty"><p>No banners to render</p></div>`;
-    wrap.classList.remove('active'); fill.style.width = '0';
-    return;
-  }
   for (let i = 0; i < allBanners.length; i++) {
     const b = allBanners[i];
     const pct = Math.round((i / allBanners.length) * 100);
     fill.style.width = pct + '%'; ppct.textContent = pct + '%';
     ptxt.textContent = `Rendering ${b.fileName}...`;
     await new Promise(r => setTimeout(r, 0));
-    grid.appendChild(await makeCard(b));
+    const card = await makeCard(b);
+    (b.kind === 'option' ? optionGrid : transitionGrid).appendChild(card);
   }
   fill.style.width = '100%'; ppct.textContent = '100%'; ptxt.textContent = 'Done';
   setTimeout(() => { wrap.classList.remove('active'); fill.style.width = '0'; }, 250);
-  updateCountLabel(allBanners.length);
+
+  document.getElementById('transitionCount').textContent = `(${transitionGrid.children.length})`;
+  document.getElementById('optionCount').textContent = `(${optionGrid.children.length})`;
+  setResultsFilter(resultsFilter); // re-applies the current filter + search to the freshly rendered cards
 }
 
 async function makeCard(banner) {
@@ -1949,12 +2067,21 @@ function updateStats() {
   document.getElementById('sOptionBanners').textContent = options.length;
   document.getElementById('sStates').textContent = new Set(transitions.map(b => b.stateAbbr).filter(Boolean)).size;
   document.getElementById('sMissing').textContent = missing.length;
-  const el = document.getElementById('missingAlert');
+
+  // Build Issues — consolidated list of whatever the existing build logic
+  // actually flags. Missing state images is the only such warning today;
+  // this list format is written to accommodate more without restructuring
+  // if the build logic ever grows another one, not to invent one now.
+  const issuesWrap = document.getElementById('buildIssuesWrap');
+  const issuesList = document.getElementById('buildIssuesList');
+  const issuesCount = document.getElementById('buildIssuesCount');
   if (missing.length > 0) {
-    el.style.display = 'block';
-    el.innerHTML = `<strong>Missing state images:</strong> ${missing.join(', ')} — upload these in the State Library tab before downloading.`;
+    issuesWrap.style.display = 'block';
+    issuesCount.textContent = missing.length;
+    issuesList.innerHTML = missing.map(s => `<li>Missing state image: ${esc(s)} — upload it in Assets → State Images before downloading.</li>`).join('');
   } else {
-    el.style.display = 'none';
+    issuesWrap.style.display = 'none';
+    issuesList.innerHTML = '';
   }
 }
 
@@ -1962,11 +2089,26 @@ function updateCountLabel(n) {
   document.getElementById('countLabel').textContent = `${n} banner${n !== 1 ? 's' : ''}`;
 }
 
+// 'all' | 'transition' | 'option' — which banner section(s) are visible.
+// Persists across a re-render (renderAllBanners re-applies it) so
+// switching Design and regenerating doesn't silently reset the filter.
+let resultsFilter = 'all';
+
+function setResultsFilter(kind) {
+  resultsFilter = kind;
+  document.querySelectorAll('.results-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === kind));
+  document.getElementById('transitionSection').style.display = (kind === 'all' || kind === 'transition') ? '' : 'none';
+  document.getElementById('optionSection').style.display = (kind === 'all' || kind === 'option') ? '' : 'none';
+  applySearch();
+}
+
 function applySearch() {
   const q = document.getElementById('searchBox').value.toLowerCase();
   let vis = 0;
   document.querySelectorAll('.banner-card').forEach(c => {
-    const match = !q || c.dataset.lot.includes(q) || c.dataset.consignor.includes(q) || c.dataset.state.includes(q);
+    const kindOk = resultsFilter === 'all' || c.dataset.kind === resultsFilter;
+    const textOk = !q || c.dataset.lot.includes(q) || c.dataset.consignor.includes(q) || c.dataset.state.includes(q);
+    const match = kindOk && textOk;
     c.style.display = match ? '' : 'none';
     if (match) vis++;
   });
@@ -2045,7 +2187,7 @@ async function dlAllBanners() {
       for (const { fileName, blob } of extraAssets) zip.file(fileName, blob);
     }
     if (extraFailed.length) {
-      console.warn('[beta] Skipped from banner ZIP (see warnings above for why):', extraFailed);
+      console.warn('[BETA-ZIP-02/03] Skipped from banner ZIP (see warnings above for why):', extraFailed);
     }
 
     ppct.textContent = '100%'; ptxt.textContent = 'Zipping...';
@@ -2114,18 +2256,20 @@ function resetUpload() {
 }
 function resetAll() {
   resetUpload();
-  document.getElementById('bannerGrid').innerHTML = `<div class="empty"><p>No banners yet</p></div>`;
-  document.getElementById('statsRow').style.display = 'none';
-  document.getElementById('ctrlRow').style.display = 'none';
-  document.getElementById('missingAlert').style.display = 'none';
+  resultsFilter = 'all';
+  document.getElementById('transitionGrid').innerHTML = '';
+  document.getElementById('optionGrid').innerHTML = '';
+  document.getElementById('buildSummaryCard').style.display = 'none';
+  document.getElementById('resultsToolbar').style.display = 'none';
+  document.getElementById('resultsSections').style.display = 'none';
+  document.getElementById('reviewEmptyState').style.display = '';
+  document.getElementById('buildIssuesWrap').style.display = 'none';
   showPanel('upload');
 }
 
 // ═══════════════════════════════════════════════════════════════
 // ADMIN — State Library (unchanged behavior)
 // ═══════════════════════════════════════════════════════════════
-let pendingImgFile = null;
-
 function unlockAdmin() {
   document.getElementById('adminGate').style.display = 'none';
   document.getElementById('adminContent').style.display = 'block';
@@ -2149,31 +2293,6 @@ function checkAdminPin() {
   if (val === ADMIN_PIN) { pinMsg.textContent = 'Code accepted.'; unlockAdmin(); }
   else { pinMsg.textContent = 'Invalid code.'; showToast('Invalid admin code', true); }
 }
-async function saveStateToGitHub() {
-  const abbr = document.getElementById('stateAbbrInput').value.trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(abbr)) { showToast('State abbreviation must be 2 letters.', true); return; }
-  if (!pendingImgFile) { showToast('Drop a PNG or SVG file first.', true); return; }
-  const CMS = await getCMSData();
-  if (!CMS || !CMS.configured) { showToast('Firebase is not configured.', true); return; }
-  const msg = document.getElementById('adminMsg');
-  msg.textContent = 'Uploading...';
-  try {
-    const { dataUrl, ext } = await CMS.imageFileToStorableDataUrl(pendingImgFile);
-    await CMS.saveStateImage(abbr, dataUrl, ext);
-    msg.textContent = `Uploaded ${abbr}.${ext}.`;
-    showToast(`${abbr}.${ext} uploaded`);
-    pendingImgFile = null;
-    document.getElementById('imgInput').value = '';
-    document.getElementById('imgThumb').style.display = 'none';
-    document.getElementById('stateAbbrInput').value = '';
-    await fetchStateIndex();
-  } catch (err) {
-    console.error(err);
-    msg.textContent = 'Upload failed.';
-    showToast(err.message, true);
-  }
-}
-
 async function deleteState(abbr) {
   const info = getStateImageInfo(abbr);
   if (!info) return;
@@ -2183,6 +2302,7 @@ async function deleteState(abbr) {
   try {
     await CMS.deleteStateImage(info.abbr);
     showToast(`${info.abbr} deleted`);
+    if (window.CMSDrawer) window.CMSDrawer.closeDrawer();
     await fetchStateIndex();
   } catch (err) {
     console.error(err);
@@ -2192,23 +2312,106 @@ async function deleteState(abbr) {
 
 function renderLibrary() {
   const grid = document.getElementById('stateLibGrid');
-  const count = document.getElementById('libCount');
+  const count = document.getElementById('stateLibCountLabel');
   const abbrs = Object.keys(stateIndex).sort();
-  count.textContent = abbrs.length;
+  if (count) count.textContent = `${abbrs.length} state${abbrs.length === 1 ? '' : 's'}`;
   if (!abbrs.length) {
-    grid.innerHTML = `<p class="no-states">No state images saved yet. Add one above.</p>`;
+    grid.innerHTML = `<p class="no-states">No state images saved yet. Click "+ Add State Image" to add one.</p>`;
     return;
   }
   grid.innerHTML = abbrs.map(a => {
     const info = stateIndex[a];
-    return `<div class="state-lib-card">
+    return `<div class="state-lib-card" onclick="openStateImageDrawer('${a}')" role="button" tabindex="0" style="cursor:pointer;">
       <img src="${info.dataUrl}" alt="${a}">
       <div class="state-lib-label">
         <span class="state-abbr">${a}</span>
-        <button class="del-btn" onclick="deleteState('${a}')" title="Delete">×</button>
       </div>
     </div>`;
   }).join('');
+}
+
+// Add/replace a state image — used both for "+ Add State Image" (abbr =
+// null, create mode) and clicking an existing card (abbr set, edit mode:
+// abbreviation locked since it's the Firestore doc id, only the image can
+// be replaced). Requires the shared drawer primitive (../beta-drawer.js,
+// attached to window.CMSDrawer for this classic script to call).
+function openStateImageDrawer(abbr) {
+  const info = abbr ? getStateImageInfo(abbr) : null;
+  let pendingFile = null;
+
+  const body = window.CMSDrawer.openDrawer({
+    title: info ? `Edit ${info.abbr}` : 'Add State Image',
+    bodyHtml: `
+      <div class="form-row">
+        <label class="form-label">State Abbreviation</label>
+        <input type="text" class="form-input" id="drawerStateAbbrInput" placeholder="TX" maxlength="2" style="text-transform:uppercase;width:90px" value="${info ? info.abbr : ''}" ${info ? 'disabled' : ''}>
+      </div>
+      <div class="form-row">
+        <label class="form-label">${info ? 'Replace Image' : 'State Image'}</label>
+        <div class="img-drop" id="drawerImgDrop">
+          <input type="file" accept=".png,.svg,image/png,image/svg+xml" id="drawerImgInput">
+          <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+            <path d="M21 15l-5-5L5 21"/>
+          </svg>
+          <p>Drop PNG or SVG or click to browse</p>
+          <img id="drawerImgThumb" class="img-preview-thumb" style="${info ? 'display:block' : ''}" ${info ? `src="${info.dataUrl}"` : ''}>
+        </div>
+      </div>
+      <div class="two-col">
+        <button class="btn btn-success" id="btnDrawerSaveState">${info ? 'Upload / Replace' : 'Upload'}</button>
+        ${info ? `<button class="btn btn-danger" id="btnDrawerDeleteState">Delete</button>` : '<span></span>'}
+      </div>
+      <p id="drawerStateMsg" class="helper" style="margin-top:10px;min-height:18px">PNG and SVG are supported. One file per state.</p>
+    `,
+  });
+
+  const abbrInput = body.querySelector('#drawerStateAbbrInput');
+  abbrInput.addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+
+  const drop = body.querySelector('#drawerImgDrop');
+  const input = body.querySelector('#drawerImgInput');
+  const thumb = body.querySelector('#drawerImgThumb');
+  const msg = body.querySelector('#drawerStateMsg');
+  const handleFile = file => {
+    if (!['image/png', 'image/svg+xml'].includes(file.type)) {
+      showToast(`State image must be PNG or SVG (got "${file.type || 'unknown type'}").`, true);
+      return;
+    }
+    pendingFile = file;
+    msg.textContent = `Ready: ${file.name}`;
+    if (file.type === 'image/svg+xml') { thumb.src = URL.createObjectURL(file); thumb.style.display = 'block'; return; }
+    const reader = new FileReader();
+    reader.onload = e => { thumb.src = e.target.result; thumb.style.display = 'block'; };
+    reader.readAsDataURL(file);
+  };
+  input.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('drag-over'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+  body.querySelector('#btnDrawerSaveState').addEventListener('click', async () => {
+    const abbrVal = abbrInput.value.trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(abbrVal)) { showToast('State abbreviation must be 2 letters.', true); return; }
+    if (!pendingFile) { showToast('Drop a PNG or SVG file first.', true); return; }
+    const CMS = await getCMSData();
+    if (!CMS || !CMS.configured) { showToast('Firebase is not configured.', true); return; }
+    msg.textContent = 'Uploading...';
+    try {
+      const { dataUrl, ext } = await CMS.imageFileToStorableDataUrl(pendingFile);
+      await CMS.saveStateImage(abbrVal, dataUrl, ext);
+      showToast(`${abbrVal}.${ext} saved`);
+      window.CMSDrawer.closeDrawer();
+      await fetchStateIndex();
+    } catch (err) {
+      console.error(err);
+      msg.textContent = 'Save failed.';
+      showToast(err.message, true);
+    }
+  });
+
+  const deleteBtn = body.querySelector('#btnDrawerDeleteState');
+  if (deleteBtn) deleteBtn.addEventListener('click', () => deleteState(info.abbr));
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2233,7 +2436,12 @@ document.getElementById('btnBackToUpload').addEventListener('click', () => showP
 document.getElementById('btnGenerate').addEventListener('click', () => generateAndReview().catch(err => showToast(err.message, true)));
 
 document.getElementById('btnBackToStyles').addEventListener('click', () => showPanel('styles'));
-document.getElementById('btnResetAll').addEventListener('click', resetAll);
+document.getElementById('btnResetAll').addEventListener('click', () => {
+  // Only ask for confirmation when there's actually generated state to
+  // lose — an empty/not-yet-generated build resets silently.
+  if (allBanners.length && !confirm('Start a new build? This clears the current generated banners from this screen (anything already downloaded is unaffected).')) return;
+  resetAll();
+});
 document.getElementById('btnZip').addEventListener('click', () => dlAllBanners().catch(err => showToast(err.message, true)));
 document.getElementById('btnDownloadObs').addEventListener('click', () => dlObsJson().catch(err => showToast(err.message, true)));
 document.getElementById('searchBox').addEventListener('input', applySearch);
@@ -2267,8 +2475,8 @@ function clSyncFormVisibility() {
   const type = document.getElementById('clType').value;
   const needsLoc = (type === 'transition' || type === 'both');
   const needsOpt = (type === 'option' || type === 'both');
-  document.querySelectorAll('#page-custom [data-cl="loc"]').forEach(el => el.style.display = needsLoc ? '' : 'none');
-  document.querySelectorAll('#page-custom [data-cl="opt"]').forEach(el => el.style.display = needsOpt ? '' : 'none');
+  document.querySelectorAll('#customLotView [data-cl="loc"]').forEach(el => el.style.display = needsLoc ? '' : 'none');
+  document.querySelectorAll('#customLotView [data-cl="opt"]').forEach(el => el.style.display = needsOpt ? '' : 'none');
 }
 
 function clUpdateBar() {
@@ -2473,46 +2681,16 @@ clSyncFormVisibility();
 document.getElementById('btnPinEnter').addEventListener('click', checkAdminPin);
 document.getElementById('pinInput').addEventListener('keypress', e => { if (e.key === 'Enter') checkAdminPin(); });
 document.getElementById('btnLockAdmin').addEventListener('click', lockAdmin);
-document.getElementById('btnRefreshLibrary').addEventListener('click', async () => {
-  try { await fetchStateIndex(); showToast('Library refreshed'); }
-  catch (err) { showToast(err.message, true); }
-});
-document.getElementById('btnSaveState').addEventListener('click', saveStateToGitHub);
-document.getElementById('stateAbbrInput').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
-
-const imgDrop = document.getElementById('imgDrop');
-const imgInput = document.getElementById('imgInput');
-function handleImgFile(file) {
-  const name = file.name.toLowerCase();
-  if (!name.endsWith('.png') && !name.endsWith('.svg')) { showToast('Only PNG or SVG files are allowed.', true); return; }
-  pendingImgFile = file;
-  document.getElementById('adminMsg').textContent = `Ready: ${file.name}`;
-  if (name.endsWith('.svg')) {
-    const blobUrl = URL.createObjectURL(file);
-    const th = document.getElementById('imgThumb');
-    th.src = blobUrl; th.style.display = 'block';
-  } else {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const th = document.getElementById('imgThumb');
-      th.src = e.target.result; th.style.display = 'block';
-    };
-    reader.readAsDataURL(file);
-  }
-}
-imgInput.addEventListener('change', e => { if (e.target.files[0]) handleImgFile(e.target.files[0]); });
-imgDrop.addEventListener('dragover', e => { e.preventDefault(); imgDrop.classList.add('drag-over'); });
-imgDrop.addEventListener('dragleave', () => imgDrop.classList.remove('drag-over'));
-imgDrop.addEventListener('drop', e => {
-  e.preventDefault(); imgDrop.classList.remove('drag-over');
-  if (e.dataTransfer.files[0]) handleImgFile(e.dataTransfer.files[0]);
-});
 
 window.dlSingleFromCard = dlSingleFromCard;
 window.deleteState = deleteState;
 window.showPage = showPage;
+window.showSubPage = showSubPage;
+window.showBuildView = showBuildView;
+window.openStateImageDrawer = openStateImageDrawer;
 window.pickStandardStyle = pickStandardStyle;
 window.pickOptionStyle = pickOptionStyle;
+window.setResultsFilter = setResultsFilter;
 
 // ═══════════════════════════════════════════════════════════════
 // INITIALIZE
@@ -2552,7 +2730,7 @@ window.pickOptionStyle = pickOptionStyle;
   import { renderBetaReview } from './beta/beta-review-ui.js';
   import { initTagManagerPage } from './beta/beta-tag-manager-ui.js';
   import { initStingerSettingsPage } from './beta/beta-stinger-ui.js';
-  import { initObsSettingsPage } from './beta/beta-obs-settings-ui.js';
+  import { initSettingsPage } from './beta/beta-obs-settings-ui.js';
 
   let betaCtx = null;
   let fuzzyResolutions = {};       // cleared whenever a new CSV is parsed
@@ -2563,15 +2741,40 @@ window.pickOptionStyle = pickOptionStyle;
 
   function isBeta() { return Beta.State.getBuildMode() === 'beta'; }
 
+  // Updates every UI surface that reflects the current build mode: the
+  // header dropdown's own label/active state (below), the Builder tab's
+  // Download button label, the Beta Review panel's visibility, and — if
+  // the Settings page has been visited this session — its Build Mode
+  // radio card (initSettingsPage mounts #settingsModeClassic/Beta once
+  // and leaves them in the DOM, just hidden, so this keeps working even
+  // when Settings isn't the currently-visible page).
   function setModeUI(mode) {
-    document.getElementById('btnModeClassic').classList.toggle('active', mode === 'classic');
-    document.getElementById('btnModeBeta').classList.toggle('active', mode === 'beta');
+    const label = document.getElementById('modeDropdownLabel');
+    if (label) label.textContent = `Build Mode: ${mode === 'beta' ? 'Automated Beta' : 'Classic'}`;
+    const settingsClassic = document.getElementById('settingsModeClassic');
+    const settingsBeta = document.getElementById('settingsModeBeta');
+    if (settingsClassic) settingsClassic.checked = (mode !== 'beta');
+    if (settingsBeta) settingsBeta.checked = (mode === 'beta');
     const dlBtn = document.getElementById('btnDownloadObs');
     if (dlBtn) {
-      const label = mode === 'beta' ? '2 · Download Auction OBS Package (ZIP)' : '2 · Download OBS Scene Collection';
-      if (dlBtn.textContent.trim().startsWith('2 ·') || dlBtn.textContent.trim().startsWith('2·')) dlBtn.textContent = label;
+      // Only swap the label when it's currently one of the two static
+      // labels below (not, e.g., "Building OBS JSON..." mid-download) —
+      // same guard as before, just no longer keyed off a numeric prefix
+      // now that the toolbar dropped the "1 ·"/"2 ·" step numbers.
+      const STATIC_LABELS = ['Download OBS Scene Collection', 'Download Auction OBS Package (ZIP)'];
+      const dlLabel = mode === 'beta' ? 'Download Auction OBS Package (ZIP)' : 'Download OBS Scene Collection';
+      if (STATIC_LABELS.includes(dlBtn.textContent.trim())) dlBtn.textContent = dlLabel;
     }
     document.getElementById('betaReviewWrap').style.display = (mode === 'beta' && betaCtx) ? 'block' : 'none';
+  }
+
+  // Single entry point for switching modes — every UI surface (header
+  // dropdown, Settings' Build Mode card, the "Enable Automated Mode"
+  // quick-action button) calls this instead of duplicating the sequence.
+  async function setBuildMode(mode) {
+    Beta.State.setBuildMode(mode);
+    setModeUI(mode);
+    if (mode === 'beta' && lastParsedForBeta) await runBetaReviewIfNeeded();
   }
 
   async function runBetaReviewIfNeeded() {
@@ -2579,9 +2782,21 @@ window.pickOptionStyle = pickOptionStyle;
     const wrap = document.getElementById('betaReviewWrap');
     const section = document.getElementById('betaReviewSection');
     wrap.style.display = 'block';
-    section.innerHTML = '<p class="helper">Running Beta review — matching videos and scanning descriptions for verification tags…</p>';
-    // ctrlRow (Download All Banners) is already visible by the time this
-    // runs — Classic reveals it right after its own banners render, before
+    section.innerHTML = `
+      <div class="progress-header"><span id="betaProgressText">Starting Beta review…</span><span id="betaProgressPct">0%</span></div>
+      <div class="progress-track"><div class="progress-fill" id="betaProgressFill" style="width:0"></div></div>
+    `;
+    const progressText = document.getElementById('betaProgressText');
+    const progressFill = document.getElementById('betaProgressFill');
+    const progressPct = document.getElementById('betaProgressPct');
+    const onProgress = (pct, label) => {
+      progressFill.style.width = pct + '%';
+      progressPct.textContent = pct + '%';
+      if (label) progressText.textContent = label;
+    };
+    // The results toolbar (Download All Banners) is already visible by the
+    // time this runs — Classic reveals it right after its own banners
+    // render, before
     // awaiting this hook. Without this gate, clicking Download All Banners
     // while this pipeline is still fetching tag/video data silently ships
     // a ZIP with zero tags/stinger: getBannerZipExtras() below returns
@@ -2592,11 +2807,11 @@ window.pickOptionStyle = pickOptionStyle;
     zipBtn.disabled = true;
     zipBtn.title = 'Beta review is still running (matching videos, loading tag images) — one moment…';
     try {
-      betaCtx = await Beta.runBetaPipeline(lastParsedForBeta, fuzzyResolutions);
+      betaCtx = await Beta.runBetaPipeline(lastParsedForBeta, fuzzyResolutions, onProgress);
       renderReview();
     } catch (err) {
-      console.error('[beta]', err);
-      section.innerHTML = `<div class="alert-banner" style="display:block;">Beta review failed to load: ${String(err.message || err)}. Classic mode is unaffected — you can still switch back to Classic and build normally.</div>`;
+      console.error('[BETA-REVIEW-01]', err);
+      section.innerHTML = `<div class="alert-banner" style="display:block;"><strong>[BETA-REVIEW-01]</strong> Beta review failed to load: ${esc(String(err.message || err))}. Classic mode is unaffected — you can still switch back to Classic and build normally.</div>`;
     } finally {
       zipBtn.disabled = zipBtnWasDisabled;
       zipBtn.title = zipBtnOrigTitle;
@@ -2638,47 +2853,65 @@ window.pickOptionStyle = pickOptionStyle;
     getBannerZipExtras: async () => {
       if (!isBeta()) return { assets: [], failed: [] };
       if (!betaCtx) {
-        console.warn('[beta] Download All Banners was clicked before Beta review finished — tag images and stinger were skipped this time. Wait for the "Beta Review" panel to finish loading, then click Download All Banners again.');
+        console.warn('[BETA-ZIP-01] Download All Banners was clicked before Beta review finished — tag images and stinger were skipped this time. Wait for the "Beta Review" panel to finish loading, then click Download All Banners again.');
         return { assets: [], failed: [] };
       }
       return Beta.collectLotBannerAssets(betaCtx);
     },
   };
 
-  document.getElementById('btnModeClassic').addEventListener('click', () => {
-    Beta.State.setBuildMode('classic');
-    setModeUI('classic');
+  const modeDropdownBtn = document.getElementById('btnModeDropdown');
+  const modeDropdownMenu = document.getElementById('modeDropdownMenu');
+  modeDropdownBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    modeDropdownMenu.hidden = !modeDropdownMenu.hidden;
   });
-  document.getElementById('btnModeBeta').addEventListener('click', async () => {
-    Beta.State.setBuildMode('beta');
-    setModeUI('beta');
-    if (lastParsedForBeta) await runBetaReviewIfNeeded();
+  modeDropdownMenu.querySelectorAll('.mode-dropdown-item').forEach(item => {
+    item.addEventListener('click', async () => {
+      modeDropdownMenu.hidden = true;
+      await setBuildMode(item.dataset.mode);
+    });
+  });
+  document.addEventListener('click', e => {
+    if (!modeDropdownMenu.hidden && !modeDropdownMenu.contains(e.target) && e.target !== modeDropdownBtn) {
+      modeDropdownMenu.hidden = true;
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') modeDropdownMenu.hidden = true;
   });
 
-  // Wrap (not replace) Classic's own showPage so the Beta settings pages
-  // lazy-initialize on first visit.
+  // Wrap (not replace) Classic's own showPage/showSubPage so the Beta
+  // settings pages lazy-initialize on first visit. Tags/Stinger live under
+  // Assets now (reached via showSubPage), OBS Settings lives at the
+  // top-level Settings page (reached via showPage('settings', ...)).
   const originalShowPage = window.showPage;
   window.showPage = function (id, btn) {
     originalShowPage(id, btn);
-    if (id === 'tags' && !tagManagerInitialized) {
+    if (id === 'settings' && !obsSettingsInitialized) {
+      obsSettingsInitialized = true;
+      initSettingsPage(document.getElementById('obsSettingsRoot'), { showToast, setBuildMode }).catch(err => {
+        console.error('[beta]', err);
+        document.getElementById('obsSettingsRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load Settings: ${String(err.message || err)}</div>`;
+      });
+    }
+  };
+
+  const originalShowSubPage = window.showSubPage;
+  window.showSubPage = function (containerId, subId, btn) {
+    originalShowSubPage(containerId, subId, btn);
+    if (subId === 'assets-tags' && !tagManagerInitialized) {
       tagManagerInitialized = true;
-      initTagManagerPage(document.getElementById('tagManagerRoot'), { showToast }).catch(err => {
+      initTagManagerPage(document.getElementById('tagManagerRoot'), { showToast, setBuildMode }).catch(err => {
         console.error('[beta]', err);
         document.getElementById('tagManagerRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load Verification Tags: ${String(err.message || err)}</div>`;
       });
     }
-    if (id === 'stinger' && !stingerSettingsInitialized) {
+    if (subId === 'assets-stinger' && !stingerSettingsInitialized) {
       stingerSettingsInitialized = true;
-      initStingerSettingsPage(document.getElementById('stingerRoot'), { showToast }).catch(err => {
+      initStingerSettingsPage(document.getElementById('stingerRoot'), { showToast, setBuildMode }).catch(err => {
         console.error('[beta]', err);
         document.getElementById('stingerRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load Stinger Settings: ${String(err.message || err)}</div>`;
-      });
-    }
-    if (id === 'obs' && !obsSettingsInitialized) {
-      obsSettingsInitialized = true;
-      initObsSettingsPage(document.getElementById('obsSettingsRoot'), { showToast }).catch(err => {
-        console.error('[beta]', err);
-        document.getElementById('obsSettingsRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load OBS Settings: ${String(err.message || err)}</div>`;
       });
     }
   };

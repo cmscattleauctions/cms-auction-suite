@@ -190,6 +190,11 @@ function makeMediaSource(localFilePath, sourceName) {
  * setting. Placing content bounding boxes at a consistent row height/
  * baseline fixes that for every tag automatically.
  *
+ * Returns { positions, dropped } — `dropped` lists any tags that didn't
+ * fit within the canvas and were left off (see the drop-priority comment
+ * inline below); the caller surfaces these as build warnings, never a
+ * crash.
+ *
  * `sizeAdjustPct` (default 100) and `verticalOffsetPx` (default 0) are
  * optional PER-TAG manual fine-tuning on top of that automatic sizing —
  * most tags need neither once auto-trim is in place; they're an escape
@@ -210,11 +215,37 @@ export function layoutTagRow(activeTagIds, tagAssets, layout, canvasW, canvasH) 
     return { ...t, scale, width };
   });
 
-  const totalWidth = placed.reduce((sum, t) => sum + t.width, 0) + layout.spacing * Math.max(0, placed.length - 1);
+  // ---- Drop tags that won't fit rather than let the row run off the
+  // canvas or overlap other content. The row is right-aligned and grows
+  // leftward, so it must fit within [leftMargin, canvasW - rightMargin] —
+  // there's no separately configured left margin, so rightMargin is
+  // mirrored as a symmetric default.
+  //
+  // Drop priority, lowest first: "IMI Global" is always the first thing
+  // left off regardless of its configured sort order — the operator
+  // doesn't need it on-screen if space is tight. Beyond that, tags drop
+  // from the end of the configured sort order (whatever the operator
+  // placed last is what they care about showing least).
+  const leftMargin = layout.leftMargin ?? layout.rightMargin;
+  const availableWidth = Math.max(0, canvasW - leftMargin - layout.rightMargin);
+  const rowWidthOf = list => list.reduce((sum, t) => sum + t.width, 0) + layout.spacing * Math.max(0, list.length - 1);
+
+  let kept = placed;
+  const dropped = [];
+  while (kept.length > 1 && rowWidthOf(kept) > availableWidth) {
+    let dropIdx = kept.findIndex(t => /imi\s*global/i.test(t.name || ''));
+    if (dropIdx === -1) dropIdx = kept.length - 1;
+    dropped.push(kept[dropIdx]);
+    kept = kept.filter((_, i) => i !== dropIdx);
+  }
+  // A single tag still too wide on its own is an oversized-image problem,
+  // not something more dropping fixes — leave it rather than show nothing.
+
+  const totalWidth = rowWidthOf(kept);
   let rowX = canvasW - layout.rightMargin - totalWidth;          // left edge of the next tag's VISIBLE content
   const rowY = canvasH - layout.bottomMargin - layout.tagHeight; // top edge of every tag's VISIBLE content
 
-  return placed.map(t => {
+  const positions = kept.map(t => {
     // pos is the SOURCE IMAGE's own top-left corner (what OBS actually
     // positions, padding included) — back out the scaled content offset
     // so the visible content itself, not the raw file's edges, lands at
@@ -225,6 +256,8 @@ export function layoutTagRow(activeTagIds, tagAssets, layout, canvasW, canvasH) 
     rowX += t.width + layout.spacing;
     return pos;
   });
+
+  return { positions, dropped: dropped.map(t => ({ tagId: t.id, name: t.name })) };
 }
 
 /**
@@ -318,13 +351,16 @@ function applyStingerOverride(scene, transitionDurationMs) {
 
 /**
  * Main entry point. Does not mutate `baseObsJson`.
+ * Returns { output, droppedTagWarnings } — droppedTagWarnings is
+ * [{ lot, tagName }] for any tag that didn't fit a lot's tag row and was
+ * left off (see layoutTagRow); the caller surfaces these, never a crash.
  *
  * @param baseObsJson  output of Classic's buildObsJson() — untouched
  * @param opts.canvasW/canvasH  must match Classic's CANVAS_W/CANVAS_H
  * @param opts.lotPlans  Map<lotId, { cmsVideoId: string|null, videoScale, tagIds: string[] }>
  * @param opts.uniqueVideoSources  Map<cmsVideoId, localPath>  (FILE dedup for the local-path lookup only — never source sharing, see header)
  * @param opts.tagAssets  Map<tagId, { id, name, localPath, naturalWidth, naturalHeight, contentX, contentY, contentWidth, contentHeight, sortOrder, sizeAdjustPct, verticalOffsetPx }>
- * @param opts.tagLayout  { rightMargin, bottomMargin, spacing, tagHeight }
+ * @param opts.tagLayout  { rightMargin, bottomMargin, spacing, tagHeight, leftMargin? }  (leftMargin defaults to rightMargin)
  * @param opts.stingerConfig  { enabled, localPath, durationMs, transitionPointMs } | null
  */
 export function augmentObsJsonForBeta(baseObsJson, opts) {
@@ -333,6 +369,7 @@ export function augmentObsJsonForBeta(baseObsJson, opts) {
   output.transitions = Array.isArray(output.transitions) ? output.transitions : [];
 
   const newSources = [];
+  const droppedTagWarnings = []; // [{ lot, tagName }] — tags that didn't fit in a lot's tag row; see layoutTagRow
 
   // One image_source per configured tag actually used anywhere in this auction.
   const usedTagIds = new Set();
@@ -433,7 +470,7 @@ export function augmentObsJsonForBeta(baseObsJson, opts) {
 
     // 3. Verification tags — top layer, bottom-right row, one independent
     //    scene item per tag (never combined into one composite image).
-    const positions = layoutTagRow(plan.tagIds || [], tagAssets, tagLayout, canvasW, canvasH);
+    const { positions, dropped } = layoutTagRow(plan.tagIds || [], tagAssets, tagLayout, canvasW, canvasH);
     for (const p of positions) {
       const tsrc = tagSourceById.get(p.tagId);
       if (!tsrc) continue;
@@ -442,10 +479,11 @@ export function augmentObsJsonForBeta(baseObsJson, opts) {
         canvasW, canvasH, posX: p.x, posY: p.y, scaleX: p.scale, scaleY: p.scale,
       }));
     }
+    for (const d of dropped) droppedTagWarnings.push({ lot, tagName: d.name });
 
     settings.id_counter = nextId;
   }
 
   output.sources = [...output.sources, ...newSources];
-  return output;
+  return { output, droppedTagWarnings };
 }

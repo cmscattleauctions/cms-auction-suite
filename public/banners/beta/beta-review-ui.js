@@ -54,16 +54,19 @@ function renderVideoSection(ctx) {
       <span class="status-chip ${summary.videosUnmatched ? 'warn' : 'good'}" style="margin-left:10px;">${pct}% matched</span>
     </div>
     ${unmatchedLots.length ? `
-      <div class="beta-warning-list">
-        ${unmatchedLots.map(u => `
-          <div class="beta-warning-row" data-lot="${esc(u.lot)}">
-            <div><strong>Lot ${esc(u.lot)}</strong> — <span class="helper">${esc(u.reason)}</span></div>
-            <div style="display:flex;gap:8px;">
-              <button class="btn btn-ghost btn-sm beta-btn-choose" data-lot="${esc(u.lot)}">Choose File</button>
-              <button class="btn btn-ghost btn-sm beta-btn-skip" data-lot="${esc(u.lot)}">Skip Video</button>
-            </div>
-          </div>`).join('')}
-      </div>` : `<p class="helper" style="margin-top:8px;">All lots matched — nothing to review.</p>`}
+      <details style="margin-top:10px;">
+        <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);">${unmatchedLots.length} lot${unmatchedLots.length === 1 ? '' : 's'} need a video — click to review</summary>
+        <div class="beta-warning-list">
+          ${unmatchedLots.map(u => `
+            <div class="beta-warning-row" data-lot="${esc(u.lot)}">
+              <div><strong>Lot ${esc(u.lot)}</strong> — <span class="helper">${esc(u.reason)}</span></div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-ghost btn-sm beta-btn-choose" data-lot="${esc(u.lot)}">Choose File</button>
+                <button class="btn btn-ghost btn-sm beta-btn-skip" data-lot="${esc(u.lot)}">Skip Video</button>
+              </div>
+            </div>`).join('')}
+        </div>
+      </details>` : `<p class="helper" style="margin-top:8px;">All lots matched — nothing to review.</p>`}
     ${rememberOffers.length ? `
       <div class="beta-fuzzy-list" style="margin-top:14px;">
         ${rememberOffers.map(p => `
