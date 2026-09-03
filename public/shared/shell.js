@@ -20,6 +20,8 @@
 import * as Auth   from './auth.js';
 import * as AuthUI from './auth-ui.js';
 import { FIREBASE_CONFIGURED } from './firebase-config.js';
+import { openAdminPanel } from './admin-panel.js';
+import { SUITE_ADMIN_EMAIL } from './admin-data.js';
 
 const TABS = [
   { id: 'listings',     label: 'Listings',     src: './listings/index.html',                ready: true, section: 'Auction Management' },
@@ -35,6 +37,14 @@ const TABS = [
 const DEFAULT_TAB = 'listings';
 
 let activeTabId = null;
+// null = every tab (default for everyone until an admin restricts a
+// specific account) — set from the current user's users/{uid}.allowedTabs
+// in renderShell() below, via Admin Settings (admin-panel.js).
+let allowedTabIds = null;
+
+function isTabAllowed(tabId) {
+  return allowedTabIds == null || allowedTabIds.includes(tabId);
+}
 
 /* =============================================================
  * Boot
@@ -55,7 +65,7 @@ async function boot() {
     });
   } else {
     // 'approved' or 'demo'
-    renderShell(root, result.user);
+    await renderShell(root, result.user);
   }
 }
 
@@ -75,14 +85,21 @@ function showLogin(root) {
  * Shell rendering
  * ============================================================= */
 
-function renderShell(root, user) {
+async function renderShell(root, user) {
   const email = user?.email || '';
   const initial = email ? email[0].toUpperCase() : '?';
+  const isSuiteAdmin = !!email && email.toLowerCase() === SUITE_ADMIN_EMAIL;
   const demoBanner = FIREBASE_CONFIGURED ? '' : `
     <div class="demo-banner no-print">
       Demo mode — Firebase not configured. Set values in
       <code>shared/firebase-config.js</code> to enable real auth.
     </div>`;
+
+  // users/{uid}.allowedTabs (set via Admin Settings) — null/absent means
+  // every tab, same as before this existed, so existing accounts are
+  // unaffected until an admin explicitly restricts one.
+  const profile = FIREBASE_CONFIGURED ? await Auth.getMyProfile(user) : null;
+  allowedTabIds = profile && Array.isArray(profile.allowedTabs) ? profile.allowedTabs : null;
 
   root.innerHTML = `
     ${demoBanner}
@@ -102,6 +119,7 @@ function renderShell(root, user) {
         <nav class="sidebar-nav" id="sidebar-nav" aria-label="App tabs"></nav>
 
         <div class="sidebar-user">
+          ${isSuiteAdmin ? `<button class="admin-settings-btn" type="button" id="btnOpenAdminSettings">Admin Settings</button>` : ''}
           <div class="user-pill">
             <span class="user-avatar" aria-hidden="true">${initial}</span>
             <span class="user-email" title="${email}">${email || 'Signed in'}</span>
@@ -116,9 +134,12 @@ function renderShell(root, user) {
 
   renderNav();
   wireSignOut();
+  if (isSuiteAdmin) {
+    document.getElementById('btnOpenAdminSettings').addEventListener('click', () => openAdminPanel());
+  }
 
   const hashTab = location.hash.replace(/^#/, '');
-  const initialTab = TABS.some(t => t.id === hashTab) ? hashTab : DEFAULT_TAB;
+  const initialTab = TABS.some(t => t.id === hashTab) && isTabAllowed(hashTab) ? hashTab : DEFAULT_TAB;
   selectTab(initialTab);
 
   window.addEventListener('hashchange', () => {
@@ -132,6 +153,7 @@ function renderNav() {
   let html = '';
   let currentSection = null;
   for (const tab of TABS) {
+    if (!isTabAllowed(tab.id)) continue;
     if (tab.section && tab.section !== currentSection) {
       currentSection = tab.section;
       html += `<div class="nav-section-title">${tab.section}</div>`;
@@ -196,6 +218,15 @@ function svg(strings) {
  * ============================================================= */
 
 function selectTab(tabId) {
+  // Defense in depth beyond renderNav()'s filtering — catches a disallowed
+  // tab reached via a typed/bookmarked #hash, not just a click. Falls back
+  // to this user's first allowed tab (own security rules inside each
+  // sub-app remain the real data boundary; this is a workflow guard).
+  if (!isTabAllowed(tabId)) {
+    const fallback = TABS.find(t => isTabAllowed(t.id));
+    if (!fallback || fallback.id === tabId) return;
+    tabId = fallback.id;
+  }
   const tab = TABS.find(t => t.id === tabId);
   if (!tab) return;
 

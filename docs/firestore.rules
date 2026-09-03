@@ -20,6 +20,15 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // Suite-wide user-management admin — the one person who can approve
+    // accounts, set responsibilities, and (via adminJobs below) create
+    // accounts / set passwords. Keyed off the Auth token's own email
+    // claim (set by Firebase Auth itself, not client-editable), not a
+    // Firestore doc, so there's no bootstrapping chicken-and-egg problem.
+    function isSuiteAdmin() {
+      return isSignedIn() && request.auth.token.email.lower() == 'jayton.h@cmslivestock.com';
+    }
+
     // Anonymous session (public Cattle Video Upload page — reps are
     // explicitly NOT approved staff; see that page's own comments).
     function isAnon() {
@@ -27,12 +36,30 @@ service cloud.firestore {
     }
 
     // Each person can read and create only their OWN approval record,
-    // and only with approved:false. Flipping it to true happens in the
-    // Firebase Console (or Admin SDK), which bypasses these rules.
+    // and only with approved:false — flipping it to true (or editing
+    // role/allowedTabs) is the suite admin's job, via the Admin Settings
+    // panel (public/shared/admin-panel.js), which only isSuiteAdmin()
+    // can reach.
     match /users/{uid} {
-      allow read:   if isSignedIn() && request.auth.uid == uid;
+      allow read:   if isSignedIn() && (request.auth.uid == uid || isSuiteAdmin());
       allow create: if isSignedIn() && request.auth.uid == uid
                     && request.resource.data.approved == false;
+      allow update: if isSuiteAdmin();
+      allow delete: if false;
+    }
+
+    // Admin Settings' create-account / set-password jobs — these two
+    // operations need the Admin SDK (creating a Firebase Auth account or
+    // setting another user's password isn't possible from the client
+    // SDK without hijacking the admin's own session), so they go through
+    // the same Firestore-trigger job pattern as clipTransferJobs below:
+    // only the adminRunJob Cloud Function (Admin SDK, bypasses rules)
+    // is ever allowed to write a result onto a job after it's created.
+    match /adminJobs/{jobId} {
+      allow read:   if isSuiteAdmin();
+      allow create: if isSuiteAdmin()
+                    && request.resource.data.requestedBy == request.auth.uid
+                    && request.resource.data.status == 'pending';
       allow update, delete: if false;
     }
 
