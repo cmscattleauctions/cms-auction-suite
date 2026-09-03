@@ -160,6 +160,22 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
   .style-pick-grid { grid-template-columns: 1fr; }
 }
 
+/* Compact Build Mode header control — replaces the old permanent
+   2-button toggle with a status/switcher dropdown. */
+.mode-dropdown { position: relative; }
+.mode-dropdown-btn { display: flex; align-items: center; gap: 6px; }
+.mode-dropdown-btn .caret { font-size: 10px; color: var(--muted); }
+.mode-dropdown-menu { position: absolute; top: calc(100% + 6px); right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; min-width: 260px; padding: 6px; z-index: 200; display: flex; flex-direction: column; gap: 2px; }
+.mode-dropdown-menu[hidden] { display: none; }
+.mode-dropdown-item { text-align: left; padding: 9px 12px; border-radius: 6px; border: none; background: none; color: var(--text); font-family: 'Barlow', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; }
+.mode-dropdown-item:hover { background: var(--surface2); }
+
+/* Settings page — File Locations / Tag Placement side by side. */
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 900px) { .settings-grid { grid-template-columns: 1fr; } }
+.tag-placement-preview { background: #0e1620; border-radius: 8px; padding: 10px; }
+.tag-placement-preview canvas { width: 100%; height: auto; display: block; border-radius: 3px; }
+
 /* Shared right-side drawer (Verification Tags, State Images) — see
    beta-drawer.js. Flat, border-only, no box-shadow — matches the rest
    of this app; z-index sits above nav (100) but below .toast (9999) so
@@ -184,10 +200,14 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
   <button class="nav-tab active" onclick="showPage('build', this)">Build</button>
   <button class="nav-tab" onclick="showPage('assets', this)">Assets</button>
   <button class="nav-tab" onclick="showPage('settings', this)">Settings</button>
-  <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-    <span class="toggle-label">OBS Build Mode</span>
-    <button class="toggle-btn active" id="btnModeClassic" title="Behaves exactly like the production builder — no video matching, no tags, no intro.">Classic</button>
-    <button class="toggle-btn" id="btnModeBeta" title="Adds automated video matching, verification tags, and a Stinger intro. Opt-in, never required.">Automated Video Setup — Beta</button>
+  <div class="mode-dropdown" style="margin-left:auto;">
+    <button class="btn btn-ghost mode-dropdown-btn" id="btnModeDropdown" type="button">
+      <span id="modeDropdownLabel">Build Mode: Classic</span> <span class="caret">▾</span>
+    </button>
+    <div class="mode-dropdown-menu" id="modeDropdownMenu" hidden>
+      <button type="button" class="mode-dropdown-item" data-mode="classic" title="Behaves exactly like the production builder — no video matching, no tags, no intro.">Classic</button>
+      <button type="button" class="mode-dropdown-item" data-mode="beta" title="Adds automated video matching, verification tags, and a Stinger intro. Opt-in, never required.">Automated Video Setup — Beta</button>
+    </div>
   </div>
 </nav>
 
@@ -2615,7 +2635,7 @@ window.pickOptionStyle = pickOptionStyle;
   import { renderBetaReview } from './beta/beta-review-ui.js';
   import { initTagManagerPage } from './beta/beta-tag-manager-ui.js';
   import { initStingerSettingsPage } from './beta/beta-stinger-ui.js';
-  import { initObsSettingsPage } from './beta/beta-obs-settings-ui.js';
+  import { initSettingsPage } from './beta/beta-obs-settings-ui.js';
 
   let betaCtx = null;
   let fuzzyResolutions = {};       // cleared whenever a new CSV is parsed
@@ -2626,15 +2646,35 @@ window.pickOptionStyle = pickOptionStyle;
 
   function isBeta() { return Beta.State.getBuildMode() === 'beta'; }
 
+  // Updates every UI surface that reflects the current build mode: the
+  // header dropdown's own label/active state (below), the Builder tab's
+  // Download button label, the Beta Review panel's visibility, and — if
+  // the Settings page has been visited this session — its Build Mode
+  // radio card (initSettingsPage mounts #settingsModeClassic/Beta once
+  // and leaves them in the DOM, just hidden, so this keeps working even
+  // when Settings isn't the currently-visible page).
   function setModeUI(mode) {
-    document.getElementById('btnModeClassic').classList.toggle('active', mode === 'classic');
-    document.getElementById('btnModeBeta').classList.toggle('active', mode === 'beta');
+    const label = document.getElementById('modeDropdownLabel');
+    if (label) label.textContent = `Build Mode: ${mode === 'beta' ? 'Automated Beta' : 'Classic'}`;
+    const settingsClassic = document.getElementById('settingsModeClassic');
+    const settingsBeta = document.getElementById('settingsModeBeta');
+    if (settingsClassic) settingsClassic.checked = (mode !== 'beta');
+    if (settingsBeta) settingsBeta.checked = (mode === 'beta');
     const dlBtn = document.getElementById('btnDownloadObs');
     if (dlBtn) {
-      const label = mode === 'beta' ? '2 · Download Auction OBS Package (ZIP)' : '2 · Download OBS Scene Collection';
-      if (dlBtn.textContent.trim().startsWith('2 ·') || dlBtn.textContent.trim().startsWith('2·')) dlBtn.textContent = label;
+      const dlLabel = mode === 'beta' ? '2 · Download Auction OBS Package (ZIP)' : '2 · Download OBS Scene Collection';
+      if (dlBtn.textContent.trim().startsWith('2 ·') || dlBtn.textContent.trim().startsWith('2·')) dlBtn.textContent = dlLabel;
     }
     document.getElementById('betaReviewWrap').style.display = (mode === 'beta' && betaCtx) ? 'block' : 'none';
+  }
+
+  // Single entry point for switching modes — every UI surface (header
+  // dropdown, Settings' Build Mode card, the "Enable Automated Mode"
+  // quick-action button) calls this instead of duplicating the sequence.
+  async function setBuildMode(mode) {
+    Beta.State.setBuildMode(mode);
+    setModeUI(mode);
+    if (mode === 'beta' && lastParsedForBeta) await runBetaReviewIfNeeded();
   }
 
   async function runBetaReviewIfNeeded() {
@@ -2719,14 +2759,25 @@ window.pickOptionStyle = pickOptionStyle;
     },
   };
 
-  document.getElementById('btnModeClassic').addEventListener('click', () => {
-    Beta.State.setBuildMode('classic');
-    setModeUI('classic');
+  const modeDropdownBtn = document.getElementById('btnModeDropdown');
+  const modeDropdownMenu = document.getElementById('modeDropdownMenu');
+  modeDropdownBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    modeDropdownMenu.hidden = !modeDropdownMenu.hidden;
   });
-  document.getElementById('btnModeBeta').addEventListener('click', async () => {
-    Beta.State.setBuildMode('beta');
-    setModeUI('beta');
-    if (lastParsedForBeta) await runBetaReviewIfNeeded();
+  modeDropdownMenu.querySelectorAll('.mode-dropdown-item').forEach(item => {
+    item.addEventListener('click', async () => {
+      modeDropdownMenu.hidden = true;
+      await setBuildMode(item.dataset.mode);
+    });
+  });
+  document.addEventListener('click', e => {
+    if (!modeDropdownMenu.hidden && !modeDropdownMenu.contains(e.target) && e.target !== modeDropdownBtn) {
+      modeDropdownMenu.hidden = true;
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') modeDropdownMenu.hidden = true;
   });
 
   // Wrap (not replace) Classic's own showPage/showSubPage so the Beta
@@ -2738,9 +2789,9 @@ window.pickOptionStyle = pickOptionStyle;
     originalShowPage(id, btn);
     if (id === 'settings' && !obsSettingsInitialized) {
       obsSettingsInitialized = true;
-      initObsSettingsPage(document.getElementById('obsSettingsRoot'), { showToast }).catch(err => {
+      initSettingsPage(document.getElementById('obsSettingsRoot'), { showToast, setBuildMode }).catch(err => {
         console.error('[beta]', err);
-        document.getElementById('obsSettingsRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load OBS Settings: ${String(err.message || err)}</div>`;
+        document.getElementById('obsSettingsRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load Settings: ${String(err.message || err)}</div>`;
       });
     }
   };

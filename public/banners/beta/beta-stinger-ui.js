@@ -12,7 +12,6 @@ import { getStingerConfig, saveStingerConfig, setStingerAsset } from './beta-sti
 
 export async function initStingerSettingsPage(root, { showToast }) {
   root.innerHTML = `
-    <div style="max-width:640px;">
       <div class="card">
         <div class="section-title">CMS Video Intro / Stinger</div>
         <div class="info-banner" style="margin-bottom:14px;font-size:12px;padding:12px 14px;">
@@ -45,7 +44,6 @@ export async function initStingerSettingsPage(root, { showToast }) {
         </div>
         <p id="introMsg" class="helper" style="margin-top:10px;min-height:18px;">Applies as a Transition Override on every Lot Video scene, and on the Transition scene right after one (lot or breed/type) — so it plays going in and coming back out. Skipped on the show's opening transition and on a lot transition right after a breed/type transition, since neither follows an actual lot video.</p>
       </div>
-    </div>
   `;
 
   wireIntro(root, showToast);
