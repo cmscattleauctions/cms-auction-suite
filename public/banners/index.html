@@ -38,6 +38,12 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 .nav-tab.active { color: var(--blue-light); border-bottom-color: var(--blue-light); }
 .page { display: none; padding: 32px; max-width: 1440px; margin: 0 auto; }
 .page.active { display: block; }
+.subnav { display: flex; align-items: center; gap: 4px; margin-bottom: 22px; border-bottom: 1px solid var(--border); }
+.subnav-tab { padding: 9px 4px; margin-right: 22px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; background: none; border: none; border-bottom: 2px solid transparent; font-family: 'Barlow', sans-serif; transition: all 0.15s; }
+.subnav-tab:hover { color: var(--text); }
+.subnav-tab.active { color: var(--blue-light); border-bottom-color: var(--blue-light); }
+.subpage { display: none; }
+.subpage.active { display: block; }
 .section-title { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 14px; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 24px; }
 .btn { padding: 10px 20px; border-radius: 7px; border: none; font-family: 'Barlow', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: all 0.15s; white-space: nowrap; }
@@ -155,12 +161,9 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 <body>
 <nav>
   <!-- nav-brand removed in Phase 2 — suite shell owns the brand bar -->
-  <button class="nav-tab active" onclick="showPage('flow', this)">Builder</button>
-  <button class="nav-tab" onclick="showPage('custom', this)">Custom Lots</button>
-  <button class="nav-tab" onclick="showPage('admin', this)">State Library</button>
-  <button class="nav-tab" onclick="showPage('tags', this)">Verification Tags</button>
-  <button class="nav-tab" onclick="showPage('stinger', this)">Stinger Settings</button>
-  <button class="nav-tab" onclick="showPage('obs', this)">OBS Settings</button>
+  <button class="nav-tab active" onclick="showPage('build', this)">Build</button>
+  <button class="nav-tab" onclick="showPage('assets', this)">Assets</button>
+  <button class="nav-tab" onclick="showPage('settings', this)">Settings</button>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
     <span class="toggle-label">OBS Build Mode</span>
     <button class="toggle-btn active" id="btnModeClassic" title="Behaves exactly like the production builder — no video matching, no tags, no intro.">Classic</button>
@@ -169,16 +172,24 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 </nav>
 
 <!-- ============================================================
-     BUILDER FLOW — 3 panels (Upload, Style Picker, Review)
+     BUILD — Build Auction (CSV → banners/OBS) + Custom Lot Builder
      ============================================================ -->
-<div class="page active" id="page-flow">
+<div class="page active" id="page-build">
+
+  <div class="subnav">
+    <button class="subnav-tab active" onclick="showBuildView('auction', this)">Build Auction</button>
+    <button class="subnav-tab" onclick="showBuildView('custom', this)">Custom Lot</button>
+  </div>
+
+  <!-- ---- Build Auction — 3 panels (Upload, Design, Review & Download) ---- -->
+  <div id="buildAuctionView">
 
   <div class="flow-steps">
     <div class="flow-step active" id="flowStep1"><span class="step-num">1</span> Upload CSV</div>
     <span class="flow-arrow">→</span>
-    <div class="flow-step" id="flowStep2"><span class="step-num">2</span> Pick Styles</div>
+    <div class="flow-step" id="flowStep2"><span class="step-num">2</span> Design</div>
     <span class="flow-arrow">→</span>
-    <div class="flow-step" id="flowStep3"><span class="step-num">3</span> Download</div>
+    <div class="flow-step" id="flowStep3"><span class="step-num">3</span> Review &amp; Download</div>
   </div>
 
   <!-- Panel 1: Upload -->
@@ -212,11 +223,15 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 
     <div class="action-row" id="uploadActions" style="display:none">
       <button class="btn btn-ghost" id="btnResetUpload">Upload different CSV</button>
-      <button class="btn btn-primary btn-lg" id="btnToStyles">Continue to Style Picker →</button>
+      <button class="btn btn-primary btn-lg" id="btnToStyles">Continue to Design →</button>
+    </div>
+
+    <div class="helper" style="margin-top:18px;">
+      Building one-off banners instead? <button class="btn btn-ghost btn-sm" onclick="showBuildView('custom')">+ Create Custom Lot</button>
     </div>
   </div>
 
-  <!-- Panel 2: Style Picker -->
+  <!-- Panel 2: Design (banner style picker) -->
   <div id="panelStyles" style="display:none">
     <div class="info-banner" style="margin-bottom:24px;">
       Choose the style for your <strong>standard lot transition banners</strong> and <strong>option lot banners</strong>. Previews use data from your first option group.
@@ -313,15 +328,13 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
     </div>
   </div>
 
-</div>
+  </div><!-- /#buildAuctionView -->
 
-<!-- ============================================================
-     CUSTOM LOTS PAGE — build one-off banners without a CSV
-     ============================================================ -->
-<div class="page" id="page-custom">
+  <!-- ---- Custom Lot Builder — build one-off banners without a CSV ---- -->
+  <div id="customLotView" style="display:none">
   <div class="info-banner" style="margin-bottom:20px;">
     Build one-off banners without a CSV — type a lot number and location, generate, and download.
-    Custom banners are <strong>download-only</strong>: they never change the OBS Scene Collection download on the Builder tab.
+    Custom banners are <strong>download-only</strong>: they never change the OBS Scene Collection download on the Build Auction view.
   </div>
 
   <div class="card" style="margin-bottom:20px;">
@@ -394,20 +407,25 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
     <span class="count-label" id="clCount"></span>
   </div>
 
-  <div class="grid" id="clGrid">
-    <div class="empty">
-      <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 4.5v15m7.5-7.5h-15"/>
-      </svg>
-      <p>No custom banners yet — fill in the form above and hit Generate</p>
-    </div>
-  </div>
-</div>
+  <div class="grid" id="clGrid"></div>
+
+  </div><!-- /#customLotView -->
+
+</div><!-- /#page-build -->
 
 <!-- ============================================================
-     ADMIN PAGE — State Library (unchanged from original)
+     ASSETS — State Images / Verification Tags / Stinger
      ============================================================ -->
-<div class="page" id="page-admin">
+<div class="page" id="page-assets">
+
+  <div class="subnav">
+    <button class="subnav-tab active" onclick="showSubPage('assets', 'assets-state', this)">State Images</button>
+    <button class="subnav-tab" onclick="showSubPage('assets', 'assets-tags', this)">Verification Tags</button>
+    <button class="subnav-tab" onclick="showSubPage('assets', 'assets-stinger', this)">Stinger</button>
+  </div>
+
+  <!-- ---- State Images (unchanged from original State Library) ---- -->
+  <div class="subpage active" id="assets-state">
   <div id="adminGate" class="secret-box">
     <div class="card">
       <div class="section-title">Admin Access</div>
@@ -468,34 +486,31 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
   </div>
 </div>
 
-<!-- ============================================================
-     VERIFICATION TAGS — Beta-only settings page (Firebase-backed)
-     Always reachable from the nav; entirely inert if Beta mode is
-     never turned on, since Classic never reads this collection.
-     ============================================================ -->
-<div class="page" id="page-tags">
-  <div class="info-banner" id="tagsPageIntro">
-    Verification tags configured here are only used when <strong>OBS Build Mode</strong> is set to
-    <strong>Automated Video Setup — Beta</strong>. They have no effect on the Classic workflow.
+  <!-- ---- Verification Tags — Beta-only settings, entirely inert if Beta
+       mode is never turned on, since Classic never reads this collection ---- -->
+  <div class="subpage" id="assets-tags">
+    <div class="info-banner" id="tagsPageIntro">
+      Verification tags configured here are only used when <strong>OBS Build Mode</strong> is set to
+      <strong>Automated Video Setup — Beta</strong>. They have no effect on the Classic workflow.
+    </div>
+    <div id="tagManagerRoot"><p class="helper">Loading…</p></div>
   </div>
-  <div id="tagManagerRoot"><p class="helper">Loading…</p></div>
-</div>
+
+  <!-- ---- Stinger — Beta-only settings page (Firebase-backed) ---- -->
+  <div class="subpage" id="assets-stinger">
+    <div class="info-banner" id="stingerPageIntro">
+      The Stinger configured here is only used when <strong>OBS Build Mode</strong> is set to
+      <strong>Automated Video Setup — Beta</strong>. It has no effect on the Classic workflow.
+    </div>
+    <div id="stingerRoot"><p class="helper">Loading…</p></div>
+  </div>
+
+</div><!-- /#page-assets -->
 
 <!-- ============================================================
-     STINGER SETTINGS — Beta-only settings page (Firebase-backed)
+     SETTINGS — OBS configuration (local/device settings)
      ============================================================ -->
-<div class="page" id="page-stinger">
-  <div class="info-banner" id="stingerPageIntro">
-    The Stinger configured here is only used when <strong>OBS Build Mode</strong> is set to
-    <strong>Automated Video Setup — Beta</strong>. It has no effect on the Classic workflow.
-  </div>
-  <div id="stingerRoot"><p class="helper">Loading…</p></div>
-</div>
-
-<!-- ============================================================
-     OBS SETTINGS — Beta-only settings page (local/device settings)
-     ============================================================ -->
-<div class="page" id="page-obs">
+<div class="page" id="page-settings">
   <div class="info-banner" id="obsPageIntro">
     These settings are only used when <strong>OBS Build Mode</strong> is set to
     <strong>Automated Video Setup — Beta</strong>. They have no effect on the Classic workflow.
@@ -602,6 +617,38 @@ function showPage(id, btn) {
   if (btn) {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
+  }
+}
+
+// Sub-tab navigation within a top-level page (e.g. Assets' State Images /
+// Verification Tags / Stinger) — same classList-toggle mechanics as
+// showPage above, scoped to `#${containerId} .subpage`/`.subnav-tab`.
+// Deliberately does not reset the "current" subpage when the parent page
+// is merely re-shown (showPage only toggles .page, never touches
+// .subpage) — that's what makes Assets "remember" the last-viewed
+// sub-tab across visits, with no extra state to track.
+function showSubPage(containerId, subId, btn) {
+  const container = document.getElementById('page-' + containerId);
+  container.querySelectorAll(':scope > .subpage').forEach(p => p.classList.remove('active'));
+  document.getElementById(subId).classList.add('active');
+  if (btn) {
+    container.querySelectorAll(':scope > .subnav > .subnav-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+  }
+}
+
+// Build's own internal Build-Auction / Custom-Lot toggle — a simple
+// display:none swap (matches showPanel's existing convention below),
+// not the classList-based .subpage pattern, since these two views are
+// each a full sub-workflow rather than a small settings panel.
+function showBuildView(view, btn) {
+  document.getElementById('buildAuctionView').style.display = (view === 'auction' ? '' : 'none');
+  document.getElementById('customLotView').style.display = (view === 'custom' ? '' : 'none');
+  const nav = document.getElementById('page-build').querySelector(':scope > .subnav');
+  if (nav) {
+    nav.querySelectorAll('.subnav-tab').forEach(t => t.classList.remove('active'));
+    const tabBtn = btn || nav.querySelector(view === 'custom' ? '.subnav-tab:nth-child(2)' : '.subnav-tab:nth-child(1)');
+    if (tabBtn) tabBtn.classList.add('active');
   }
 }
 
@@ -2267,8 +2314,8 @@ function clSyncFormVisibility() {
   const type = document.getElementById('clType').value;
   const needsLoc = (type === 'transition' || type === 'both');
   const needsOpt = (type === 'option' || type === 'both');
-  document.querySelectorAll('#page-custom [data-cl="loc"]').forEach(el => el.style.display = needsLoc ? '' : 'none');
-  document.querySelectorAll('#page-custom [data-cl="opt"]').forEach(el => el.style.display = needsOpt ? '' : 'none');
+  document.querySelectorAll('#customLotView [data-cl="loc"]').forEach(el => el.style.display = needsLoc ? '' : 'none');
+  document.querySelectorAll('#customLotView [data-cl="opt"]').forEach(el => el.style.display = needsOpt ? '' : 'none');
 }
 
 function clUpdateBar() {
@@ -2666,30 +2713,37 @@ window.pickOptionStyle = pickOptionStyle;
     if (lastParsedForBeta) await runBetaReviewIfNeeded();
   });
 
-  // Wrap (not replace) Classic's own showPage so the Beta settings pages
-  // lazy-initialize on first visit.
+  // Wrap (not replace) Classic's own showPage/showSubPage so the Beta
+  // settings pages lazy-initialize on first visit. Tags/Stinger live under
+  // Assets now (reached via showSubPage), OBS Settings lives at the
+  // top-level Settings page (reached via showPage('settings', ...)).
   const originalShowPage = window.showPage;
   window.showPage = function (id, btn) {
     originalShowPage(id, btn);
-    if (id === 'tags' && !tagManagerInitialized) {
+    if (id === 'settings' && !obsSettingsInitialized) {
+      obsSettingsInitialized = true;
+      initObsSettingsPage(document.getElementById('obsSettingsRoot'), { showToast }).catch(err => {
+        console.error('[beta]', err);
+        document.getElementById('obsSettingsRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load OBS Settings: ${String(err.message || err)}</div>`;
+      });
+    }
+  };
+
+  const originalShowSubPage = window.showSubPage;
+  window.showSubPage = function (containerId, subId, btn) {
+    originalShowSubPage(containerId, subId, btn);
+    if (subId === 'assets-tags' && !tagManagerInitialized) {
       tagManagerInitialized = true;
       initTagManagerPage(document.getElementById('tagManagerRoot'), { showToast }).catch(err => {
         console.error('[beta]', err);
         document.getElementById('tagManagerRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load Verification Tags: ${String(err.message || err)}</div>`;
       });
     }
-    if (id === 'stinger' && !stingerSettingsInitialized) {
+    if (subId === 'assets-stinger' && !stingerSettingsInitialized) {
       stingerSettingsInitialized = true;
       initStingerSettingsPage(document.getElementById('stingerRoot'), { showToast }).catch(err => {
         console.error('[beta]', err);
         document.getElementById('stingerRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load Stinger Settings: ${String(err.message || err)}</div>`;
-      });
-    }
-    if (id === 'obs' && !obsSettingsInitialized) {
-      obsSettingsInitialized = true;
-      initObsSettingsPage(document.getElementById('obsSettingsRoot'), { showToast }).catch(err => {
-        console.error('[beta]', err);
-        document.getElementById('obsSettingsRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load OBS Settings: ${String(err.message || err)}</div>`;
       });
     }
   };
