@@ -21,6 +21,11 @@ window.cmsDataReady = new Promise(function(res){
   window.CMSData = CMSData;
   window.dispatchEvent(new Event('cmsdata-ready'));
 </script>
+<!-- Shared drawer primitive (State Images, Verification Tags) — attaches
+     window.CMSDrawer for the classic script below; loaded eagerly since
+     State Images (a classic-script feature) can be the first Assets
+     sub-tab a user opens, well before any Beta module. -->
+<script type="module" src="./beta-drawer.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -154,6 +159,21 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
   .grid { grid-template-columns: 1fr; }
   .style-pick-grid { grid-template-columns: 1fr; }
 }
+
+/* Shared right-side drawer (Verification Tags, State Images) — see
+   beta-drawer.js. Flat, border-only, no box-shadow — matches the rest
+   of this app; z-index sits above nav (100) but below .toast (9999) so
+   a save-confirmation toast stays visible over an open drawer. */
+.drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); opacity: 0; pointer-events: none; transition: opacity 0.18s ease; z-index: 899; }
+.drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+.drawer-panel { position: fixed; top: 0; right: 0; height: 100vh; width: 420px; max-width: 92vw; background: var(--surface); border-left: 1px solid var(--border); transform: translateX(100%); transition: transform 0.18s ease; z-index: 900; display: flex; flex-direction: column; overflow-y: auto; }
+.drawer-panel.open { transform: translateX(0); }
+.drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); }
+.drawer-header h3 { font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 700; }
+.drawer-close { background: none; border: none; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; padding: 2px 6px; }
+.drawer-close:hover { color: var(--text); }
+.drawer-body { padding: 22px; display: grid; gap: 14px; }
+@media (max-width: 600px) { .drawer-panel { width: 100vw; } }
 </style>
 <link rel="stylesheet" href="./light-theme.css">
 <link rel="stylesheet" href="./beta/beta.css">
@@ -439,49 +459,19 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
   </div>
 
   <div id="adminContent" style="display:none;">
-    <div class="admin-grid">
-      <div style="display:grid;gap:20px;">
-        <div class="card">
-          <div class="section-title">Add / Replace State Image</div>
-          <div class="form-row">
-            <label class="form-label">State Abbreviation</label>
-            <input type="text" class="form-input" id="stateAbbrInput" placeholder="TX" maxlength="2" style="text-transform:uppercase;width:90px">
-          </div>
-          <div class="form-row">
-            <label class="form-label">State Image</label>
-            <div class="img-drop" id="imgDrop">
-              <input type="file" accept=".png,.svg,image/png,image/svg+xml" id="imgInput">
-              <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
-                <path d="M21 15l-5-5L5 21"/>
-              </svg>
-              <p>Drop PNG or SVG or click to browse</p>
-              <img id="imgThumb" class="img-preview-thumb">
-            </div>
-          </div>
-          <div class="two-col">
-            <button class="btn btn-success" id="btnSaveState">Upload / Replace</button>
-            <button class="btn btn-ghost" id="btnRefreshLibrary">Refresh Library</button>
-          </div>
-          <p id="adminMsg" class="helper" style="margin-top:10px;min-height:18px">PNG and SVG are supported. One file per state.</p>
-        </div>
-      </div>
-
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
       <div>
-        <div class="card" style="margin-bottom:20px;">
-          <div class="section-title">Storage</div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-            <div id="adminSessionChip" class="status-chip good">Saved to Firebase · shared with the whole team</div>
-            <button class="btn btn-ghost btn-sm" id="btnLockAdmin">Lock Admin</button>
-          </div>
-          <p class="helper" style="margin-top:10px;">Just pick a 2-letter state, drop a PNG or SVG, and click Upload. No GitHub token needed.</p>
-        </div>
-
-        <div class="section-title">State Image Library (<span id="libCount">0</span> states)</div>
-        <div class="state-library-grid" id="stateLibGrid">
-          <p class="no-states">No state images found in the repository yet.</p>
-        </div>
+        <div class="section-title" style="margin-bottom:2px;">State Images</div>
+        <p class="helper" id="stateLibCountLabel">0 states</p>
       </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div id="adminSessionChip" class="status-chip good">Saved to Firebase · shared with the whole team</div>
+        <button class="btn btn-ghost btn-sm" id="btnLockAdmin">Lock Admin</button>
+        <button class="btn btn-primary" onclick="openStateImageDrawer(null)">+ Add State Image</button>
+      </div>
+    </div>
+    <div class="state-library-grid" id="stateLibGrid">
+      <p class="no-states">No state images found in the repository yet.</p>
     </div>
   </div>
 </div>
@@ -2171,8 +2161,6 @@ function resetAll() {
 // ═══════════════════════════════════════════════════════════════
 // ADMIN — State Library (unchanged behavior)
 // ═══════════════════════════════════════════════════════════════
-let pendingImgFile = null;
-
 function unlockAdmin() {
   document.getElementById('adminGate').style.display = 'none';
   document.getElementById('adminContent').style.display = 'block';
@@ -2196,31 +2184,6 @@ function checkAdminPin() {
   if (val === ADMIN_PIN) { pinMsg.textContent = 'Code accepted.'; unlockAdmin(); }
   else { pinMsg.textContent = 'Invalid code.'; showToast('Invalid admin code', true); }
 }
-async function saveStateToGitHub() {
-  const abbr = document.getElementById('stateAbbrInput').value.trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(abbr)) { showToast('State abbreviation must be 2 letters.', true); return; }
-  if (!pendingImgFile) { showToast('Drop a PNG or SVG file first.', true); return; }
-  const CMS = await getCMSData();
-  if (!CMS || !CMS.configured) { showToast('Firebase is not configured.', true); return; }
-  const msg = document.getElementById('adminMsg');
-  msg.textContent = 'Uploading...';
-  try {
-    const { dataUrl, ext } = await CMS.imageFileToStorableDataUrl(pendingImgFile);
-    await CMS.saveStateImage(abbr, dataUrl, ext);
-    msg.textContent = `Uploaded ${abbr}.${ext}.`;
-    showToast(`${abbr}.${ext} uploaded`);
-    pendingImgFile = null;
-    document.getElementById('imgInput').value = '';
-    document.getElementById('imgThumb').style.display = 'none';
-    document.getElementById('stateAbbrInput').value = '';
-    await fetchStateIndex();
-  } catch (err) {
-    console.error(err);
-    msg.textContent = 'Upload failed.';
-    showToast(err.message, true);
-  }
-}
-
 async function deleteState(abbr) {
   const info = getStateImageInfo(abbr);
   if (!info) return;
@@ -2230,6 +2193,7 @@ async function deleteState(abbr) {
   try {
     await CMS.deleteStateImage(info.abbr);
     showToast(`${info.abbr} deleted`);
+    if (window.CMSDrawer) window.CMSDrawer.closeDrawer();
     await fetchStateIndex();
   } catch (err) {
     console.error(err);
@@ -2239,23 +2203,106 @@ async function deleteState(abbr) {
 
 function renderLibrary() {
   const grid = document.getElementById('stateLibGrid');
-  const count = document.getElementById('libCount');
+  const count = document.getElementById('stateLibCountLabel');
   const abbrs = Object.keys(stateIndex).sort();
-  count.textContent = abbrs.length;
+  if (count) count.textContent = `${abbrs.length} state${abbrs.length === 1 ? '' : 's'}`;
   if (!abbrs.length) {
-    grid.innerHTML = `<p class="no-states">No state images saved yet. Add one above.</p>`;
+    grid.innerHTML = `<p class="no-states">No state images saved yet. Click "+ Add State Image" to add one.</p>`;
     return;
   }
   grid.innerHTML = abbrs.map(a => {
     const info = stateIndex[a];
-    return `<div class="state-lib-card">
+    return `<div class="state-lib-card" onclick="openStateImageDrawer('${a}')" role="button" tabindex="0" style="cursor:pointer;">
       <img src="${info.dataUrl}" alt="${a}">
       <div class="state-lib-label">
         <span class="state-abbr">${a}</span>
-        <button class="del-btn" onclick="deleteState('${a}')" title="Delete">×</button>
       </div>
     </div>`;
   }).join('');
+}
+
+// Add/replace a state image — used both for "+ Add State Image" (abbr =
+// null, create mode) and clicking an existing card (abbr set, edit mode:
+// abbreviation locked since it's the Firestore doc id, only the image can
+// be replaced). Requires the shared drawer primitive (../beta-drawer.js,
+// attached to window.CMSDrawer for this classic script to call).
+function openStateImageDrawer(abbr) {
+  const info = abbr ? getStateImageInfo(abbr) : null;
+  let pendingFile = null;
+
+  const body = window.CMSDrawer.openDrawer({
+    title: info ? `Edit ${info.abbr}` : 'Add State Image',
+    bodyHtml: `
+      <div class="form-row">
+        <label class="form-label">State Abbreviation</label>
+        <input type="text" class="form-input" id="drawerStateAbbrInput" placeholder="TX" maxlength="2" style="text-transform:uppercase;width:90px" value="${info ? info.abbr : ''}" ${info ? 'disabled' : ''}>
+      </div>
+      <div class="form-row">
+        <label class="form-label">${info ? 'Replace Image' : 'State Image'}</label>
+        <div class="img-drop" id="drawerImgDrop">
+          <input type="file" accept=".png,.svg,image/png,image/svg+xml" id="drawerImgInput">
+          <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+            <path d="M21 15l-5-5L5 21"/>
+          </svg>
+          <p>Drop PNG or SVG or click to browse</p>
+          <img id="drawerImgThumb" class="img-preview-thumb" style="${info ? 'display:block' : ''}" ${info ? `src="${info.dataUrl}"` : ''}>
+        </div>
+      </div>
+      <div class="two-col">
+        <button class="btn btn-success" id="btnDrawerSaveState">${info ? 'Upload / Replace' : 'Upload'}</button>
+        ${info ? `<button class="btn btn-danger" id="btnDrawerDeleteState">Delete</button>` : '<span></span>'}
+      </div>
+      <p id="drawerStateMsg" class="helper" style="margin-top:10px;min-height:18px">PNG and SVG are supported. One file per state.</p>
+    `,
+  });
+
+  const abbrInput = body.querySelector('#drawerStateAbbrInput');
+  abbrInput.addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+
+  const drop = body.querySelector('#drawerImgDrop');
+  const input = body.querySelector('#drawerImgInput');
+  const thumb = body.querySelector('#drawerImgThumb');
+  const msg = body.querySelector('#drawerStateMsg');
+  const handleFile = file => {
+    if (!['image/png', 'image/svg+xml'].includes(file.type)) {
+      showToast(`State image must be PNG or SVG (got "${file.type || 'unknown type'}").`, true);
+      return;
+    }
+    pendingFile = file;
+    msg.textContent = `Ready: ${file.name}`;
+    if (file.type === 'image/svg+xml') { thumb.src = URL.createObjectURL(file); thumb.style.display = 'block'; return; }
+    const reader = new FileReader();
+    reader.onload = e => { thumb.src = e.target.result; thumb.style.display = 'block'; };
+    reader.readAsDataURL(file);
+  };
+  input.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('drag-over'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+  body.querySelector('#btnDrawerSaveState').addEventListener('click', async () => {
+    const abbrVal = abbrInput.value.trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(abbrVal)) { showToast('State abbreviation must be 2 letters.', true); return; }
+    if (!pendingFile) { showToast('Drop a PNG or SVG file first.', true); return; }
+    const CMS = await getCMSData();
+    if (!CMS || !CMS.configured) { showToast('Firebase is not configured.', true); return; }
+    msg.textContent = 'Uploading...';
+    try {
+      const { dataUrl, ext } = await CMS.imageFileToStorableDataUrl(pendingFile);
+      await CMS.saveStateImage(abbrVal, dataUrl, ext);
+      showToast(`${abbrVal}.${ext} saved`);
+      window.CMSDrawer.closeDrawer();
+      await fetchStateIndex();
+    } catch (err) {
+      console.error(err);
+      msg.textContent = 'Save failed.';
+      showToast(err.message, true);
+    }
+  });
+
+  const deleteBtn = body.querySelector('#btnDrawerDeleteState');
+  if (deleteBtn) deleteBtn.addEventListener('click', () => deleteState(info.abbr));
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2520,44 +2567,13 @@ clSyncFormVisibility();
 document.getElementById('btnPinEnter').addEventListener('click', checkAdminPin);
 document.getElementById('pinInput').addEventListener('keypress', e => { if (e.key === 'Enter') checkAdminPin(); });
 document.getElementById('btnLockAdmin').addEventListener('click', lockAdmin);
-document.getElementById('btnRefreshLibrary').addEventListener('click', async () => {
-  try { await fetchStateIndex(); showToast('Library refreshed'); }
-  catch (err) { showToast(err.message, true); }
-});
-document.getElementById('btnSaveState').addEventListener('click', saveStateToGitHub);
-document.getElementById('stateAbbrInput').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
-
-const imgDrop = document.getElementById('imgDrop');
-const imgInput = document.getElementById('imgInput');
-function handleImgFile(file) {
-  const name = file.name.toLowerCase();
-  if (!name.endsWith('.png') && !name.endsWith('.svg')) { showToast('Only PNG or SVG files are allowed.', true); return; }
-  pendingImgFile = file;
-  document.getElementById('adminMsg').textContent = `Ready: ${file.name}`;
-  if (name.endsWith('.svg')) {
-    const blobUrl = URL.createObjectURL(file);
-    const th = document.getElementById('imgThumb');
-    th.src = blobUrl; th.style.display = 'block';
-  } else {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const th = document.getElementById('imgThumb');
-      th.src = e.target.result; th.style.display = 'block';
-    };
-    reader.readAsDataURL(file);
-  }
-}
-imgInput.addEventListener('change', e => { if (e.target.files[0]) handleImgFile(e.target.files[0]); });
-imgDrop.addEventListener('dragover', e => { e.preventDefault(); imgDrop.classList.add('drag-over'); });
-imgDrop.addEventListener('dragleave', () => imgDrop.classList.remove('drag-over'));
-imgDrop.addEventListener('drop', e => {
-  e.preventDefault(); imgDrop.classList.remove('drag-over');
-  if (e.dataTransfer.files[0]) handleImgFile(e.dataTransfer.files[0]);
-});
 
 window.dlSingleFromCard = dlSingleFromCard;
 window.deleteState = deleteState;
 window.showPage = showPage;
+window.showSubPage = showSubPage;
+window.showBuildView = showBuildView;
+window.openStateImageDrawer = openStateImageDrawer;
 window.pickStandardStyle = pickStandardStyle;
 window.pickOptionStyle = pickOptionStyle;
 
