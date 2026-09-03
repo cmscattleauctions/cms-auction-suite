@@ -2580,12 +2580,26 @@ window.pickOptionStyle = pickOptionStyle;
     const section = document.getElementById('betaReviewSection');
     wrap.style.display = 'block';
     section.innerHTML = '<p class="helper">Running Beta review — matching videos and scanning descriptions for verification tags…</p>';
+    // ctrlRow (Download All Banners) is already visible by the time this
+    // runs — Classic reveals it right after its own banners render, before
+    // awaiting this hook. Without this gate, clicking Download All Banners
+    // while this pipeline is still fetching tag/video data silently ships
+    // a ZIP with zero tags/stinger: getBannerZipExtras() below returns
+    // empty when betaCtx isn't ready yet, with nothing to show for it.
+    const zipBtn = document.getElementById('btnZip');
+    const zipBtnWasDisabled = zipBtn.disabled;
+    const zipBtnOrigTitle = zipBtn.title;
+    zipBtn.disabled = true;
+    zipBtn.title = 'Beta review is still running (matching videos, loading tag images) — one moment…';
     try {
       betaCtx = await Beta.runBetaPipeline(lastParsedForBeta, fuzzyResolutions);
       renderReview();
     } catch (err) {
       console.error('[beta]', err);
       section.innerHTML = `<div class="alert-banner" style="display:block;">Beta review failed to load: ${String(err.message || err)}. Classic mode is unaffected — you can still switch back to Classic and build normally.</div>`;
+    } finally {
+      zipBtn.disabled = zipBtnWasDisabled;
+      zipBtn.title = zipBtnOrigTitle;
     }
   }
 
@@ -2622,7 +2636,11 @@ window.pickOptionStyle = pickOptionStyle;
     // Classic's own banner ZIP — see dlAllBanners() below. Empty when not
     // in Beta mode or the review hasn't produced a betaCtx yet.
     getBannerZipExtras: async () => {
-      if (!isBeta() || !betaCtx) return { assets: [], failed: [] };
+      if (!isBeta()) return { assets: [], failed: [] };
+      if (!betaCtx) {
+        console.warn('[beta] Download All Banners was clicked before Beta review finished — tag images and stinger were skipped this time. Wait for the "Beta Review" panel to finish loading, then click Download All Banners again.');
+        return { assets: [], failed: [] };
+      }
       return Beta.collectLotBannerAssets(betaCtx);
     },
   };
