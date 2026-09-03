@@ -374,3 +374,58 @@
 }
 .admin-approved-chip.approved { background: var(--success-bg); color: var(--success); }
 .admin-approved-chip.pending  { background: var(--warning-bg); color: var(--warning); }
+
+/* Add User — collapsed by default behind its own summary/button */
+.admin-add-user { margin-bottom: var(--space-5); }
+.admin-add-user-summary {
+  display: inline-flex; cursor: pointer; list-style: none; user-select: none;
+}
+.admin-add-user-summary::-webkit-details-marker { display: none; }
+.admin-add-user-form {
+  margin-top: var(--space-3); padding: var(--space-4);
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+/* Each user — one compact row, expands on click */
+.admin-user-list-title { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: var(--space-2); }
+.admin-user-list { display: flex; flex-direction: column; gap: 6px; }
+.admin-user-row {
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); overflow: hidden;
+}
+.admin-user-summary {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 10px var(--space-3); cursor: pointer; list-style: none; user-select: none;
+}
+.admin-user-summary::-webkit-details-marker { display: none; }
+.admin-user-summary::before {
+  content: '\25B8'; color: var(--text-muted); font-size: 11px; flex-shrink: 0;
+  transition: transform 120ms ease;
+}
+.admin-user-row[open] .admin-user-summary::before { transform: rotate(90deg); }
+.admin-user-email {
+  font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; min-width: 0; flex: 1;
+}
+.admin-user-role {
+  font-size: 11px; color: var(--text-secondary); background: var(--bg-muted);
+  padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+}
+.admin-user-edit {
+  padding: 0 var(--space-4) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-4);
+}
+.admin-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.admin-tab-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-2); }
+.admin-tab-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px; border-radius: 999px;
+  background: var(--bg-muted); border: 1px solid var(--border-subtle);
+  font-size: 12px; font-weight: 500; color: var(--text-primary);
+  text-transform: none; letter-spacing: normal; cursor: pointer;
+}
+.admin-tab-chip input { width: auto; margin: 0; }
+.admin-row-actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); }
+.admin-msg { margin-top: var(--space-2); min-height: 16px; font-size: 12px; }
