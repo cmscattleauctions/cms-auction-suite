@@ -140,9 +140,10 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 .flow-step .step-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:var(--surface2); font-family:'Barlow Condensed', sans-serif; font-weight:800; font-size:12px; color:inherit; border:1px solid currentColor; }
 .flow-arrow { color: var(--border); font-size: 16px; }
 .style-pick-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top:14px; }
-.style-pick-card { background: var(--surface2); border: 2px solid var(--border); border-radius: 10px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
+.style-pick-card { position: relative; background: var(--surface2); border: 2px solid var(--border); border-radius: 10px; overflow: hidden; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
 .style-pick-card:hover { border-color: var(--blue-light); }
-.style-pick-card.active { border-color: var(--blue-light); background: rgba(67,133,200,0.08); }
+.style-pick-card.active { border-color: var(--blue); border-width: 3px; background: rgba(37,99,163,0.08); }
+.style-pick-card.active::after { content: 'Selected'; position: absolute; top: 10px; right: 10px; background: var(--blue); color: #fff; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 3px 9px; border-radius: 999px; }
 .style-pick-preview { background: #0e1620; padding: 14px; }
 .style-pick-preview canvas { width:100%; height:auto; display:block; border-radius:3px; }
 .style-pick-footer { padding: 10px 14px; border-top: 1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
@@ -175,6 +176,11 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 @media (max-width: 900px) { .settings-grid { grid-template-columns: 1fr; } }
 .tag-placement-preview { background: #0e1620; border-radius: 8px; padding: 10px; }
 .tag-placement-preview canvas { width: 100%; height: auto; display: block; border-radius: 3px; }
+
+/* Stinger's 16:9 preview player */
+.stinger-preview-wrap { position: relative; width: 100%; max-width: 640px; aspect-ratio: 16 / 9; background: #0e1620; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.stinger-preview-wrap video { width: 100%; height: 100%; object-fit: contain; display: block; }
+.stinger-preview-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
 
 /* Shared right-side drawer (Verification Tags, State Images) — see
    beta-drawer.js. Flat, border-only, no box-shadow — matches the rest
@@ -278,7 +284,8 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
     </div>
 
     <div class="card" style="margin-bottom:20px;">
-      <div class="section-title">Transition Banner Style <span style="color:var(--muted);font-weight:500;text-transform:none;letter-spacing:0;">· bottom-center on screen</span></div>
+      <div class="section-title" style="margin-bottom:2px;">Transition Banner</div>
+      <p class="helper" style="margin-bottom:14px;">Displayed bottom-center during lot changes.</p>
       <div class="style-pick-grid">
         <div class="style-pick-card active" id="pickStd1" onclick="pickStandardStyle(1)">
           <div class="style-pick-preview"><canvas id="pickStd1Canvas"></canvas></div>
@@ -298,7 +305,8 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
     </div>
 
     <div class="card" style="margin-bottom:20px;">
-      <div class="section-title">Option Banner Style <span style="color:var(--muted);font-weight:500;text-transform:none;letter-spacing:0;">· top-center on screen, shared per option group</span></div>
+      <div class="section-title" style="margin-bottom:2px;">Option Banner</div>
+      <p class="helper" style="margin-bottom:14px;">Displayed top-center for grouped option lots.</p>
       <div class="style-pick-grid">
         <div class="style-pick-card active" id="pickOpt1" onclick="pickOptionStyle(1)">
           <div class="style-pick-preview"><canvas id="pickOpt1Canvas"></canvas></div>
@@ -499,19 +507,11 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
   <!-- ---- Verification Tags — Beta-only settings, entirely inert if Beta
        mode is never turned on, since Classic never reads this collection ---- -->
   <div class="subpage" id="assets-tags">
-    <div class="info-banner" id="tagsPageIntro">
-      Verification tags configured here are only used when <strong>OBS Build Mode</strong> is set to
-      <strong>Automated Video Setup — Beta</strong>. They have no effect on the Classic workflow.
-    </div>
     <div id="tagManagerRoot"><p class="helper">Loading…</p></div>
   </div>
 
   <!-- ---- Stinger — Beta-only settings page (Firebase-backed) ---- -->
   <div class="subpage" id="assets-stinger">
-    <div class="info-banner" id="stingerPageIntro">
-      The Stinger configured here is only used when <strong>OBS Build Mode</strong> is set to
-      <strong>Automated Video Setup — Beta</strong>. It has no effect on the Classic workflow.
-    </div>
     <div id="stingerRoot"><p class="helper">Loading…</p></div>
   </div>
 
@@ -521,10 +521,6 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
      SETTINGS — OBS configuration (local/device settings)
      ============================================================ -->
 <div class="page" id="page-settings">
-  <div class="info-banner" id="obsPageIntro">
-    These settings are only used when <strong>OBS Build Mode</strong> is set to
-    <strong>Automated Video Setup — Beta</strong>. They have no effect on the Classic workflow.
-  </div>
   <div id="obsSettingsRoot"><p class="helper">Loading…</p></div>
 </div>
 
@@ -2801,14 +2797,14 @@ window.pickOptionStyle = pickOptionStyle;
     originalShowSubPage(containerId, subId, btn);
     if (subId === 'assets-tags' && !tagManagerInitialized) {
       tagManagerInitialized = true;
-      initTagManagerPage(document.getElementById('tagManagerRoot'), { showToast }).catch(err => {
+      initTagManagerPage(document.getElementById('tagManagerRoot'), { showToast, setBuildMode }).catch(err => {
         console.error('[beta]', err);
         document.getElementById('tagManagerRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load Verification Tags: ${String(err.message || err)}</div>`;
       });
     }
     if (subId === 'assets-stinger' && !stingerSettingsInitialized) {
       stingerSettingsInitialized = true;
-      initStingerSettingsPage(document.getElementById('stingerRoot'), { showToast }).catch(err => {
+      initStingerSettingsPage(document.getElementById('stingerRoot'), { showToast, setBuildMode }).catch(err => {
         console.error('[beta]', err);
         document.getElementById('stingerRoot').innerHTML = `<div class="alert-banner" style="display:block;">Could not load Stinger Settings: ${String(err.message || err)}</div>`;
       });

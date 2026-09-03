@@ -24,6 +24,8 @@ import { openDrawer, closeDrawer } from '../beta-drawer.js';
 import { listTags, createTag, updateTag, setTagEnabled, deleteTag, setTagImage, reorderTags } from './beta-tags-data.js';
 import { fetchAsBlob, downloadFile } from './beta-package-export.js';
 import { safeFileStem } from './beta-video-match.js';
+import { getBuildMode } from './beta-state.js';
+import { renderModeNotice } from './beta-mode-notice.js';
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -41,8 +43,9 @@ function tagImageExt(tag) {
 let pendingTagImageFile = null;
 let editingTagId = null;
 
-export async function initTagManagerPage(root, { showToast }) {
+export async function initTagManagerPage(root, { showToast, setBuildMode }) {
   root.innerHTML = `
+    <div id="tagModeNotice" style="margin-bottom:16px;"></div>
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:6px;">
       <div>
         <div class="section-title" style="margin-bottom:2px;">Verification Tags</div>
@@ -57,6 +60,7 @@ export async function initTagManagerPage(root, { showToast }) {
     <div class="state-library-grid" id="tagLibGrid"><p class="no-states">No verification tags configured yet.</p></div>
   `;
 
+  renderModeNotice(root.querySelector('#tagModeNotice'), { isBeta: getBuildMode() === 'beta', setBuildMode });
   root.querySelector('#btnAddTag').addEventListener('click', () => openTagDrawer(root, showToast, null));
   wireReorder(root, showToast);
   wireDownloadAll(root, showToast);

@@ -6,27 +6,42 @@
  * and OBS Settings. Manages the single CMS video-entry intro asset
  * (obs-stinger/{filename} in Storage, obsStingerConfig/default in
  * Firestore) — see beta-stinger-data.js for the persistence layer.
+ *
+ * The mechanics of how OBS actually plays this (native Stinger
+ * Transition, transition override, the source-activation timing
+ * limitation) are real and worth knowing, but shouldn't dominate the
+ * page — see the collapsed "How stinger playback works" disclosure
+ * at the bottom of the markup below, not a top-of-page wall of text.
  * ============================================================= */
 
 import { getStingerConfig, saveStingerConfig, setStingerAsset } from './beta-stinger-data.js';
+import { getBuildMode } from './beta-state.js';
+import { renderModeNotice } from './beta-mode-notice.js';
 
-export async function initStingerSettingsPage(root, { showToast }) {
+export async function initStingerSettingsPage(root, { showToast, setBuildMode }) {
   root.innerHTML = `
+      <div id="stingerModeNotice" style="margin-bottom:16px;"></div>
       <div class="card">
-        <div class="section-title">CMS Video Intro / Stinger</div>
-        <div class="info-banner" style="margin-bottom:14px;font-size:12px;padding:12px 14px;">
-          Implemented as a native <strong>OBS Stinger Transition</strong>, applied as the incoming transition on every Lot Video scene AND every Transition scene that follows one (lot transitions and breed/type transitions) — so it plays going into a lot's video and again going out of it into the next transition banner. This is OBS's own built-in mechanism (no plugin, no script).<br><br>
-          <strong>Known limitation:</strong> OBS activates the cattle video's Media Source (and restarts it) the instant the Stinger begins, not when it visually reveals the video — so the first fraction of a second of the cattle video plays underneath the Stinger before it's shown. Keep this clip short (well under 1 second is a reasonable target) to keep that unavoidable overlap imperceptible. A video asset is required — a static image has no natural end point for OBS to key the transition off of.
+        <div class="section-title" style="margin-bottom:14px;">Auction Stinger</div>
+
+        <div class="stinger-preview-wrap">
+          <video id="introVideoPreview" controls muted playsinline style="display:none;"></video>
+          <div class="stinger-preview-empty" id="introPreviewEmpty">No stinger uploaded yet</div>
         </div>
-        <div class="form-row">
-          <label class="form-label">Stinger Video (MP4/MOV/WebM)</label>
-          <div class="img-drop" id="introImgDrop">
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:14px;">
+          <div>
+            <div class="form-label">Current File</div>
+            <p class="helper mono" id="introFileLabel" style="margin-top:4px;">None uploaded</p>
+          </div>
+          <div class="img-drop" id="introImgDrop" style="padding:12px 22px;">
             <input type="file" accept="video/mp4,video/quicktime,video/webm" id="introImgInput">
-            <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-            <p>Drop the stinger clip or click to browse</p>
-            <p id="introFileLabel" class="helper" style="margin-top:6px;"></p>
+            <p style="margin:0;font-weight:600;">Replace Video</p>
+            <p class="helper" style="margin-top:4px;">Drop or click to browse — MP4, MOV, or WebM</p>
           </div>
         </div>
+
+        <div class="section-title" style="margin-top:24px;margin-bottom:10px;">Timing</div>
         <div class="two-col">
           <div class="form-row">
             <label class="form-label">Clip Length Estimate (ms)</label>
@@ -37,15 +52,26 @@ export async function initStingerSettingsPage(root, { showToast }) {
             <input type="number" class="form-input" id="introTransitionPointInput" value="700" min="0" max="10000">
           </div>
         </div>
-        <p class="helper" style="margin-top:-4px;margin-bottom:10px;">OBS actually uses the clip's own real length at runtime regardless of the estimate above — this is only a fallback/display value. Transition Point is when OBS's internal renderer swaps to the Video scene's content; largely invisible if your clip is opaque the whole way through.</p>
-        <div class="two-col">
+
+        <div class="two-col" style="margin-top:14px;">
           <button class="btn btn-ghost toggle-btn" id="btnIntroEnabled">Enabled: No</button>
-          <button class="btn btn-primary" id="btnSaveIntro">Save Stinger Settings</button>
+          <button class="btn btn-primary" id="btnSaveIntro">Save Changes</button>
         </div>
-        <p id="introMsg" class="helper" style="margin-top:10px;min-height:18px;">Applies as a Transition Override on every Lot Video scene, and on the Transition scene right after one (lot or breed/type) — so it plays going in and coming back out. Skipped on the show's opening transition and on a lot transition right after a breed/type transition, since neither follows an actual lot video.</p>
+        <p id="introMsg" class="helper" style="margin-top:10px;min-height:18px;"></p>
+
+        <details style="margin-top:20px;">
+          <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);">How stinger playback works ▾</summary>
+          <div class="info-banner" style="margin-top:12px;font-size:12px;padding:12px 14px;">
+            Implemented as a native <strong>OBS Stinger Transition</strong>, applied as the incoming transition on every Lot Video scene AND every Transition scene that follows one (lot transitions and breed/type transitions) — so it plays going into a lot's video and again going out of it into the next transition banner. This is OBS's own built-in mechanism (no plugin, no script).<br><br>
+            <strong>Known limitation:</strong> OBS activates the cattle video's Media Source (and restarts it) the instant the Stinger begins, not when it visually reveals the video — so the first fraction of a second of the cattle video plays underneath the Stinger before it's shown. Keep this clip short (well under 1 second is a reasonable target) to keep that unavoidable overlap imperceptible. A video asset is required — a static image has no natural end point for OBS to key the transition off of.<br><br>
+            OBS actually uses the clip's own real length at runtime regardless of the Clip Length Estimate above — that field is only a fallback/display value. Transition Point is when OBS's internal renderer swaps to the Video scene's content; largely invisible if your clip is opaque the whole way through.<br><br>
+            Applies as a Transition Override on every Lot Video scene, and on the Transition scene right after one (lot or breed/type) — so it plays going in and coming back out. Skipped on the show's opening transition and on a lot transition right after a breed/type transition, since neither follows an actual lot video.
+          </div>
+        </details>
       </div>
   `;
 
+  renderModeNotice(root.querySelector('#stingerModeNotice'), { isBeta: getBuildMode() === 'beta', setBuildMode });
   wireIntro(root, showToast);
   await refreshIntro(root);
 }
@@ -59,7 +85,13 @@ async function refreshIntro(root) {
   btn.classList.toggle('active', !!cfg.enabled);
   btn.dataset.enabled = cfg.enabled ? '1' : '0';
   if (cfg.fileName) {
-    root.querySelector('#introFileLabel').textContent = `Current: ${cfg.fileName}`;
+    root.querySelector('#introFileLabel').textContent = cfg.fileName;
+  }
+  if (cfg.videoUrl) {
+    const video = root.querySelector('#introVideoPreview');
+    video.src = cfg.videoUrl;
+    video.style.display = 'block';
+    root.querySelector('#introPreviewEmpty').style.display = 'none';
   }
 }
 
@@ -67,6 +99,8 @@ function wireIntro(root, showToast) {
   let pendingIntroFile = null;
   const drop = root.querySelector('#introImgDrop');
   const input = root.querySelector('#introImgInput');
+  const video = root.querySelector('#introVideoPreview');
+  const empty = root.querySelector('#introPreviewEmpty');
   const ALLOWED_TYPES = ['video/mp4', 'video/quicktime', 'video/webm'];
   const handleFile = file => {
     if (!ALLOWED_TYPES.includes(file.type)) {
@@ -74,7 +108,10 @@ function wireIntro(root, showToast) {
       return;
     }
     pendingIntroFile = file;
-    root.querySelector('#introFileLabel').textContent = `Ready: ${file.name}`;
+    root.querySelector('#introFileLabel').textContent = `${file.name} (not saved yet)`;
+    video.src = URL.createObjectURL(file);
+    video.style.display = 'block';
+    empty.style.display = 'none';
   };
   input.addEventListener('change', () => { if (input.files[0]) handleFile(input.files[0]); });
   drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
@@ -98,8 +135,9 @@ function wireIntro(root, showToast) {
       if (pendingIntroFile) await setStingerAsset(pendingIntroFile);
       await saveStingerConfig({ enabled, durationMs, transitionPointMs });
       pendingIntroFile = null;
-      msg.textContent = 'Stinger settings saved.';
+      msg.textContent = 'Saved.';
       showToast('Stinger settings saved');
+      await refreshIntro(root);
     } catch (err) {
       console.error(err);
       msg.textContent = 'Save failed.';

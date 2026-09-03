@@ -13,6 +13,7 @@
 
 import * as State from './beta-state.js';
 import { renderTagPlacementPreview } from './beta-tag-preview.js';
+import { renderModeNotice } from './beta-mode-notice.js';
 
 /**
  * @param opts.showToast
@@ -37,6 +38,8 @@ export async function initSettingsPage(root, { showToast, setBuildMode }) {
         </label>
       </div>
     </div>
+
+    <div id="settingsModeNotice" style="margin-bottom:16px;"></div>
 
     <div class="settings-grid">
       <div class="card">
@@ -99,6 +102,7 @@ export async function initSettingsPage(root, { showToast, setBuildMode }) {
     </div>
   `;
 
+  renderModeNotice(root.querySelector('#settingsModeNotice'), { isBeta: State.getBuildMode() === 'beta', setBuildMode });
   wireBuildModeCard(root, setBuildMode);
   wireSettings(root, showToast);
   await refreshSettingsForm(root, showToast);
