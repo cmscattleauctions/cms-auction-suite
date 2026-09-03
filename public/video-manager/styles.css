@@ -854,3 +854,24 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
   .vm-compare-modal { width: 100vw; height: 100vh; max-height: 100vh; }
   .vm-compare-grid { grid-template-columns: 1fr; }
 }
+
+/* Phone widths: the topbar/status-tabs/toolbar row above the table are
+   all fixed single-row flex layouts with no wrap — fine down to tablet
+   width, but they overflow the viewport outright on an actual phone
+   (confirmed: topbar content and the status tabs both ran past 390px).
+   Same fix shape throughout: let the row wrap or scroll horizontally
+   instead of forcing everything to fit on one line. */
+@media (max-width: 640px) {
+  .vm-topbar { flex-wrap: wrap; row-gap: 8px; padding: 10px 14px; }
+  .vm-topbar-actions { width: 100%; justify-content: flex-end; }
+  .vm-subtitle { display: none; } /* the title alone is enough at this width */
+
+  .vm-tabs { overflow-x: auto; padding: 0 14px; -webkit-overflow-scrolling: touch; }
+  .vm-tab { padding: 12px 10px; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
+
+  .vm-toolbar { flex-wrap: wrap; padding: 10px 14px; }
+  .vm-search { flex: 1 1 100%; max-width: none; order: 1; }
+  .vm-filters-wrap, .vm-sort-wrap, .vm-view-toggle { order: 2; }
+
+  .vm-active-filters, .vm-meta, .vm-content { padding-left: 14px; padding-right: 14px; }
+}
