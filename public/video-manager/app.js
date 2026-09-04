@@ -11,9 +11,10 @@ import { renderTable } from './ui-table.js';
 import { renderGrid } from './ui-grid.js';
 import { openDrawer, closeDrawer } from './ui-drawer.js';
 import { openUploadModal, openCsvImportModal, openVideoIdManagerModal, openStaffManagerModal, openTrashModal } from './ui-modals.js';
+import { readInitialRoute, reportRoute } from '../shared/subapp-url.js';
 
 const state = {
-  statusTab: 'created', // "Completed" — the default view staff actually want first
+  statusTab: 'created', // "Completed" — the default view staff actually want first; boot() below overrides this from the URL when a reload is restoring a specific tab
   view: 'table',
   search: '',
   filters: {},
@@ -87,6 +88,14 @@ function paintSelectedRow() {
  * Boot
  * ============================================================= */
 async function boot() {
+  // Restore whichever status tab the shell was asked to reopen us on
+  // (see shared/subapp-url.js) — otherwise a reload always drops back
+  // to the hardcoded default above, discarding wherever staff actually
+  // were. Falls back to the default for an unrecognized/absent route.
+  const initialRoute = readInitialRoute();
+  if (STATUS_TABS.some(t => t.id === initialRoute)) state.statusTab = initialRoute;
+  reportRoute(state.statusTab); // keep the shell's URL in sync even when nothing changed
+
   // Reference dictionaries (consignors, sire/dam types) are read
   // synchronously everywhere below (renderFiltersPanel, the Video ID
   // Manager, the upload modal) — load them once before anything renders,
@@ -169,6 +178,7 @@ function renderTabsShell() {
     const btn = e.target.closest('.vm-tab');
     if (!btn) return;
     state.statusTab = btn.dataset.tab;
+    reportRoute(state.statusTab);
     paintActiveTab();
     refresh();
   });

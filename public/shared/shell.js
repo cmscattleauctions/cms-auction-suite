@@ -37,10 +37,25 @@ const TABS = [
 const DEFAULT_TAB = 'listings';
 
 let activeTabId = null;
+// A sub-app's own internal "where am I" (e.g. Video Manager's status
+// tab). Mirrored into the outer URL as "#<tabId>/<route>" so a reload
+// lands back in the same place instead of the sub-app's hardcoded
+// default — see the postMessage listener in wireSubAppRouting() below.
+let activeRoute = null;
 // null = every tab (default for everyone until an admin restricts a
 // specific account) — set from the current user's users/{uid}.allowedTabs
 // in renderShell() below, via Admin Settings (admin-panel.js).
 let allowedTabIds = null;
+
+/** "tab" or "tab/route" -> { tabId, route } — route may contain its own
+ *  encoded content but never another "/", so splitting on the first
+ *  "/" only is deliberate. */
+function parseHash(hash) {
+  const raw = hash.replace(/^#/, '');
+  const slash = raw.indexOf('/');
+  if (slash === -1) return { tabId: raw, route: null };
+  return { tabId: raw.slice(0, slash), route: decodeURIComponent(raw.slice(slash + 1)) };
+}
 
 function isTabAllowed(tabId) {
   return allowedTabIds == null || allowedTabIds.includes(tabId);
@@ -157,14 +172,40 @@ async function renderShell(root, user) {
     });
   }
 
-  const hashTab = location.hash.replace(/^#/, '');
-  const initialTab = TABS.some(t => t.id === hashTab) && isTabAllowed(hashTab) ? hashTab : DEFAULT_TAB;
-  selectTab(initialTab);
+  const initial = parseHash(location.hash);
+  const initialTab = TABS.some(t => t.id === initial.tabId) && isTabAllowed(initial.tabId) ? initial.tabId : DEFAULT_TAB;
+  selectTab(initialTab, initial.tabId === initialTab ? initial.route : null);
 
   window.addEventListener('hashchange', () => {
-    const hashTab = location.hash.replace(/^#/, '');
-    if (hashTab && hashTab !== activeTabId) selectTab(hashTab);
+    const { tabId, route } = parseHash(location.hash);
+    if (tabId && (tabId !== activeTabId || route !== activeRoute)) selectTab(tabId, route);
   });
+
+  wireSubAppRouting();
+}
+
+/* =============================================================
+ * Sub-app deep-linking — a sub-app running in the iframe can report
+ * its own internal nav state (e.g. Video Manager's status tab) so a
+ * page reload restores it instead of landing on the sub-app's default.
+ * See shared/subapp-url.js for the sub-app side of this contract.
+ * ============================================================= */
+
+function wireSubAppRouting() {
+  window.addEventListener('message', e => {
+    if (e.origin !== location.origin) return;
+    if (!e.data || e.data.ns !== 'cms-subapp-route') return;
+    updateActiveRoute(e.data.route || null);
+  });
+}
+
+/** Rewrites the outer URL to reflect a sub-app-reported route, without
+ *  touching the iframe — the sub-app already applied this state itself,
+ *  this only makes a reload able to restore it. */
+function updateActiveRoute(route) {
+  activeRoute = route;
+  const hash = `#${activeTabId}${activeRoute ? '/' + encodeURIComponent(activeRoute) : ''}`;
+  if (location.hash !== hash) history.replaceState(null, '', hash);
 }
 
 function renderNav() {
@@ -288,7 +329,7 @@ function svg(strings) {
  * Tab selection
  * ============================================================= */
 
-function selectTab(tabId) {
+function selectTab(tabId, route = null) {
   // Defense in depth beyond renderNav()'s filtering — catches a disallowed
   // tab reached via a typed/bookmarked #hash, not just a click. Falls back
   // to this user's first allowed tab (own security rules inside each
@@ -297,24 +338,36 @@ function selectTab(tabId) {
     const fallback = TABS.find(t => isTabAllowed(t.id));
     if (!fallback || fallback.id === tabId) return;
     tabId = fallback.id;
+    route = null;
   }
   const tab = TABS.find(t => t.id === tabId);
   if (!tab) return;
 
+  // Switching tabs by hand (nav click, typed hash) drops any route from
+  // the PREVIOUS tab — only a same-tab reload/back-forward should ever
+  // carry one in. activeTabId is still null on the very first call
+  // (page boot), which must NOT count as "switching tabs" or it would
+  // discard the route a reload is trying to restore.
+  if (activeTabId !== null && tabId !== activeTabId) route = null;
+
   activeTabId = tabId;
+  activeRoute = route;
 
   document.querySelectorAll('.nav-item').forEach(el => {
     el.classList.toggle('active', el.dataset.tab === tabId);
   });
 
-  if (location.hash !== `#${tabId}`) {
-    history.replaceState(null, '', `#${tabId}`);
+  const hash = `#${tabId}${route ? '/' + encodeURIComponent(route) : ''}`;
+  if (location.hash !== hash) {
+    history.replaceState(null, '', hash);
   }
 
   const contentEl = document.getElementById('content');
   if (tab.ready) {
+    const sep = tab.src.includes('?') ? '&' : '?';
+    const src = route ? `${tab.src}${sep}route=${encodeURIComponent(route)}` : tab.src;
     contentEl.innerHTML = `
-      <iframe class="app-frame" src="${tab.src}" title="${tab.label}"
+      <iframe class="app-frame" src="${src}" title="${tab.label}"
               referrerpolicy="no-referrer"></iframe>
     `;
   } else {
