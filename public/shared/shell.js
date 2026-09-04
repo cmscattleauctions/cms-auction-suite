@@ -104,14 +104,28 @@ async function renderShell(root, user) {
   root.innerHTML = `
     ${demoBanner}
     <header class="mobile-topbar">
+      <button class="hamburger-btn" type="button" id="btnHamburger" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
       <div class="sidebar-brand" style="padding:0;border:0;">
         <img class="sidebar-brand-logo" src="shared/assets/cms-auction-suite-logo.png" alt="CMS Auction Suite" />
       </div>
-      <button class="signout-btn" type="button" data-signout>Sign out</button>
+      <div class="profile-menu">
+        <button class="profile-btn" type="button" id="btnProfile" aria-label="Account menu" aria-expanded="false">
+          <span class="user-avatar" aria-hidden="true">${initial}</span>
+        </button>
+        <div class="profile-dropdown" id="profileDropdown" hidden>
+          <div class="profile-dropdown-email" title="${email}">${email || 'Signed in'}</div>
+          ${isSuiteAdmin ? `<button class="profile-dropdown-item" type="button" id="btnOpenAdminSettingsMobile">Settings</button>` : ''}
+          <button class="profile-dropdown-item" type="button" data-signout>Sign out</button>
+        </div>
+      </div>
     </header>
 
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
     <div class="shell">
-      <aside class="sidebar" aria-label="Primary navigation">
+      <aside class="sidebar" id="sidebarDrawer" aria-label="Primary navigation">
         <div class="sidebar-brand">
           <img class="sidebar-brand-logo" src="shared/assets/cms-auction-suite-logo.png" alt="CMS Auction Suite" />
         </div>
@@ -134,8 +148,13 @@ async function renderShell(root, user) {
 
   renderNav();
   wireSignOut();
+  wireMobileChrome();
   if (isSuiteAdmin) {
     document.getElementById('btnOpenAdminSettings').addEventListener('click', () => openAdminPanel());
+    document.getElementById('btnOpenAdminSettingsMobile').addEventListener('click', () => {
+      closeProfileMenu();
+      openAdminPanel();
+    });
   }
 
   const hashTab = location.hash.replace(/^#/, '');
@@ -171,6 +190,58 @@ function renderNav() {
     if (!btn) return;
     const tabId = btn.dataset.tab;
     if (tabId) selectTab(tabId);
+    closeSidebarDrawer();
+  });
+}
+
+/* =============================================================
+ * Mobile chrome: hamburger drawer + profile dropdown
+ * ============================================================= */
+
+function closeSidebarDrawer() {
+  document.getElementById('sidebarDrawer')?.classList.remove('open');
+  document.getElementById('sidebarBackdrop')?.classList.remove('open');
+  document.getElementById('btnHamburger')?.setAttribute('aria-expanded', 'false');
+}
+
+function closeProfileMenu() {
+  document.getElementById('profileDropdown')?.setAttribute('hidden', '');
+  document.getElementById('btnProfile')?.setAttribute('aria-expanded', 'false');
+}
+
+function wireMobileChrome() {
+  const hamburgerBtn = document.getElementById('btnHamburger');
+  const drawer = document.getElementById('sidebarDrawer');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  const profileBtn = document.getElementById('btnProfile');
+  const profileDropdown = document.getElementById('profileDropdown');
+
+  hamburgerBtn.addEventListener('click', () => {
+    const open = drawer.classList.toggle('open');
+    backdrop.classList.toggle('open', open);
+    hamburgerBtn.setAttribute('aria-expanded', String(open));
+    closeProfileMenu();
+  });
+
+  backdrop.addEventListener('click', closeSidebarDrawer);
+
+  profileBtn.addEventListener('click', () => {
+    const open = profileDropdown.hasAttribute('hidden');
+    if (open) profileDropdown.removeAttribute('hidden');
+    else profileDropdown.setAttribute('hidden', '');
+    profileBtn.setAttribute('aria-expanded', String(open));
+    closeSidebarDrawer();
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.profile-menu')) closeProfileMenu();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeSidebarDrawer();
+      closeProfileMenu();
+    }
   });
 }
 

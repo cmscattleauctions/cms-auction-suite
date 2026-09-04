@@ -848,7 +848,7 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
  * rather than shrinking everything illegibly.
  * ============================================================= */
 @media (max-width: 900px) {
-  .vm-col-added, .vm-col-usage { display: none; }
+  .vm-col-added, .vm-col-usage, .vm-col-published { display: none; }
   .vm-drawer { width: 100vw !important; }
   .vm-drawer-resize-handle { display: none; }
   .vm-compare-modal { width: 100vw; height: 100vh; max-height: 100vh; }
@@ -874,4 +874,21 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
   .vm-filters-wrap, .vm-sort-wrap, .vm-view-toggle { order: 2; }
 
   .vm-active-filters, .vm-meta, .vm-content { padding-left: 14px; padding-right: 14px; }
+
+  /* Table: at phone width even the 900px tablet trim (Added/Usage/
+     Published hidden) still leaves Cattle+Clips+Working On competing
+     for space with Video+Status, forcing a wide horizontal scroll for
+     the two columns that actually answer "which video, is it usable".
+     Drop the secondary columns entirely here and let Video/Status
+     breathe — anything still cut off truncates with ellipsis (existing
+     .vm-identity-* rules) rather than forcing scroll for core info. */
+  .vm-col-cattle, .vm-col-clips, .vm-col-workingon { display: none; }
+  .vm-table th:nth-child(2), .vm-table td:nth-child(2) { width: auto; min-width: 0; }
+  /* Still capped, just narrower than the 280px desktop max — without a
+     cap here a long consignor name claims all the free space and pushes
+     Status past the edge instead of the two of them sharing the row. */
+  .vm-identity-cell { max-width: 190px; }
+  table.vm-table { font-size: 12px; }
+  .vm-table tbody tr { height: 56px; } /* slightly taller rows = easier tap targets on touch */
+  .vm-table td { padding: 8px; }
 }

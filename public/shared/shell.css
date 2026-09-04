@@ -223,111 +223,18 @@
 }
 
 /* =============================================================
- * Mobile layout: sidebar collapses to bottom nav
+ * Mobile layout: sidebar becomes a hamburger-triggered drawer,
+ * account actions move into a profile dropdown in the top bar.
  * ============================================================= */
 
 @media (max-width: 768px) {
   .shell {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr var(--mobile-nav-height);
-  }
-
-  .sidebar {
-    position: relative;
-    grid-row: 2;
-    flex-direction: row;
-    border-right: none;
-    border-top: 1px solid var(--sidebar-divider);
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* With 8 tabs, the row is wider than any phone screen. Rather than
-     shrinking tabs down to illegible widths (flex:1 on all 8 collapses
-     labels to ~10px), let the row scroll at a readable tab size and
-     show a fade at the trailing edge so the overflow is discoverable
-     instead of a silent, unmarked scroll area. */
-  .sidebar::after {
-    content: '';
-    position: sticky;
-    top: 0;
-    right: 0;
-    margin-left: -24px;
-    width: 24px;
-    height: 100%;
-    flex-shrink: 0;
-    background: linear-gradient(to right, transparent, var(--sidebar-bg));
-    pointer-events: none;
-  }
-
-  /* Scoped to .sidebar specifically — .mobile-topbar reuses the same
-     .sidebar-brand class for its own (visible) logo, and an unscoped
-     rule here was matching that too, hiding the mobile topbar logo. */
-  .sidebar > .sidebar-brand,
-  .sidebar > .sidebar-user {
-    display: none;     /* surfaced via a topbar on mobile, not bottom */
-  }
-
-  .sidebar-nav {
-    flex-direction: row;
-    width: 100%;
-    padding: var(--space-2);
-    gap: var(--space-1);
-  }
-
-  .nav-item {
-    flex: 0 0 auto;
-    /* override the desktop rule's width:100% — with flex-basis:auto,
-       a definite width wins over content sizing and forced every tab
-       to the row's full width instead of its own content width */
-    width: auto;
-    flex-direction: column;
-    gap: 4px;
-    padding: 8px 10px;
-    font-size: 10px;
-    text-align: center;
-    min-width: 64px;
-    white-space: nowrap;
+    grid-template-rows: 1fr;
   }
 
   .content {
     grid-row: 1;
-  }
-
-  /* Mobile gets a thin top bar with brand + sign-out */
-  .mobile-topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-3) var(--space-4);
-    background: var(--sidebar-bg);
-    color: var(--sidebar-fg);
-    border-bottom: 1px solid var(--sidebar-divider);
-    height: 52px;
-    flex-shrink: 0;
-  }
-
-  .mobile-topbar .sidebar-brand {
-    flex-shrink: 0;
-  }
-
-  /* Explicit width, not 100%: inside a flex item with no defined size
-     (.sidebar-brand has no width of its own here), a replaced element
-     sized to 100% of its container creates a circular dependency and
-     collapses to 0x0 instead of rendering at 150px. */
-  .mobile-topbar .sidebar-brand-logo {
-    width: 150px;
-    max-width: 150px;
-  }
-
-  .mobile-topbar .signout-btn {
-    width: auto;
-    padding: 6px 12px;
-    font-size: 12px;
-  }
-
-  .content {
     display: flex;
     flex-direction: column;
   }
@@ -335,11 +242,201 @@
   .app-frame, .placeholder {
     flex: 1;
   }
+
+  /* Mobile gets a thin top bar with hamburger + brand + profile menu */
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--sidebar-bg);
+    color: var(--sidebar-fg);
+    border-bottom: 1px solid var(--sidebar-divider);
+    height: 52px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 501;
+  }
+
+  .mobile-topbar .sidebar-brand {
+    flex-shrink: 0;
+    /* brand no longer needs to sit at either edge now that the
+       hamburger and profile button flank it */
+    margin: 0 auto;
+  }
+
+  /* Sized by height, not width: the logo's ~2:1 aspect ratio means a
+     150px-wide render (this class's old value) comes out ~75px tall —
+     taller than the 52px bar itself, spilling out top and bottom.
+     Also explicit rather than 100%: inside a flex item with no defined
+     size of its own, a replaced element at 100% of its container is a
+     circular dependency that collapses to 0x0 instead of rendering. */
+  .mobile-topbar .sidebar-brand-logo {
+    width: auto;
+    height: 30px;
+    max-width: 150px;
+  }
+
+  .hamburger-btn {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .hamburger-btn span {
+    display: block;
+    width: 18px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--sidebar-fg);
+  }
+
+  /* Sidebar becomes an off-canvas drawer, opened via the hamburger
+     button above. Its own brand/user blocks stay hidden — brand lives
+     in the topbar, account actions in the profile menu below — so the
+     drawer is nav-only. */
+  .sidebar {
+    position: fixed;
+    top: 52px;
+    left: 0;
+    bottom: 0;
+    width: 260px;
+    max-width: 80vw;
+    flex-direction: column;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--sidebar-divider);
+    border-top: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    z-index: 500;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Scoped to .sidebar specifically — .mobile-topbar reuses the same
+     .sidebar-brand class for its own (visible) logo, and an unscoped
+     rule here was matching that too, hiding the mobile topbar logo. */
+  .sidebar > .sidebar-brand,
+  .sidebar > .sidebar-user {
+    display: none;
+  }
+
+  .sidebar-nav {
+    flex-direction: column;
+    width: 100%;
+    padding: var(--space-3);
+    gap: 2px;
+  }
+
+  .nav-item {
+    flex: none;
+    width: 100%;
+    flex-direction: row;
+    gap: var(--space-3);
+    padding: 10px var(--space-3);
+    font-size: 13px;
+    text-align: left;
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 499;
+  }
+  .sidebar-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Profile menu: avatar button + dropdown carrying account email,
+     Settings (admins only), and Sign out — replaces the old bottom-nav
+     sign-out button as the one place account actions live on mobile. */
+  .profile-menu {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .profile-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    background: rgba(37, 99, 235, 0.18);
+  }
+
+  .profile-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 200px;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    padding: var(--space-2);
+    z-index: 600;
+  }
+  .profile-dropdown[hidden] {
+    display: none;
+  }
+
+  .profile-dropdown-email {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 6px 8px 8px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border-subtle);
+    word-break: break-all;
+  }
+
+  .profile-dropdown-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .profile-dropdown-item:hover {
+    background: var(--bg-surface-hover);
+  }
 }
 
 /* Hide mobile-only elements on desktop */
 @media (min-width: 769px) {
   .mobile-topbar { display: none; }
+  .sidebar-backdrop { display: none; }
 }
 
 /* Sidebar section titles */
