@@ -25,17 +25,20 @@ export function renderTable(container, records, ctx) {
   const isCreated = ctx.state.statusTab === 'created';
   const showWorkingOn = ctx.state.statusTab === 'ready';
   // No dedicated Open/action column — the row itself opens the drawer.
+  // Paired with a class so narrow-viewport CSS can hide the same column
+  // in both <th> and <td> — Video/Status stay put as the two columns
+  // that answer "which video, is it usable"; the rest are detail.
   const headCells = isCreated
-    ? ['', 'Video', 'Cattle', 'Clips', 'Usage', 'Published', 'Added']
+    ? [['', 'vm-col-check'], ['Video', ''], ['Cattle', 'vm-col-cattle'], ['Clips', 'vm-col-clips'], ['Usage', 'vm-col-usage'], ['Published', 'vm-col-published'], ['Added', 'vm-col-added']]
     : showWorkingOn
-      ? ['', 'Video', 'Cattle', 'Clips', 'Status', 'Working On', 'Added']
-      : ['', 'Video', 'Cattle', 'Clips', 'Status', 'Added'];
+      ? [['', 'vm-col-check'], ['Video', ''], ['Cattle', 'vm-col-cattle'], ['Clips', 'vm-col-clips'], ['Status', ''], ['Working On', 'vm-col-workingon'], ['Added', 'vm-col-added']]
+      : [['', 'vm-col-check'], ['Video', ''], ['Cattle', 'vm-col-cattle'], ['Clips', 'vm-col-clips'], ['Status', ''], ['Added', 'vm-col-added']];
   const colspan = headCells.length;
 
   container.innerHTML = `
     <div class="vm-table-wrap">
       <table class="vm-table">
-        <thead><tr>${headCells.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+        <thead><tr>${headCells.map(([label, cls]) => `<th class="${cls}">${label}</th>`).join('')}</tr></thead>
         <tbody id="vm-table-body"></tbody>
       </table>
     </div>
@@ -236,11 +239,11 @@ function readyRowHtml(r, ctx, showWorkingOn) {
     <tr data-id="${r.id}" class="${rowExceptionClass(r, 'ready')} ${ctx.state.selectedId === r.id ? 'is-selected' : ''}">
       <td class="vm-col-check">${compareCheckboxCell(r)}</td>
       <td>${identityCell(r, 'ready')}</td>
-      <td>${cattleCell(r, ctx)}</td>
-      <td>${clipsCell(r)}</td>
+      <td class="vm-col-cattle">${cattleCell(r, ctx)}</td>
+      <td class="vm-col-clips">${clipsCell(r)}</td>
       <td>${statusIssueCell(r)}</td>
-      ${showWorkingOn ? `<td>${workingOnCell(r)}</td>` : ''}
-      <td>${addedCell(r)}</td>
+      ${showWorkingOn ? `<td class="vm-col-workingon">${workingOnCell(r)}</td>` : ''}
+      <td class="vm-col-added">${addedCell(r)}</td>
     </tr>`;
 }
 
@@ -249,11 +252,11 @@ function createdRowHtml(r, ctx) {
     <tr data-id="${r.id}" class="${rowExceptionClass(r, 'created')} ${ctx.state.selectedId === r.id ? 'is-selected' : ''}">
       <td class="vm-col-check">${compareCheckboxCell(r)}</td>
       <td>${identityCell(r, 'created')}</td>
-      <td>${cattleCell(r, ctx)}</td>
-      <td>${clipsCell(r)}</td>
-      <td>${usageCell(r)}</td>
-      <td>${publishedCell(r)}</td>
-      <td>${addedCell(r)}</td>
+      <td class="vm-col-cattle">${cattleCell(r, ctx)}</td>
+      <td class="vm-col-clips">${clipsCell(r)}</td>
+      <td class="vm-col-usage">${usageCell(r)}</td>
+      <td class="vm-col-published">${publishedCell(r)}</td>
+      <td class="vm-col-added">${addedCell(r)}</td>
     </tr>`;
 }
 

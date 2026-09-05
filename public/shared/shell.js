@@ -37,10 +37,25 @@ const TABS = [
 const DEFAULT_TAB = 'listings';
 
 let activeTabId = null;
+// A sub-app's own internal "where am I" (e.g. Video Manager's status
+// tab). Mirrored into the outer URL as "#<tabId>/<route>" so a reload
+// lands back in the same place instead of the sub-app's hardcoded
+// default — see the postMessage listener in wireSubAppRouting() below.
+let activeRoute = null;
 // null = every tab (default for everyone until an admin restricts a
 // specific account) — set from the current user's users/{uid}.allowedTabs
 // in renderShell() below, via Admin Settings (admin-panel.js).
 let allowedTabIds = null;
+
+/** "tab" or "tab/route" -> { tabId, route } — route may contain its own
+ *  encoded content but never another "/", so splitting on the first
+ *  "/" only is deliberate. */
+function parseHash(hash) {
+  const raw = hash.replace(/^#/, '');
+  const slash = raw.indexOf('/');
+  if (slash === -1) return { tabId: raw, route: null };
+  return { tabId: raw.slice(0, slash), route: decodeURIComponent(raw.slice(slash + 1)) };
+}
 
 function isTabAllowed(tabId) {
   return allowedTabIds == null || allowedTabIds.includes(tabId);
@@ -104,14 +119,28 @@ async function renderShell(root, user) {
   root.innerHTML = `
     ${demoBanner}
     <header class="mobile-topbar">
+      <button class="hamburger-btn" type="button" id="btnHamburger" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
       <div class="sidebar-brand" style="padding:0;border:0;">
         <img class="sidebar-brand-logo" src="shared/assets/cms-auction-suite-logo.png" alt="CMS Auction Suite" />
       </div>
-      <button class="signout-btn" type="button" data-signout>Sign out</button>
+      <div class="profile-menu">
+        <button class="profile-btn" type="button" id="btnProfile" aria-label="Account menu" aria-expanded="false">
+          <span class="user-avatar" aria-hidden="true">${initial}</span>
+        </button>
+        <div class="profile-dropdown" id="profileDropdown" hidden>
+          <div class="profile-dropdown-email" title="${email}">${email || 'Signed in'}</div>
+          ${isSuiteAdmin ? `<button class="profile-dropdown-item" type="button" id="btnOpenAdminSettingsMobile">Settings</button>` : ''}
+          <button class="profile-dropdown-item" type="button" data-signout>Sign out</button>
+        </div>
+      </div>
     </header>
 
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
     <div class="shell">
-      <aside class="sidebar" aria-label="Primary navigation">
+      <aside class="sidebar" id="sidebarDrawer" aria-label="Primary navigation">
         <div class="sidebar-brand">
           <img class="sidebar-brand-logo" src="shared/assets/cms-auction-suite-logo.png" alt="CMS Auction Suite" />
         </div>
@@ -134,18 +163,49 @@ async function renderShell(root, user) {
 
   renderNav();
   wireSignOut();
+  wireMobileChrome();
   if (isSuiteAdmin) {
     document.getElementById('btnOpenAdminSettings').addEventListener('click', () => openAdminPanel());
+    document.getElementById('btnOpenAdminSettingsMobile').addEventListener('click', () => {
+      closeProfileMenu();
+      openAdminPanel();
+    });
   }
 
-  const hashTab = location.hash.replace(/^#/, '');
-  const initialTab = TABS.some(t => t.id === hashTab) && isTabAllowed(hashTab) ? hashTab : DEFAULT_TAB;
-  selectTab(initialTab);
+  const initial = parseHash(location.hash);
+  const initialTab = TABS.some(t => t.id === initial.tabId) && isTabAllowed(initial.tabId) ? initial.tabId : DEFAULT_TAB;
+  selectTab(initialTab, initial.tabId === initialTab ? initial.route : null);
 
   window.addEventListener('hashchange', () => {
-    const hashTab = location.hash.replace(/^#/, '');
-    if (hashTab && hashTab !== activeTabId) selectTab(hashTab);
+    const { tabId, route } = parseHash(location.hash);
+    if (tabId && (tabId !== activeTabId || route !== activeRoute)) selectTab(tabId, route);
   });
+
+  wireSubAppRouting();
+}
+
+/* =============================================================
+ * Sub-app deep-linking — a sub-app running in the iframe can report
+ * its own internal nav state (e.g. Video Manager's status tab) so a
+ * page reload restores it instead of landing on the sub-app's default.
+ * See shared/subapp-url.js for the sub-app side of this contract.
+ * ============================================================= */
+
+function wireSubAppRouting() {
+  window.addEventListener('message', e => {
+    if (e.origin !== location.origin) return;
+    if (!e.data || e.data.ns !== 'cms-subapp-route') return;
+    updateActiveRoute(e.data.route || null);
+  });
+}
+
+/** Rewrites the outer URL to reflect a sub-app-reported route, without
+ *  touching the iframe — the sub-app already applied this state itself,
+ *  this only makes a reload able to restore it. */
+function updateActiveRoute(route) {
+  activeRoute = route;
+  const hash = `#${activeTabId}${activeRoute ? '/' + encodeURIComponent(activeRoute) : ''}`;
+  if (location.hash !== hash) history.replaceState(null, '', hash);
 }
 
 function renderNav() {
@@ -171,6 +231,58 @@ function renderNav() {
     if (!btn) return;
     const tabId = btn.dataset.tab;
     if (tabId) selectTab(tabId);
+    closeSidebarDrawer();
+  });
+}
+
+/* =============================================================
+ * Mobile chrome: hamburger drawer + profile dropdown
+ * ============================================================= */
+
+function closeSidebarDrawer() {
+  document.getElementById('sidebarDrawer')?.classList.remove('open');
+  document.getElementById('sidebarBackdrop')?.classList.remove('open');
+  document.getElementById('btnHamburger')?.setAttribute('aria-expanded', 'false');
+}
+
+function closeProfileMenu() {
+  document.getElementById('profileDropdown')?.setAttribute('hidden', '');
+  document.getElementById('btnProfile')?.setAttribute('aria-expanded', 'false');
+}
+
+function wireMobileChrome() {
+  const hamburgerBtn = document.getElementById('btnHamburger');
+  const drawer = document.getElementById('sidebarDrawer');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  const profileBtn = document.getElementById('btnProfile');
+  const profileDropdown = document.getElementById('profileDropdown');
+
+  hamburgerBtn.addEventListener('click', () => {
+    const open = drawer.classList.toggle('open');
+    backdrop.classList.toggle('open', open);
+    hamburgerBtn.setAttribute('aria-expanded', String(open));
+    closeProfileMenu();
+  });
+
+  backdrop.addEventListener('click', closeSidebarDrawer);
+
+  profileBtn.addEventListener('click', () => {
+    const open = profileDropdown.hasAttribute('hidden');
+    if (open) profileDropdown.removeAttribute('hidden');
+    else profileDropdown.setAttribute('hidden', '');
+    profileBtn.setAttribute('aria-expanded', String(open));
+    closeSidebarDrawer();
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.profile-menu')) closeProfileMenu();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeSidebarDrawer();
+      closeProfileMenu();
+    }
   });
 }
 
@@ -217,7 +329,7 @@ function svg(strings) {
  * Tab selection
  * ============================================================= */
 
-function selectTab(tabId) {
+function selectTab(tabId, route = null) {
   // Defense in depth beyond renderNav()'s filtering — catches a disallowed
   // tab reached via a typed/bookmarked #hash, not just a click. Falls back
   // to this user's first allowed tab (own security rules inside each
@@ -226,24 +338,36 @@ function selectTab(tabId) {
     const fallback = TABS.find(t => isTabAllowed(t.id));
     if (!fallback || fallback.id === tabId) return;
     tabId = fallback.id;
+    route = null;
   }
   const tab = TABS.find(t => t.id === tabId);
   if (!tab) return;
 
+  // Switching tabs by hand (nav click, typed hash) drops any route from
+  // the PREVIOUS tab — only a same-tab reload/back-forward should ever
+  // carry one in. activeTabId is still null on the very first call
+  // (page boot), which must NOT count as "switching tabs" or it would
+  // discard the route a reload is trying to restore.
+  if (activeTabId !== null && tabId !== activeTabId) route = null;
+
   activeTabId = tabId;
+  activeRoute = route;
 
   document.querySelectorAll('.nav-item').forEach(el => {
     el.classList.toggle('active', el.dataset.tab === tabId);
   });
 
-  if (location.hash !== `#${tabId}`) {
-    history.replaceState(null, '', `#${tabId}`);
+  const hash = `#${tabId}${route ? '/' + encodeURIComponent(route) : ''}`;
+  if (location.hash !== hash) {
+    history.replaceState(null, '', hash);
   }
 
   const contentEl = document.getElementById('content');
   if (tab.ready) {
+    const sep = tab.src.includes('?') ? '&' : '?';
+    const src = route ? `${tab.src}${sep}route=${encodeURIComponent(route)}` : tab.src;
     contentEl.innerHTML = `
-      <iframe class="app-frame" src="${tab.src}" title="${tab.label}"
+      <iframe class="app-frame" src="${src}" title="${tab.label}"
               referrerpolicy="no-referrer"></iframe>
     `;
   } else {

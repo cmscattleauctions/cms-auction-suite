@@ -834,7 +834,7 @@ export function openUploadModal(ctx) {
         sireCode: matchedExisting.sireCode, damCode: matchedExisting.damCode,
         weight: matchedExisting.weight, monthYear: matchedExisting.monthYear,
       };
-      const record = await ctx.repo.createVideo({ ...fields, suffix, status: 'ready', notes, clips }, 'Staff');
+      const record = await ctx.repo.createVideo({ ...fields, suffix, status: ctx.state.statusTab, notes, clips }, 'Staff');
       showToast(`Created ${record.videoId}`);
       close(); ctx.refresh();
       return;
@@ -860,7 +860,7 @@ export function openUploadModal(ctx) {
 
     let suffix = outcome.fields.suffix || null;
     if (outcome.type === 'create-separate') suffix = await ctx.repo.nextSuffixFor(outcome.baseId);
-    const record = await ctx.repo.createVideo({ ...outcome.fields, suffix, status: 'ready', notes, clips }, 'Staff');
+    const record = await ctx.repo.createVideo({ ...outcome.fields, suffix, status: ctx.state.statusTab, notes, clips }, 'Staff');
     showToast(`Created ${record.videoId}`);
     close();
     ctx.refresh();
