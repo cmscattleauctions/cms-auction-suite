@@ -662,8 +662,13 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 .vm-clip-card2-actions { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 8px; }
 .vm-clip-card2-actions .btn-sm { padding: 4px 8px; font-size: 11.5px; }
 
-/* ----- Sticky footer: one primary + an overflow menu for the rest ----- */
-.vm-drawer-footer { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border-subtle); background: var(--bg-surface); flex-shrink: 0; }
+/* ----- Sticky footer: one primary + an overflow menu for the rest -----
+ * Bottom padding includes env(safe-area-inset-bottom) so Save/the
+ * overflow menu aren't crowded against an iOS home-indicator area on
+ * a full-width mobile drawer (same pattern as shell.css's mobile
+ * topbar using safe-area-inset-top) — a no-op on any device without
+ * a safe-area inset. */
+.vm-drawer-footer { display: flex; align-items: center; gap: 8px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border-subtle); background: var(--bg-surface); flex-shrink: 0; }
 .vm-drawer-footer .btn-primary { flex: 1; }
 .vm-drawer-footer-spacer { flex: 1; }
 .vm-overflow-menu.vm-overflow-menu-up { top: auto; bottom: calc(100% + 4px); }
