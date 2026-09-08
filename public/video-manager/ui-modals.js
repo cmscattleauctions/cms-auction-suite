@@ -10,17 +10,70 @@ import { resolveVideoIdEntry, CODE_KIND_LABELS, CODE_KIND_SHORT_LABELS } from '.
 import { buildBaseId, formatMonthYear, parseVideoId, monthYearToInputValue, inputValueToMonthYear } from './video-id.js';
 import * as StorageData from './storage-data.js';
 
-/* ----- generic modal shell ----- */
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/* ----- generic modal shell -----
+ * Every Video Manager modal (upload, collision resolution, new
+ * consignor, CSV import, Video ID Manager, etc.) goes through this one
+ * function, so its dialog behavior (spec section 9: correct initial
+ * focus, focus containment while open, focus restoration on close,
+ * Escape dismissal) only needs to be implemented once here rather than
+ * per modal. */
 function mountModal(innerHtml, { wide = false } = {}) {
   const root = document.getElementById('vm-modal-root');
+  const previouslyFocused = document.activeElement;
   const backdrop = document.createElement('div');
   backdrop.className = 'vm-modal-backdrop';
-  backdrop.innerHTML = `<div class="vm-modal ${wide ? 'vm-modal-wide' : ''}">${innerHtml}</div>`;
+  backdrop.innerHTML = `<div class="vm-modal ${wide ? 'vm-modal-wide' : ''}" role="dialog" aria-modal="true" tabindex="-1">${innerHtml}</div>`;
   root.appendChild(backdrop);
   backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
-  function close() { backdrop.remove(); }
+
+  function close() {
+    backdrop.removeEventListener('keydown', onKeydown);
+    backdrop.remove();
+    // Restore focus to whatever opened this modal — if that element is
+    // itself gone (e.g. the row it was on got removed by a refresh),
+    // activeElement just falls back to <body>, which is fine.
+    if (previouslyFocused && previouslyFocused.isConnected && previouslyFocused.focus) {
+      previouslyFocused.focus();
+    }
+  }
+
+  function focusableEls() {
+    return Array.from(modal.querySelectorAll(FOCUSABLE_SELECTOR)).filter(el => el.offsetParent !== null);
+  }
+
+  function onKeydown(e) {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      close();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    // Focus containment: cycle within the modal's own focusable elements
+    // instead of letting Tab/Shift+Tab escape to the page underneath.
+    const els = focusableEls();
+    if (!els.length) { e.preventDefault(); return; }
+    const first = els[0], last = els[els.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault(); first.focus();
+    }
+  }
+  backdrop.addEventListener('keydown', onKeydown);
+
   const modal = backdrop.querySelector('.vm-modal');
   modal.querySelectorAll('[data-modal-close]').forEach(b => b.addEventListener('click', close));
+
+  // Initial focus: the first real input/button inside the modal reads
+  // better than the modal shell itself for a form-first dialog: staff
+  // can start typing/acting immediately. Falls back to the modal
+  // container (still focusable via tabindex="-1" above) if the modal
+  // has no focusable content of its own yet (e.g. still loading).
+  const firstFocusable = focusableEls()[0];
+  (firstFocusable || modal).focus();
+
   return { backdrop, modal, close };
 }
 

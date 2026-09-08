@@ -63,7 +63,7 @@ rather than repeating it here.
 | 6 | Buttons, forms, save feedback | **Implemented (buttons); not started (forms/save feedback)** | `.btn-primary` is blue suite-wide now (was near-black, or gold via a stale local override in 3 modules). Persistent labels/inline validation/save-feedback wording ("Saving…"/"Saved"/"Couldn't save — Retry") not audited or built this pass. |
 | 7 | Tables and large datasets | **Still outstanding** | Not touched this pass beyond the token cascade (borders/hover colors update automatically via theme.css). Sticky headers, density options, sortable-column indicators, horizontal-scroll containment not reviewed. |
 | 8 | Video Manager | **Partial** | Status badges retinted to the spec's blue/amber/green treatment (previously "Ready to Make" was slate, not blue); fixed a real label bug (status tab said "Completed", every record's own badge said "Created"). Boot-time load failure now shows a real error + Retry instead of hanging forever (also relevant to §15). Grid/clip-list/mobile-record-layout requirements not reviewed against the spec's checklist this pass. |
-| 9 | Record drawers and dialogs | **Still outstanding** | Not reviewed against the spec's dialog-behavior checklist (focus containment/restoration, Escape, cancellation lifecycle) this pass. |
+| 9 | Record drawers and dialogs | **Partial — dialogs done, drawer not** | Video Manager's shared modal shell now has focus containment, initial focus, Escape dismissal, and focus restoration (all its modals go through one function, fixed once). The record drawer itself (a different, non-modal pattern) wasn't audited against this section's drawer-specific bullets. |
 | 10 | Public upload experience | **Already present, with specific evidence (mostly)** | The reliability fixes this session (file-status distinction, preserved form contents on failure, "Upload another") satisfy several bullets here already — see review item 4's section. Not reviewed line-by-line against every bullet (e.g. explicit require-a-choice-before-submitting-with-failed-files). |
 | 11 | Listings editor | **Still outstanding** | Only the PDF-library deferred-load change touched this module. Zoom controls, narrow-screen page-nav collapse, etc. not reviewed. |
 | 12 | Banners and OBS | **Still outstanding (beyond tokens)** | light-theme.css retinted; no layout/workflow review against this section's bullets. |
@@ -1243,6 +1243,41 @@ dropped-connection scenario — would need a real restricted account or
 a deliberately broken connection to reproduce.
 
 **Remaining/deploy steps:** none — static-file changes only.
+
+### Dialog accessibility (§9, the "Dialogs" bullets specifically)
+
+**Implemented:** every Video Manager modal (upload, Video ID collision
+resolution, new-consignor, unrecognized-code, CSV usage import, Video
+ID Manager) goes through one shared `mountModal()` in `ui-modals.js` —
+fixed once there rather than per modal. Added: `role="dialog"
+aria-modal="true"`; initial focus moves to the modal's first
+focusable control (or the modal container itself as a fallback);
+Tab/Shift+Tab now cycle within the modal instead of escaping to the
+page underneath; Escape closes it; closing (by Escape, backdrop click,
+or an explicit Close/Done button) restores focus to whatever element
+had focus before the modal opened.
+
+**Not covered by this fix:** the record **drawer** (`ui-drawer.js`) is
+a different pattern — a non-modal side panel meant to coexist with the
+list behind it, not a true modal dialog — and doesn't get the same
+focus-trap/Escape-to-close treatment. Its own section-9 requirements
+(organize content into sections, protect unsaved edits, reachable
+action bars) weren't audited against the spec this pass. Considered
+adding drawer-level Escape-to-close, but several of its inline field
+edits already use Escape to mean "cancel this one edit" without
+`stopPropagation()` — bolting on a drawer-level Escape handler without
+checking every one of those first risked closing the whole drawer as
+a surprise side effect of canceling a single field edit, so left this
+for a dedicated pass rather than guessing.
+
+**Verified:** syntax-checked via `.mjs` copy. Traced the focus-trap
+logic by hand (first/last focusable element cycling, the `tabindex="-1"`
+fallback when a modal has no other focusable content — checked that
+every modal that goes through `mountModal()` has at least its own
+Close button, so that fallback is a safety net, not the common case).
+Not click-tested live — no test credentials in this environment.
+
+**Remaining/deploy steps:** none — static-file change.
 
 ### Everything else in the 16-section spec
 
