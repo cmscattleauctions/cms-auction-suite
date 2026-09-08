@@ -228,6 +228,15 @@
  * ============================================================= */
 
 @media (max-width: 768px) {
+  /* Base bar height plus whatever the device's own notch/status-bar
+     area (env(safe-area-inset-top), only ever nonzero on a cutout
+     display, given viewport-fit=cover in index.html) needs on top of
+     it — used for both the bar's own height and the drawer's offset
+     below it, so the two can't drift out of sync. */
+  :root {
+    --mobile-topbar-h: calc(56px + env(safe-area-inset-top));
+  }
+
   .shell {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
@@ -243,17 +252,23 @@
     flex: 1;
   }
 
-  /* Mobile gets a thin top bar with hamburger + brand + profile menu */
+  /* Mobile gets a thin top bar with hamburger + brand + profile menu.
+     min-height (not height) + padding-top including the safe-area
+     inset: a fixed height clipped the 32px hamburger button against
+     the 52px box's own padding, and on a notched phone the bar's
+     content rendered under the status bar/notch instead of below it
+     — both read as "the top of the app is cut off". */
   .mobile-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
+    padding-top: calc(var(--space-3) + env(safe-area-inset-top));
     background: var(--sidebar-bg);
     color: var(--sidebar-fg);
     border-bottom: 1px solid var(--sidebar-divider);
-    height: 52px;
+    min-height: var(--mobile-topbar-h);
     flex-shrink: 0;
     position: sticky;
     top: 0;
@@ -307,7 +322,7 @@
      drawer is nav-only. */
   .sidebar {
     position: fixed;
-    top: 52px;
+    top: var(--mobile-topbar-h);
     left: 0;
     bottom: 0;
     width: 260px;
