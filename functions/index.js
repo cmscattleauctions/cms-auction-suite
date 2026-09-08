@@ -34,15 +34,98 @@ const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const admin = require('firebase-admin');
 const { randomUUID } = require('crypto');
+const dns = require('node:dns');
+const net = require('node:net');
 
 admin.initializeApp();
 setGlobalOptions({ region: 'us-central1' });
 
 const MAX_CLIP_BYTES = 2 * 1024 * 1024 * 1024; // matches docs/storage.rules' own cap
 const SUITE_ADMIN_EMAIL = 'jayton.h@cmslivestock.com'; // matches docs/firestore.rules' isSuiteAdmin()
+const FETCH_TIMEOUT_MS = 30 * 1000; // connect+headers only — body streaming isn't bound by this
 
 function sanitizeFilename(name) {
   return String(name || 'clip').replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+/**
+ * SSRF guard for transferClip below — publicUrl is a value the CLIENT
+ * supplies when creating a clipTransferJobs document (see
+ * public/video-manager/firestore-data.js's requestClipTransfer()), and
+ * this function fetches it with the Admin SDK's own service-account
+ * network access, then persists whatever comes back into Storage,
+ * which any approved user can then read out again (docs/storage.rules).
+ * Without validation, a malicious approved account could point
+ * publicUrl at an internal service or the cloud metadata endpoint
+ * (169.254.169.254) and exfiltrate its response through a "clip".
+ *
+ * This checks the ACTUAL RESOLVED IP(s), not just the hostname string,
+ * so a hostname crafted to look legitimate can't hide a private target.
+ * It does not fully close a DNS-rebinding race (the name could
+ * legitimately re-resolve to a different IP between this check and
+ * fetch()'s own internal resolution a moment later) — full protection
+ * would mean pinning the checked IP into the actual socket connection,
+ * which Node's global fetch doesn't expose a supported way to do. This
+ * closes the realistic threat model here (a malicious/compromised
+ * approved account pointing this at a static internal address), not a
+ * network-level adversary controlling DNS — flagged as an accepted
+ * residual gap in docs/HARDENING_CHECKLIST.md.
+ */
+function isPrivateOrReservedIp(ip) {
+  const type = net.isIP(ip);
+  if (type === 4) {
+    const [a, b] = ip.split('.').map(Number);
+    if (a === 10) return true;                       // 10.0.0.0/8
+    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+    if (a === 192 && b === 168) return true;          // 192.168.0.0/16
+    if (a === 127) return true;                       // 127.0.0.0/8 loopback
+    if (a === 169 && b === 254) return true;          // 169.254.0.0/16 link-local, incl. cloud metadata
+    if (a === 0) return true;                         // 0.0.0.0/8
+    if (a >= 224) return true;                         // 224.0.0.0/4 multicast + 240.0.0.0/4 reserved
+    return false;
+  }
+  if (type === 6) {
+    const lower = ip.toLowerCase();
+    if (lower === '::1') return true; // loopback
+    if (lower.startsWith('::ffff:')) {
+      const v4 = lower.slice(7);
+      return net.isIP(v4) === 4 ? isPrivateOrReservedIp(v4) : true;
+    }
+    if (/^fe[89ab]/.test(lower)) return true; // fe80::/10 link-local
+    if (/^f[cd]/.test(lower)) return true;    // fc00::/7 unique local
+    return false;
+  }
+  return true; // not a recognizable IP at all — fail closed
+}
+
+async function assertPublicHost(hostname) {
+  let addresses;
+  try {
+    addresses = await dns.promises.lookup(hostname, { all: true, verbatim: true });
+  } catch (err) {
+    throw new Error(`Could not resolve host "${hostname}": ${err.message}`);
+  }
+  if (!addresses.length) throw new Error(`Host "${hostname}" did not resolve to any address`);
+  for (const { address } of addresses) {
+    if (isPrivateOrReservedIp(address)) {
+      throw new Error(`Host "${hostname}" resolves to a private/internal address — refusing to fetch`);
+    }
+  }
+}
+
+/** https-only, resolves to a public IP — throws a client-safe message on failure. */
+async function assertSafeFetchTarget(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error('Source URL is not a valid URL');
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Only https:// source URLs are allowed');
+  }
+  await assertPublicHost(parsed.hostname);
+  return parsed;
 }
 
 exports.transferClip = onDocumentCreated(
@@ -62,13 +145,64 @@ exports.transferClip = onDocumentCreated(
       return;
     }
 
+    // Defense in depth beyond docs/firestore.rules — re-verify the
+    // requester's actual Auth record directly, same reasoning as
+    // adminRunJob below (this function bypasses rules with the Admin
+    // SDK). This job type is only ever created by the Monday clips
+    // migration (public/monday-migration-test.html), which is itself
+    // now migration-admin-gated (see docs/HARDENING_CHECKLIST.md item
+    // 1) — no regular staff workflow uses this, so scoping it to the
+    // same one account is a real restriction, not just a formality.
+    let requester;
+    try {
+      requester = await admin.auth().getUser(job.requestedBy);
+    } catch {
+      await fail('Could not verify the requesting account.');
+      return;
+    }
+    if ((requester.email || '').toLowerCase() !== SUITE_ADMIN_EMAIL) {
+      await fail('Not authorized for clip transfer operations.');
+      return;
+    }
+
+    let validatedUrl;
+    try {
+      validatedUrl = await assertSafeFetchTarget(publicUrl);
+    } catch (err) {
+      await fail(err.message);
+      return;
+    }
+
     let upstream;
     try {
-      upstream = await fetch(publicUrl);
+      upstream = await fetch(validatedUrl, { redirect: 'manual', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     } catch (err) {
       await fail(`Could not reach the source file: ${err.message}`);
       return;
     }
+
+    // Handle at most one redirect hop, re-validating the target the
+    // same way as the original URL — redirect: 'manual' above means
+    // fetch() never follows one on its own, which would skip this
+    // check entirely for whatever host the redirect points to.
+    if (upstream.status >= 300 && upstream.status < 400) {
+      const location = upstream.headers.get('location');
+      if (!location) { await fail('Source returned a redirect with no Location header'); return; }
+      let redirectUrl;
+      try {
+        redirectUrl = await assertSafeFetchTarget(new URL(location, validatedUrl).toString());
+      } catch (err) {
+        await fail(`Redirect target rejected: ${err.message}`);
+        return;
+      }
+      try {
+        upstream = await fetch(redirectUrl, { redirect: 'error', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+      } catch (err) {
+        await fail(`Could not reach the redirected source file: ${err.message}`);
+        return;
+      }
+    }
+
     if (!upstream.ok || !upstream.body) {
       await fail(`Source fetch failed (HTTP ${upstream.status})`);
       return;

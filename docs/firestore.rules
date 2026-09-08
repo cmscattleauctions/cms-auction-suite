@@ -165,10 +165,16 @@ service cloud.firestore {
     // transferClip Cloud Function (see functions/index.js); only that
     // function (via the Admin SDK, which bypasses these rules) is ever
     // allowed to update a job after it's created, so a client can't
-    // fake a "done" result for itself.
+    // fake a "done" result for itself. Scoped to isSuiteAdmin() (not
+    // isApproved()): this job type only ever exists to make the
+    // transferClip function fetch a client-supplied publicUrl
+    // server-side — see that function's SSRF hardening — so it's
+    // scoped to the one account allowed to run migrations, matching
+    // the requester re-check transferClip itself now does. No regular
+    // staff workflow creates this job type.
     match /clipTransferJobs/{jobId} {
-      allow read:   if isApproved();
-      allow create: if isApproved()
+      allow read:   if isSuiteAdmin();
+      allow create: if isSuiteAdmin()
                     && request.resource.data.requestedBy == request.auth.uid
                     && request.resource.data.status == 'pending';
       allow update, delete: if false;

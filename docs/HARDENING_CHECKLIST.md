@@ -15,7 +15,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` nee
 - [x] 4. Public submission validation — see detail below
 - [ ] 5. Unsafe HTML rendering (XSS)
 - [x] 6. Passwords persisted in adminJobs documents — see detail below
-- [ ] 7. Server-side clip transfer hardening (SSRF)
+- [x] 7. Server-side clip transfer hardening (SSRF) — see detail below
 
 ### 1. Monday migration endpoint exposure
 
@@ -325,6 +325,90 @@ did not run it myself.
    retain a copy of a job document (password included) taken before
    this fix ran, for whatever retention window your Firestore backup
    policy has. Clearing the live document does not purge those.
+
+### 7. Server-side clip transfer hardening (SSRF)
+
+**Finding:** `functions/index.js`'s `transferClip` fetches
+`job.publicUrl` — a value the CLIENT supplies when creating a
+`clipTransferJobs` document — with the Admin SDK's own network access,
+then writes the response into Storage where any approved user can
+read it back out. No protocol/host/IP validation, no requester
+re-check (unlike the sibling `adminRunJob` function), no redirect
+handling, no fetch deadline. A malicious or compromised approved
+account could point `publicUrl` at an internal service or the cloud
+metadata endpoint (`169.254.169.254`) and exfiltrate the response
+through what looks like an ordinary "clip".
+
+**Verified against current code:** confirmed the exact gap by reading
+the function; confirmed via `grep` that `requestClipTransfer()` /
+`uploadClipFromUrl()` (the only path that creates this job type) is
+called *exclusively* from `public/monday-migration-test.html` — no
+regular staff workflow uses it — which is what justified scoping this
+to the migration admin specifically rather than every approved user.
+
+**Implemented:**
+- `functions/index.js`: new `assertSafeFetchTarget()` — parses the URL,
+  requires `https:`, then resolves the hostname via DNS and rejects if
+  ANY resolved address falls in a private/loopback/link-local/reserved
+  range (10/8, 172.16/12, 192.168/16, 127/8, 169.254/16 — which
+  includes the cloud metadata address, plus the IPv6 equivalents and
+  IPv4-mapped-IPv6). Checks the *resolved IP*, not just the hostname
+  string, so a hostname crafted to look legitimate can't hide a
+  private target.
+- The fetch now uses `redirect: 'manual'` and handles at most one
+  redirect hop, re-validating the redirect's target through the same
+  check — `redirect:'follow'` (the old default) would have silently
+  bypassed the whole check for wherever a redirect pointed.
+- Added a 30s deadline on the initial fetch (connect+headers; body
+  streaming into Storage is unaffected, still bounded by the
+  function's own 540s timeout and the existing 2GB cap).
+- Added the same requester re-verification `adminRunJob` already does
+  (re-check the Auth record for `job.requestedBy` server-side, not
+  just trusting the rules) — defense in depth, since this function
+  runs with the Admin SDK and bypasses rules entirely.
+- `docs/firestore.rules`: `clipTransferJobs` create/read narrowed from
+  `isApproved()` (any staff) to `isSuiteAdmin()` (the migration admin
+  only), matching the function's own new requester check and this job
+  type's actual real-world usage.
+
+**Verified:** unit-tested the private/reserved-IP classifier locally
+against 18 known addresses across IPv4/IPv6 (public DNS servers,
+`169.254.169.254`, `10.x`/`172.16-31.x`/`192.168.x`, loopback,
+link-local, IPv4-mapped-IPv6) — all classified correctly. Confirmed
+real DNS behavior locally: `localhost` resolves to `127.0.0.1`/`::1`
+(would be rejected), `google.com` resolves to public IPs (would be
+allowed). `functions/index.js` re-checked as valid syntax;
+`firestore:rules --dry-run` compiled successfully. **Not verified
+against a live Monday transfer** — no way to exercise the actual
+`transferClip` function from this environment.
+
+**Accepted residual gap, documented rather than silently left:** this
+does not fully close a DNS-rebinding race — the hostname could
+legitimately re-resolve to a different IP between this check and
+`fetch()`'s own internal resolution moments later. Fully closing that
+means pinning the checked IP into the actual socket connection, which
+Node's global `fetch` doesn't expose a supported way to do. This
+closes the realistic threat model for this app (a malicious/
+compromised approved account pointing the job at a static internal
+address) — not a network-level adversary who can manipulate DNS
+resolution in real time.
+
+**Remaining/deploy steps (needs you):**
+1. `firebase deploy --only functions:transferClip` and
+   `firebase deploy --only firestore:rules` (the same rules deploy as
+   items 2/3/4 — one deploy covers all of them). Neither run by me.
+2. **Rollback:** revert the `functions/index.js` and
+   `docs/firestore.rules` commits, redeploy both. The function change
+   is behavior-preserving for legitimate Monday URLs (https, public
+   host, no redirect) — only URLs that were never legitimate to begin
+   with now get rejected — so a rollback is only needed if the
+   migration tool itself breaks in an unexpected way.
+3. **Validation after deploy:** run an actual Monday clip transfer
+   through `/monday-migration-test.html` (signed in as the migration
+   admin) and confirm it still completes successfully — this is the
+   one path most likely to reveal a wrong assumption about Monday's
+   asset URLs (e.g. if they ever use plain http, or a multi-hop
+   redirect chain longer than one hop).
 
 ## Phase 2 — Performance
 
