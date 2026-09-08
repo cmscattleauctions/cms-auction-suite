@@ -309,8 +309,10 @@ function wireAddRow(tbody, ctx) {
     let suffix = outcome.fields.suffix || null;
     if (outcome.type === 'create-separate') suffix = await ctx.repo.nextSuffixFor(outcome.baseId);
 
+    // Always 'ready', not ctx.state.statusTab — see the matching comment
+    // on the Upload modal's submit handler in ui-modals.js.
     const record = await ctx.repo.createVideo({
-      ...outcome.fields, suffix, status: ctx.state.statusTab,
+      ...outcome.fields, suffix, status: 'ready',
     }, 'Staff');
     showToast(`Created ${record.videoId}`);
     addRowOpen = false;
