@@ -8,7 +8,6 @@
 
 import { VideoRepository, ReferenceDataRepository, UsageRepository } from './repository.js';
 import { renderTable, isTableEditActive } from './ui-table.js';
-import { renderGrid } from './ui-grid.js';
 import { openDrawer, closeDrawer } from './ui-drawer.js';
 import { openUploadModal, openCsvImportModal, openVideoIdManagerModal, openStaffManagerModal, openTrashModal } from './ui-modals.js';
 import { readInitialRoute, reportRoute } from '../shared/subapp-url.js';
@@ -16,7 +15,6 @@ import { escapeHtml } from './format.js';
 
 const state = {
   statusTab: 'created', // "Completed" — the default view staff actually want first; boot() below overrides this from the URL when a reload is restoring a specific tab
-  view: 'table',
   search: '',
   filters: {},
   draftsOnly: false,
@@ -225,11 +223,7 @@ async function refresh() {
     return;
   }
 
-  if (state.view === 'table') {
-    renderTable(content, list, ctx);
-  } else {
-    renderGrid(content, list, ctx);
-  }
+  renderTable(content, list, ctx);
 
   paintSelectedRow();
   renderActiveFilterChips();
@@ -284,14 +278,6 @@ function wireToolbar() {
     clearTimeout(debounce);
     const val = e.target.value;
     debounce = setTimeout(() => { state.search = val; refresh(); }, 120);
-  });
-
-  document.getElementById('vm-view-toggle').addEventListener('click', e => {
-    const btn = e.target.closest('.vm-view-btn');
-    if (!btn) return;
-    state.view = btn.dataset.view;
-    document.querySelectorAll('.vm-view-btn').forEach(b => b.classList.toggle('active', b === btn));
-    refresh();
   });
 
   const filtersBtn = document.getElementById('vm-btn-filters');

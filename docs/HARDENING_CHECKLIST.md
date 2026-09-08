@@ -73,7 +73,7 @@ rather than repeating it here.
 | 5 | Application shell and navigation | **Implemented, partially tested** | Sentence-case nav, compact icon-rail sidebar for 769-1024px (was a hard cliff straight to mobile-drawer at 768px) added and CSS-mechanism-verified; full nav live-verification needs credentials. Country Market's standalone-embed behavior not reviewed this pass. |
 | 6 | Buttons, forms, save feedback | **Implemented (buttons); not started (forms/save feedback)** | `.btn-primary` is blue suite-wide now (was near-black, or gold via a stale local override in 3 modules). Persistent labels/inline validation/save-feedback wording ("Saving…"/"Saved"/"Couldn't save — Retry") not audited or built this pass. |
 | 7 | Tables and large datasets | **Mostly already present, with specific evidence; some still outstanding** | Video Manager's table already had, before this pass: sticky header (`position:sticky`), subtle header background, light row separators, distinct hover/selected states, horizontal scroll contained to the table wrapper (`overflow-x:auto`), larger touch targets on mobile. Added `.tabular-nums` to clip-count/date columns for digit alignment. Sort is a dedicated toolbar dropdown showing the active sort, not per-column-header click-to-sort with arrow indicators — the spec's "clearly indicate sortable columns and active sort" reads as satisfied by that dropdown, not as a literal requirement for clickable `<th>`s; flagging the interpretation rather than assuming it. Still outstanding: a compact-density option, and pagination/virtualization (tracked under item 8 in the review list, not duplicated here). |
-| 8 | Video Manager | **Partial** | Status badges retinted to the spec's blue/amber/green treatment (previously "Ready to Make" was slate, not blue); fixed a real label bug (status tab said "Completed", every record's own badge said "Created"). Boot-time load failure now shows a real error + Retry instead of hanging forever (also relevant to §15). Grid/clip-list/mobile-record-layout requirements not reviewed against the spec's checklist this pass. |
+| 8 | Video Manager | **Partial** | Status badges retinted to the spec's blue/amber/green treatment (previously "Ready to Make" was slate, not blue); fixed a real label bug (status tab said "Completed", every record's own badge said "Created"). Boot-time load failure now shows a real error + Retry instead of hanging forever (also relevant to §15). **Grid view removed entirely at your request** (see "Grid view removed" detail section) — its bullets are now not applicable, not outstanding. Clip-list/mobile-record-layout requirements not reviewed against the spec's checklist this pass. |
 | 9 | Record drawers and dialogs | **Partial — dialogs done, drawer not** | Video Manager's shared modal shell now has focus containment, initial focus, Escape dismissal, and focus restoration (all its modals go through one function, fixed once). The record drawer itself (a different, non-modal pattern) wasn't audited against this section's drawer-specific bullets. |
 | 10 | Public upload experience | **Already present, with specific evidence (mostly)** | The reliability fixes this session (file-status distinction, preserved form contents on failure, "Upload another") satisfy several bullets here already — see review item 4's section. Not reviewed line-by-line against every bullet (e.g. explicit require-a-choice-before-submitting-with-failed-files). |
 | 11 | Listings editor | **Partial** | Added a "Fit" button next to the existing +/- zoom controls (computes zoom from the canvas's actual available width against the fixed 1056px print sheet — live-verified, produced 120% in a wide browser window). Added a collapsible off-canvas "Pages" drawer below 640px (toggle button, backdrop, Escape, and picking a page all close it — all 4 verified live via direct DOM/class-state checks) in place of a persistent 132-178px-wide sidebar that competed with the canvas for space on phone widths. Not reviewed: readable selected-lot form, distinguishing local-unsaved vs. saved-project state, complex-formatting-control grouping. |
@@ -845,6 +845,15 @@ deploy authorization needed for this item specifically.
 
 ### Original video/clip files must load only on an explicit click
 
+**Update, later in this project — Grid view removed entirely:** at
+your explicit request, Video Manager's Grid view (the view-toggle,
+`renderGrid()`, `ui-grid.js`, and its `.vm-grid`/`.vm-card-*` CSS) was
+deleted outright rather than kept fixed — Table view is now the only
+view. The Grid-specific fix described below (item 1) is therefore
+moot; kept here as an accurate record of what the code looked like at
+the time, not as a description of current behavior. See "Grid view
+removed" further down for that removal's own detail.
+
 **Finding (user-specified requirement, not from the source audit):**
 browsing records, switching to Grid view, or opening a record's clip
 list must never trigger a download of the original video file —
@@ -1289,6 +1298,42 @@ Close button, so that fallback is a safety net, not the common case).
 Not click-tested live — no test credentials in this environment.
 
 **Remaining/deploy steps:** none — static-file change.
+
+### Grid view removed (your explicit decision, not a spec requirement)
+
+**What you asked for:** "We can honestly get rid of grid view on
+video manager" — rather than continuing to fix/maintain it against
+the §8 Video Manager spec bullets (consistent 16:9 poster areas, no
+original-video fetch for thumbnails, etc.), remove it outright. Table
+view becomes the only view.
+
+**Implemented:** deleted `ui-grid.js` entirely (its one export,
+`renderGrid()`, had exactly one caller). Removed the Table/Grid
+view-toggle from `index.html`, the `state.view` field and its
+toggle-wiring/branch in `app.js` (`refresh()` now always calls
+`renderTable()` directly), and every now-dead CSS rule in
+`styles.css` (`.vm-view-toggle`/`.vm-view-btn`, the whole "GRID VIEW"
+block of `.vm-grid`/`.vm-card-*` rules, and the mobile media query's
+reference to `.vm-view-toggle`). Grepped the whole `video-manager/`
+directory afterward for `grid`/`ui-grid`/`vm-card` — nothing left
+referencing any of it.
+
+**Verified:** all touched files re-checked as valid syntax. Loaded
+the real page in a live Chrome tab (unauthenticated, so it hits the
+boot-error path this session's own earlier work built) and confirmed:
+no 404/import error for the deleted `ui-grid.js` file, no console
+errors of any kind, `#vm-view-toggle` genuinely absent from the DOM,
+and the boot-error UI (`.vm-boot-error`, "Couldn't load — access
+denied") rendered correctly — end-to-end confirmation that removing
+Grid view didn't break anything else in the same boot path.
+
+**Consequence for the reconciliation table above:** §8's Grid-view
+bullets ("use consistent 16:9 poster areas," "do not fetch original
+videos to generate thumbnails," etc.) are now **not applicable** —
+there's no Grid view left to satisfy or fail them.
+
+**Remaining/deploy steps:** none — static-file change, ships via
+normal push/PR/merge.
 
 ### Everything else in the 16-section spec
 
