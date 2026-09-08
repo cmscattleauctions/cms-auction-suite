@@ -7,6 +7,17 @@ that needs your credentials, or a decision only you can make).
 
 Status legend: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` needs your input
 
+**DEPLOYED 2026-09-08:** PR #74 merged to `main` (commit `ffb4393`),
+Netlify auto-deployed it (confirmed `ready` via the Netlify API), and
+— with your explicit go-ahead — `firebase deploy --only firestore:rules`
+and `--only storage` were both run for real against project
+`cms-auction-suite` (not a dry-run). Every "not deployed yet" note
+below that predates this line refers to the state before this deploy;
+new work continues on a fresh branch off `main` post-deploy. Migration
+scripts (`scripts/migrate-country-market-buyers.mjs`,
+`scripts/clear-adminjob-passwords.mjs`) were **not** run — that's a
+separate decision, still outstanding.
+
 **IMPORTANT — branch note (found and fixed mid-pass):** the earlier
 version of this checklist described a live Firestore subscription for
 `videoRecords` as already shipped. That work was real, but it lived on
