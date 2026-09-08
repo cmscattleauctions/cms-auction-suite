@@ -1661,16 +1661,24 @@ function buildObsJson(templateData, parsed) {
       continue;
     }
     if (group.kind === 'option_group') {
+      // Cycle through the template's interlude scenes rather than
+      // demanding one-per-use — an auction with more option-lot groups
+      // than the template has interlude scenes reuses earlier ones'
+      // visual content instead of erroring out. These pool entries are
+      // markers for "an interlude goes here, cloned from this
+      // template scene's content" only; the final output name is
+      // reassigned to a clean sequential one below, since the
+      // template's own interlude names are OBS's auto-dedup artifacts
+      // from repeated in-app duplication ("Option Lot Interlude 2 2 2"),
+      // not meaningful identifiers.
       if (!previousWasOptionGroup) {
-        if (interludePtr >= optionInterludePool.length) throw new Error('Not enough Option Lot Interlude scenes in template.json.');
-        finalSceneNames.push(optionInterludePool[interludePtr++]);
+        finalSceneNames.push(optionInterludePool[interludePtr++ % optionInterludePool.length]);
       }
       for (const row of group.rows) {
         finalSceneNames.push(row.lot + ' Transition');
         finalSceneNames.push(row.lot + ' Video');
       }
-      if (interludePtr >= optionInterludePool.length) throw new Error('Not enough Option Lot Interlude scenes in template.json.');
-      finalSceneNames.push(optionInterludePool[interludePtr++]);
+      finalSceneNames.push(optionInterludePool[interludePtr++ % optionInterludePool.length]);
       previousWasOptionGroup = true;
       continue;
     }
@@ -1701,16 +1709,18 @@ function buildObsJson(templateData, parsed) {
 
   let transitionPtr = 0;
   let videoPtr = 0;
+  let interludeDisplayNum = 0;
 
   for (const targetName of finalCompressed) {
     let templateSceneName = null;
     const normalizedTarget = normalizeSceneName(targetName);
+    const isInterlude = normalizedTarget.startsWith('Option Lot Interlude');
 
     if (
       fixedStartScenes.includes(targetName) ||
       fixedEndScenes.includes(targetName) ||
       breedTransitionScenes.includes(targetName) ||
-      normalizedTarget.startsWith('Option Lot Interlude')
+      isInterlude
     ) {
       templateSceneName = targetName;
     } else if (isLotTransitionScene(targetName)) {
@@ -1725,16 +1735,30 @@ function buildObsJson(templateData, parsed) {
       throw new Error('Unhandled target scene: ' + targetName);
     }
 
-    if (usedExactSceneNames.has(normalizedTarget)) throw new Error('Duplicate scene name would be created: ' + targetName);
-    usedExactSceneNames.add(normalizedTarget);
+    // Interlude scenes get a clean, sequential output name — "Option
+    // Lot Interlude 1", "Option Lot Interlude 2", ... in the order
+    // they're actually used in this auction — instead of the
+    // template's own name, which is an OBS auto-dedup artifact from
+    // repeated in-app scene duplication (e.g. "Option Lot Interlude
+    // 2 2 2"). templateSceneName (the messy original) is still what's
+    // used just above to find which template scene's banners/layout to
+    // clone; only the name on the cloned output scene changes. The pool
+    // can now supply the same underlying content more than once (see
+    // the cycling above), so two interludes can legitimately share a
+    // templateSceneName — outputName is what has to stay unique.
+    const outputName = isInterlude ? `Option Lot Interlude ${++interludeDisplayNum}` : targetName;
+    const normalizedOutput = normalizeSceneName(outputName);
+
+    if (usedExactSceneNames.has(normalizedOutput)) throw new Error('Duplicate scene name would be created: ' + outputName);
+    usedExactSceneNames.add(normalizedOutput);
 
     const sourceTemplate = sourceMap.get(normalizeSceneName(templateSceneName));
     if (!sourceTemplate) throw new Error('Could not find source template for: ' + templateSceneName);
 
     const clonedSource = deepClone(sourceTemplate);
-    clonedSource.name = targetName;
+    clonedSource.name = outputName;
 
-    newSceneOrder.push({ name: targetName });
+    newSceneOrder.push({ name: outputName });
     newSceneSources.push(clonedSource);
   }
 
