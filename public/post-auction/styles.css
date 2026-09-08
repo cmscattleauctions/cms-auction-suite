@@ -123,6 +123,7 @@ p{margin:8px 0}
   border:1px solid rgba(239,68,68,.35);
   padding:10px 12px;
   border-radius:12px;
+  white-space: pre-line; /* a per-report failure list is set here as one multi-line string (\n-separated) — plain textContent alone collapses those to spaces */
 }
 
 .divider{

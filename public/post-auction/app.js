@@ -3898,14 +3898,26 @@ function wireBuild(){
         }
       }
 
-      // Show errors if any
-      if(errors.length > 0){
-        const errorMsg = `⚠ ${errors.length} PDF(s) failed to generate:\n\n${errors.map((e,i) => `${i+1}. ${e}`).join('\n')}`;
-        alert(errorMsg);
-      }
-
+      // Show errors if any — a blocking alert() used to stand in here,
+      // which happened to force the operator to see the failure list
+      // before the code below navigated to the Results page (since
+      // alert() blocks until dismissed). Replaced with the existing
+      // non-blocking error banner; preserving "see the failures before
+      // moving on" now means explicitly not auto-navigating to Results
+      // when there were any, rather than setting a banner there and
+      // immediately switching away from the page that shows it.
+      //
+      // Whichever report types succeeded already have real PDF bytes
+      // (each type generated in its own try/catch above) — render them
+      // into the Results page's lists either way, so nothing that did
+      // work is hidden by a partial failure elsewhere.
       renderResults();
-      goto(pageResults);
+      if(errors.length > 0){
+        const errorMsg = `${errors.length} PDF(s) failed to generate:\n\n${errors.map((e,i) => `${i+1}. ${e}`).join('\n')}`;
+        setError(builderError, errorMsg);
+      } else {
+        goto(pageResults);
+      }
 
     } catch(err){
       console.error(err);

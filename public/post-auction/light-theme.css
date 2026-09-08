@@ -156,6 +156,17 @@ a:hover { color: var(--accent2); }
 .statusWarn { color: #8A5A12; background: rgba(138, 90, 18, 0.1); }
 .statusBad  { color: #B42318; background: rgba(180, 35, 24, 0.1); }
 
+/* .error is defined twice upstream (styles.css AND an inline <style>
+ * block in index.html itself, a "premium dark theme redesign" that
+ * predates this file) — neither reads well on this light canvas
+ * (white or light-pink text on a barely-tinted background). This is
+ * the one that actually wins (loaded last), so it's the one place
+ * that needs both the color fix and white-space: pre-line — the
+ * per-report failure list (post-auction's app.js) is one \n-separated
+ * string; plain textContent alone collapses those to spaces without
+ * this. Same red family as .statusBad above, readable on white/light. */
+.error { color: #B42318; background: rgba(180, 35, 24, 0.1); border-color: rgba(180, 35, 24, 0.3); white-space: pre-line; }
+
 /* =============================================================
  * Phase 5: Mode-based section visibility
  * -------------------------------------------------------------
