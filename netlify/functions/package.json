@@ -1,0 +1,9 @@
+{
+  "name": "cms-auction-suite-netlify-functions",
+  "private": true,
+  "type": "module",
+  "description": "Dependencies for netlify/functions/*.mjs — bundled by Netlify's build (esbuild) from this package.json.",
+  "dependencies": {
+    "jose": "^5.9.6"
+  }
+}

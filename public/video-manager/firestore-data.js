@@ -82,6 +82,16 @@ export function currentUid() {
   return (auth && auth.currentUser && auth.currentUser.uid) || null;
 }
 
+/** Fresh ID token for the signed-in user, or null if no one's signed
+ *  in — for calling server endpoints that verify it themselves (e.g.
+ *  netlify/functions/monday-migration-test.mjs's admin gate). Firebase
+ *  auto-refreshes an expiring token under the hood, so callers should
+ *  fetch a new one right before each request rather than caching it. */
+export async function getIdToken() {
+  if (!auth || !auth.currentUser) return null;
+  return auth.currentUser.getIdToken();
+}
+
 export function isSignedIn() {
   return !!(auth && auth.currentUser);
 }

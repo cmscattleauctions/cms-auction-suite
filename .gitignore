@@ -14,6 +14,10 @@ firebase-debug.log
 # Cloud Functions dependencies — installed locally before `firebase deploy`
 functions/node_modules/
 
+# Netlify Functions dependencies — bundled by Netlify's build from
+# netlify/functions/package.json; installed locally only to test/check
+netlify/functions/node_modules/
+
 # Local script dependencies — installed locally before running
 scripts/node_modules/
 

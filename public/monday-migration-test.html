@@ -251,7 +251,19 @@
   </section>
 
 </main>
-<script>
+<script type="module">
+  // Server-side (netlify/functions/monday-migration-test.mjs) now requires
+  // a valid ID token for the migration admin account on every request —
+  // see that file's requireMigrationAdmin() gate. Every fetch to
+  // /api/monday-migration from this page goes through this helper so
+  // none of them can accidentally skip it.
+  import { getIdToken } from './video-manager/firestore-data.js';
+  async function authedFetch(url) {
+    const token = await getIdToken();
+    if (!token) throw new Error('Not signed in — open the main Auction Suite app, sign in as the migration admin, then reload this page.');
+    return fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  }
+
   // Explicit per-action param list (input id -> query param name) — kept
   // out of data-* attributes on purpose, since HTML lowercases attribute
   // names and silently breaks camelCase query param names like itemScan.
@@ -282,7 +294,7 @@
       outEl.hidden = true;
 
       try {
-        const res = await fetch(`/api/monday-migration?${params.toString()}`);
+        const res = await authedFetch(`/api/monday-migration?${params.toString()}`);
         const json = await res.json();
         outEl.textContent = JSON.stringify(json, null, 2);
         outEl.hidden = false;
@@ -303,8 +315,19 @@
   // Manager app uses, so writes go through the same Firestore rules and
   // the same in-memory cache as everything else — no separate write path.
   import { VideoRepository, ReferenceDataRepository } from './video-manager/repository.js';
-  import { isSignedIn, currentUserEmail, configured as firebaseConfigured } from './video-manager/firestore-data.js';
+  import { isSignedIn, currentUserEmail, getIdToken, configured as firebaseConfigured } from './video-manager/firestore-data.js';
   import * as StorageData from './video-manager/storage-data.js';
+
+  // Same account netlify/functions/lib/require-migration-admin.mjs checks
+  // server-side — this client-side check is a UX nicety (show the right
+  // message instead of a generic 403), not the real gate.
+  const MIGRATION_ADMIN_EMAIL = 'jayton.h@cmslivestock.com';
+
+  async function authedFetch(url) {
+    const token = await getIdToken();
+    if (!token) throw new Error('Not signed in — open the main Auction Suite app, sign in as the migration admin, then reload this page.');
+    return fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  }
 
   const authPill = document.getElementById('import-auth-pill');
   function refreshAuthPill() {
@@ -313,12 +336,17 @@
       authPill.className = 'auth-pill out';
       return false;
     }
-    if (isSignedIn()) {
+    if (isSignedIn() && currentUserEmail().toLowerCase() === MIGRATION_ADMIN_EMAIL) {
       authPill.textContent = `Signed in as ${currentUserEmail()} — ready to import.`;
       authPill.className = 'auth-pill in';
       return true;
     }
-    authPill.textContent = 'Not signed in. Open the main Auction Suite app in another tab, sign in there, then reload this page.';
+    if (isSignedIn()) {
+      authPill.textContent = `Signed in as ${currentUserEmail()}, but this account isn't authorized to run migrations.`;
+      authPill.className = 'auth-pill out';
+      return false;
+    }
+    authPill.textContent = 'Not signed in. Open the main Auction Suite app in another tab, sign in there as the migration admin, then reload this page.';
     authPill.className = 'auth-pill out';
     return false;
   }
@@ -357,7 +385,7 @@
     do {
       const params = new URLSearchParams({ action: 'export-records', boardId, pageSize: '200' });
       if (cursor) params.set('cursor', cursor);
-      const res = await fetch(`/api/monday-migration?${params.toString()}`);
+      const res = await authedFetch(`/api/monday-migration?${params.toString()}`);
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || 'export-records failed');
       all.push(...json.records);
@@ -588,7 +616,7 @@
       do {
         const params = new URLSearchParams({ action: 'export-records', boardId, pageSize: '200' });
         if (cursor) params.set('cursor', cursor);
-        const res = await fetch(`/api/monday-migration?${params.toString()}`);
+        const res = await authedFetch(`/api/monday-migration?${params.toString()}`);
         const json = await res.json();
         if (!json.ok) throw new Error(json.error || 'export-records failed');
         all.push(...json.records);
@@ -668,7 +696,7 @@
       if (clipStopRequested) break;
       const batch = clipScanItems.slice(i, i + BATCH_SIZE);
       const params = new URLSearchParams({ action: 'clip-batch', itemIds: batch.map(b => b.mondayItemId).join(',') });
-      const res = await fetch(`/api/monday-migration?${params.toString()}`);
+      const res = await authedFetch(`/api/monday-migration?${params.toString()}`);
       const json = await res.json();
       if (!json.ok) { errors.push({ file: `batch starting at item ${batch[0].mondayItemId}`, error: json.error }); continue; }
 

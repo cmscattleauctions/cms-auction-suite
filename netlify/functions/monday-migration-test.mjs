@@ -43,6 +43,21 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { mondayQuery, jsonResponse, errorResponse, tokenFingerprint } from './lib/monday-client.mjs';
 import { parseVideoId } from '../../public/video-manager/video-id.js';
+import { requireMigrationAdmin, AuthError } from './lib/require-migration-admin.mjs';
+
+// The one board this tool has ever been pointed at (confirmed via
+// board-schema on 2026-08-25 — see the Phase 5-7 config comment
+// below). The Monday API token this function holds has org-wide
+// read access, so without this allowlist an authenticated migration
+// admin (or a bug in this file) could pull data from any board in
+// the account, not just the Video Manager one this tool exists for.
+const ALLOWED_BOARD_IDS = new Set(['5462086473']);
+
+function assertAllowedBoard(boardId) {
+  if (!ALLOWED_BOARD_IDS.has(String(boardId))) {
+    throw new Error(`Board ${boardId} is not on this tool's allowlist (see ALLOWED_BOARD_IDS in this file).`);
+  }
+}
 
 /* =============================================================
  * Phase 5-7 config — confirmed against the real "Video Uploads"
@@ -158,6 +173,7 @@ async function actionBoards() {
  * ============================================================= */
 async function actionBoardSchema(params) {
   const boardId = requireParam(params, 'boardId');
+  assertAllowedBoard(boardId);
   const data = await mondayQuery(
     `
     query ($boardIds: [ID!]) {
@@ -190,6 +206,7 @@ async function actionBoardSchema(params) {
  * ============================================================= */
 async function actionSampleItems(params) {
   const boardId = requireParam(params, 'boardId');
+  assertAllowedBoard(boardId);
   const limit = clampInt(params.get('limit'), 15, 1, 25);
   const data = await mondayQuery(
     `
@@ -246,6 +263,7 @@ async function actionSampleItems(params) {
  * ============================================================= */
 async function actionAssetTest(params) {
   const boardId = requireParam(params, 'boardId');
+  assertAllowedBoard(boardId);
   const scan = clampInt(params.get('itemScan'), 25, 1, 50);
 
   // Find a handful of items that actually have files attached.
@@ -370,6 +388,7 @@ async function tryDownload(asset) {
  * ============================================================= */
 async function actionPaginationProbe(params) {
   const boardId = requireParam(params, 'boardId');
+  assertAllowedBoard(boardId);
   const pageSize = clampInt(params.get('pageSize'), 100, 10, 500);
   const maxPages = clampInt(params.get('maxPages'), 3, 1, 10);
 
@@ -508,6 +527,7 @@ function extractVideoIdAndNotes(rawName) {
  * ============================================================= */
 async function actionDryRunPreview(params) {
   const boardId = requireParam(params, 'boardId');
+  assertAllowedBoard(boardId);
   const scan = clampInt(params.get('itemScan'), 100, 1, 500);
   const neededColumnIds = Object.values(COLUMN_MAP);
 
@@ -663,6 +683,7 @@ async function actionDryRunPreview(params) {
  * ============================================================= */
 async function actionExportRecords(params) {
   const boardId = requireParam(params, 'boardId');
+  assertAllowedBoard(boardId);
   const cursor = params.get('cursor') || null;
   const pageSize = clampInt(params.get('pageSize'), 100, 10, 500);
   const neededColumnIds = Object.values(COLUMN_MAP);
@@ -851,6 +872,18 @@ const actions = {
 };
 
 export default async (req) => {
+  // Every response below this point — including the bare "here's what
+  // this endpoint does" discovery message — requires proving you're
+  // the migration admin first. This tool reads real consignor/cattle
+  // data and hands out signed clip download URLs; there's no action
+  // here that's fine for an anonymous internet visitor to see.
+  try {
+    await requireMigrationAdmin(req);
+  } catch (err) {
+    if (err instanceof AuthError) return jsonResponse({ ok: false, error: err.message }, err.status);
+    return errorResponse(err);
+  }
+
   const url = new URL(req.url);
   const action = url.searchParams.get('action');
 
