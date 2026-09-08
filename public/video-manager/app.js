@@ -7,7 +7,7 @@
  * ============================================================= */
 
 import { VideoRepository, ReferenceDataRepository, UsageRepository } from './repository.js';
-import { renderTable } from './ui-table.js';
+import { renderTable, isTableEditActive } from './ui-table.js';
 import { renderGrid } from './ui-grid.js';
 import { openDrawer, closeDrawer } from './ui-drawer.js';
 import { openUploadModal, openCsvImportModal, openVideoIdManagerModal, openStaffManagerModal, openTrashModal } from './ui-modals.js';
@@ -140,6 +140,16 @@ async function refresh() {
     : `${list.length} record${list.length === 1 ? '' : 's'}`;
 
   currentList = list;
+
+  // Counts/meta text above are safe to update regardless (small text
+  // swaps, nothing a user could be mid-keystroke inside), but the
+  // table itself is a full innerHTML replace — doing that while the
+  // quick add-row or an inline cell edit has an unsaved keystroke in
+  // it would silently wipe it out. Bail before touching the content
+  // area; finish()/commit() in ui-table.js already calls refresh()
+  // again the moment the edit ends, so this data just shows up then
+  // instead of a moment sooner. See isTableEditActive()'s own comment.
+  if (isTableEditActive()) return;
 
   const content = document.getElementById('vm-content');
   if (!list.length) {

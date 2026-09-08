@@ -21,6 +21,16 @@ import * as StorageData from './storage-data.js';
 let addRowOpen = false;
 const compareSelection = new Map(); // id -> record snapshot, so the compare bar/modal work across tabs
 
+// Set while the user has an unsaved keystroke in flight in this table
+// (the quick add-row input, or an inline cell edit like the YouTube
+// link field) — refresh() does a full container.innerHTML replace,
+// which would silently destroy whatever they'd typed. Now that video
+// loading is live-synced (repository.js's onSnapshot subscription),
+// a refresh can be triggered by ANY other user's action at ANY time,
+// not just this tab's own — see isTableEditActive()'s use in app.js.
+let editingActive = false;
+export function isTableEditActive() { return editingActive || addRowOpen; }
+
 export function renderTable(container, records, ctx) {
   const isCreated = ctx.state.statusTab === 'created';
   const showWorkingOn = ctx.state.statusTab === 'ready';
@@ -405,6 +415,7 @@ function startEdit(span, ctx) {
   const id = span.dataset.id;
   const raw = span.textContent.trim() === 'Paste YouTube link…' ? '' : span.textContent.trim();
   span.classList.add('editing');
+  editingActive = true;
 
   const input = document.createElement('input');
   input.className = 'vm-edit-input';
@@ -417,6 +428,7 @@ function startEdit(span, ctx) {
 
   const finish = async (commit) => {
     span.classList.remove('editing');
+    editingActive = false;
     if (!commit) { ctx.refresh(); return; }
     const value = input.value.trim();
     await applyFieldEdit(id, field, value, ctx);

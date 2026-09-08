@@ -555,7 +555,54 @@ the normal push/PR/merge like any other code change.
 
 ## Phase 3 — Reliability
 
-(TBD after Phase 1/2)
+- [x] Live-sync refresh could destroy an in-progress, unsaved table edit — see detail below
+
+### Live-sync refresh could destroy an in-progress, unsaved table edit
+
+**Finding (self-identified, not from the source audit):** earlier this
+project's history, Video Manager's data loading moved from a one-time
+fetch to a persistent Firestore `onSnapshot` subscription, so any
+other tab/user's change now triggers this tab's `refresh()`
+automatically (that was the intended fix for "I have to click refresh
+to see who claimed a video"). But `refresh()`'s table path is a full
+`container.innerHTML` replace, and two things in the table put a real
+unsaved keystroke directly into that same DOM: the quick add-row's
+Video ID input, and the inline YouTube-link cell edit. Before live
+sync, this could only be clobbered by *this same tab's own* other
+actions (already possible, but you'd have to be doing two things at
+once); after live sync, *any other user's unrelated action anywhere
+in the app* can silently wipe out what you were typing, with no
+warning and no way to recover it — a real, newly-likely data-loss
+path introduced by an otherwise-correct earlier fix.
+
+**Implemented:** `ui-table.js` now tracks whether the add-row input or
+an inline cell edit has unsaved state (`isTableEditActive()`, exported).
+`app.js`'s `refresh()` checks this before touching the table's
+`innerHTML` (tab counts/meta text still update — those are safe, just
+small text swaps) and bails out otherwise. Once the edit actually
+finishes — Enter/Tab to commit, Escape to cancel, or blur — the
+existing `finish()`/`commit()` code already calls `ctx.refresh()`
+itself, which picks up whatever changed (including anything that
+happened elsewhere while the edit was in progress) at that point
+instead of a moment sooner. Net effect: a brief staleness window for
+other rows while you're actively editing one cell, in exchange for
+never silently losing what you typed.
+
+**Also checked, not affected:** the record drawer's own in-progress
+edit states (cattle fields, suffix, notes) — confirmed the live-sync
+subscribe handler in `app.js` only calls `refresh()` (table/grid),
+never the drawer's own `paint()`, so an open drawer doesn't
+auto-re-render from a remote change at all and was never at risk from
+this specific change.
+
+**Verified:** both touched files re-checked as valid syntax. Not
+verified against a live multi-tab scenario (would need two real
+signed-in sessions to reproduce/confirm) — the fix is a straightforward
+early-return guard, traced through both trigger paths (add-row,
+inline edit) and the one call site that checks it.
+
+**Remaining/deploy steps:** none — static-file change, ships via the
+normal push/PR/merge.
 
 ## Phase 4 — UI/UX
 
