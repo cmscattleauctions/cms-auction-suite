@@ -70,17 +70,32 @@ const emitter = createEmitter();
  */
 function ensureLoaded() {
   if (!loadPromise) {
-    loadPromise = new Promise(resolve => {
+    loadPromise = new Promise((resolve, reject) => {
       let gotFirst = false;
-      FirestoreData.subscribeToVideos(list => {
-        videos = list;
-        if (!gotFirst) {
-          gotFirst = true;
-          resolve(videos);
-        } else {
-          emitter.emit({ type: 'videos-changed' });
+      FirestoreData.subscribeToVideos(
+        list => {
+          videos = list;
+          if (!gotFirst) {
+            gotFirst = true;
+            resolve(videos);
+          } else {
+            emitter.emit({ type: 'videos-changed' });
+          }
+        },
+        err => {
+          // Without this the promise just hangs forever for a caller
+          // whose session can't read this collection (or lost the
+          // ability to, mid-session) — reject so `await ensureLoaded()`
+          // callers get a real error instead of an infinite spinner,
+          // and clear loadPromise so a later retry (e.g. after
+          // re-auth) can open a fresh subscription instead of being
+          // stuck on this same rejected one forever.
+          if (!gotFirst) {
+            loadPromise = null;
+            reject(err);
+          }
         }
-      });
+      );
     });
   }
   return loadPromise;
@@ -112,7 +127,20 @@ async function loadOrSeedReferenceList(key, arr) {
     arr.length = 0;
     arr.push(...stored);
   } else {
-    await FirestoreData.saveReferenceList(key, arr);
+    // Seeding writes to referenceData, which an anonymous session
+    // (the public video-upload page's preload() call) can't do —
+    // docs/firestore.rules only allows isApproved() to write it, by
+    // design. In production this doc should already exist from real
+    // staff usage, so this branch is a first-run/empty-project
+    // fallback more than something the public page should ever hit —
+    // but if it somehow did, failing to seed shouldn't crash the
+    // whole reference-data preload (and the anon caller couldn't
+    // seed shared data anyway even if this didn't catch the error).
+    try {
+      await FirestoreData.saveReferenceList(key, arr);
+    } catch (err) {
+      console.warn(`[repository] Could not seed referenceData/${key} (likely an anonymous session without write access — this is expected there):`, err);
+    }
   }
 }
 
@@ -548,7 +576,18 @@ export const VideoRepository = {
   },
 
   async createVideo(fields, actor = 'Staff') {
-    await ensureLoaded();
+    // A public rep submission (public/video-upload/) runs in an
+    // anonymous session that can never read videoRecords at all (see
+    // docs/firestore.rules — only isApproved() can read it, isAnon()
+    // can only create). ensureLoaded() opens a live subscription on
+    // the whole collection, which would reject/hang forever for this
+    // caller with zero benefit — a rep submission never reads the
+    // in-memory cache for anything, including its own duplicate-id
+    // check (see this function's own comment below on why that's
+    // impossible for this actor); it just constructs and persists one
+    // new record. Skipping the load here is what actually lets a
+    // public submission complete instead of hanging indefinitely.
+    if (actor !== 'Rep') await ensureLoaded();
     const baseId = fields.baseId || buildBaseId(fields);
     const finalId = fields.suffix ? `${baseId}-${fields.suffix}` : baseId;
     const now = new Date().toISOString();

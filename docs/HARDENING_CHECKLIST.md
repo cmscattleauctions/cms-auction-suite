@@ -340,6 +340,121 @@ rep account, confirm you can still edit your own Staged/Active lots
 and cannot edit someone else's or change a lot's status; as admin,
 confirm everything still works as before.
 
+### 4a. Follow-up: public upload reliability — 4 confirmed severe bugs, all fixed
+
+**Findings, all confirmed real and higher-severity than "reliability
+polish" — the form was likely unusable for real reps before this
+fix:**
+
+1. **`createVideo()` would hang forever for a public submission.**
+   It called `ensureLoaded()`, which (per the merged live-sync work)
+   opens an `onSnapshot` subscription on the whole `videoRecords`
+   collection — but an anonymous session can never read that
+   collection at all (`docs/firestore.rules`), and the subscription's
+   error handler only logged, never rejecting the waiting promise. A
+   rep's submit button would spin indefinitely. Fixed: `createVideo()`
+   skips `ensureLoaded()` entirely when `actor === 'Rep'` (it never
+   reads the cache for anything on that path anyway); separately,
+   `subscribeToVideos()`/`ensureLoaded()` now properly reject on a
+   subscription error instead of hanging, for every caller, not just
+   this one.
+2. **The photo upload would fail for every anonymous uploader.**
+   `storage-data.js`'s `uploadClip()` (used by both staff and the
+   public page) calls `getDownloadURL()` right after upload — but
+   `docs/storage.rules`' `videoClips` read rule was `isApproved()`
+   only. Every public video upload would look like it failed (it
+   hadn't — the bytes were already in Storage) the moment it tried to
+   hand back a usable link. Fixed: added `isAnon()` to that read rule
+   — no new confidentiality boundary given up, since an anonymous
+   session can already fully control (create) that same path, and
+   every one of these clips is destined to become a published public
+   video anyway.
+3. **"+ Add New Consignor" was completely broken, and blocked
+   submission entirely.** It called the async `addConsignor()` without
+   `await`, so `formState.consignorCode` was set to a Promise object,
+   not a real code — and separately, `addConsignor()` writes to the
+   shared `referenceData` collection, which an anonymous session can't
+   do at all (correctly — a random visitor shouldn't be able to spam
+   entries into a list every staff member relies on, so this was never
+   just a missing-await fix). `onSubmit()` requires a truthy
+   `consignorCode` before it will submit anything, so any rep who used
+   this button couldn't submit their video at all afterward. Fixed by
+   changing the workflow, not the permission: the button now computes
+   a plausible next code locally (`suggestNextConsignorCode()`, which
+   only computes, never writes) and puts the requested name in the
+   submission's notes — staff register the real consignor (or match it
+   to an existing one) during the review this record is already
+   flagged for either way.
+4. **The public form never preloaded its reference dictionaries.**
+   `boot()` never called `ReferenceDataRepository.preload()` before
+   rendering — every dropdown (Consignor/Sire/Dam — Sex is static, not
+   Firestore-backed) rendered from the still-empty in-memory arrays,
+   so a rep had nothing real to select at all. Fixed: added the
+   preload call (already permitted for `isAnon()` on `referenceData`'s
+   read rule).
+
+**Also fixed while tracing #1:** `loadOrSeedReferenceList()`'s "doc
+doesn't exist yet, seed it" branch would also throw for an anonymous
+caller (write requires `isApproved()`) — now caught and logged rather
+than crashing the whole preload for a scenario that, in production,
+should never actually occur (the docs already exist from real staff
+usage) but would have been a confusing full-preload failure if it ever
+did.
+
+**Verified:** live-tested in a real browser against this project's
+actual Firebase config (not a mock) — reloaded `/video-upload/`,
+confirmed **zero console errors**, and confirmed the Consignor dropdown
+populated with **69 real consignors** (would have been 0 before the
+preload fix — this alone proves the form was effectively unusable
+before today). Every touched file re-checked as valid syntax;
+`storage.rules`/`firestore.rules` both re-compiled successfully via
+`--dry-run`. The "+Add New Consignor" and photo-upload flows were
+traced through carefully but not live-clicked (browser tooling
+disconnected partway through this pass) — logic verified by reading,
+not by clicking, for those two specifically.
+
+**Remaining/deploy steps:** `firebase deploy --only storage` (new
+`isAnon()` read grant on `videoClips`, plus item 5's new
+`listingImages` path below) and the same `firestore:rules` deploy as
+every other rules item this pass. Both pending your authorization.
+After deploy, the most valuable single check is: have an actual rep
+(or yourself, in an incognito window) submit a real video through
+`/video-upload/` end to end, including a photo — this exercises all
+four fixes at once.
+
+### 5a. Follow-up: listingImageUrl — base64 photo vs. the new 2000-char rule cap (found in review, fixed)
+
+**Finding:** item 4's original rules pass capped `listingImageUrl` at
+2000 characters, matching what a real Storage download URL looks
+like — but the form was reading the WHOLE photo as a base64 data URL
+(`FileReader.readAsDataURL`) and storing that directly, often several
+MB of text for a real phone photo. My own rule would have rejected
+literally every submission that included a photo. A real, severe
+self-inflicted regression, caught before it shipped.
+
+**Implemented:** new `storage-data.js`'s `uploadListingImage()`
+(mirrors `uploadClip()`) uploads the photo to Storage under
+`listingImages/{uploadId}/` and resolves a real download URL; new
+matching `docs/storage.rules` path (`isAnon()` create, 10MB cap,
+`image/*` content-type check). `video-upload/app.js`'s photo picker
+now shows an instant local preview (a `blob:` URL, revoked on
+replace/reset) while the real upload runs in the background, tracks
+upload status (uploading/complete/error), blocks submission while a
+photo is still uploading (same pattern as the existing video-upload
+guard), and submits the real Storage URL — which now actually
+satisfies the 2000-char rule cap, the way it was always supposed to.
+
+**Verified:** all touched files re-checked as valid syntax;
+`storage.rules` re-compiled successfully via `--dry-run`. Not
+live-tested end to end (browser tooling disconnected before this
+specific flow could be click-tested) — logic traced by reading,
+including the re-render-loses-the-preview edge case (`render()` after
+"+Add New Consignor" rebuilds the whole form; added a repaint-from-
+state call so an already-picked photo doesn't visually disappear).
+
+**Remaining/deploy steps:** same `storage` deploy as item 4a above —
+one deploy covers both new/changed paths.
+
 ### 4. Public submission validation
 
 **Finding:** `videoRecords/{id}`'s anonymous-create rule (public

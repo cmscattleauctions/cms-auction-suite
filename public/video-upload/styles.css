@@ -94,6 +94,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
 
 .ru-listing-preview { margin-top: 10px; }
 .ru-listing-preview img { max-width: 140px; border-radius: 8px; display: block; }
+.ru-photo-status { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+.ru-photo-status-ok { color: var(--success); }
+.ru-photo-status-err { color: var(--danger); }
 
 .ru-success { text-align: center; padding: 30px 10px; }
 .ru-success .icon { width: 56px; height: 56px; border-radius: 50%; background: var(--success-bg); color: var(--success); display: grid; place-items: center; margin: 0 auto 16px; }

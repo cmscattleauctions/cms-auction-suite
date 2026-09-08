@@ -19,13 +19,25 @@
 
 import { ReferenceDataRepository, VideoRepository } from '../video-manager/repository.js';
 import { ensureAnonymousAuth, currentUid } from '../video-manager/firestore-data.js';
-import { uploadClip } from '../video-manager/storage-data.js';
+import { uploadClip, uploadListingImage } from '../video-manager/storage-data.js';
 
 const main = document.getElementById('ru-main');
 
 const formState = {
   consignorCode: '', sexCode: '', sireCode: '', damCode: '', weight: '', monthYear: '',
-  notes: '', listingImageDataUrl: null,
+  notes: '',
+  // The photo is uploaded to Storage the moment it's picked (same
+  // "start immediately, no recordId yet" pattern as video clips —
+  // see storage-data.js's uploadListingImage()) rather than inlined
+  // as base64 — listingImagePreviewUrl (a local blob: URL) is shown
+  // instantly for UX; listingImageUrl (the real Storage download URL,
+  // set once the upload finishes) is what actually gets submitted.
+  // listingImageStatus: 'idle' | 'uploading' | 'complete' | 'error'.
+  listingImagePreviewUrl: null, listingImageUrl: null, listingImageStatus: 'idle',
+  // Set only by "+ Add New Consignor" below — a name staff hasn't
+  // confirmed yet, so it's never written to the shared consignors
+  // dictionary directly (see that handler's own comment for why).
+  pendingNewConsignorName: '',
 };
 const files = []; // { file, progress, status }
 
@@ -59,6 +71,7 @@ function render() {
         <select id="f-consignor">
           <option value="">Select consignor…</option>
           ${consignors.map(c => `<option value="${c.code}" ${formState.consignorCode === c.code ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+          ${formState.pendingNewConsignorName ? `<option value="${formState.consignorCode}" selected>${escapeHtml(formState.pendingNewConsignorName)} (new — pending staff review)</option>` : ''}
         </select>
         <button class="btn btn-sm btn-ghost" id="f-new-consignor" type="button" style="margin-top:8px;">+ Add New Consignor</button>
       </div>
@@ -146,7 +159,6 @@ function formatBytes(bytes) {
 }
 
 function wire() {
-  main.querySelector('#f-consignor').addEventListener('change', e => formState.consignorCode = e.target.value);
   main.querySelector('#f-sex').addEventListener('change', e => formState.sexCode = e.target.value);
   main.querySelector('#f-sire').addEventListener('change', e => formState.sireCode = e.target.value);
   main.querySelector('#f-dam').addEventListener('change', e => formState.damCode = e.target.value);
@@ -154,14 +166,28 @@ function wire() {
   main.querySelector('#f-monthyear').addEventListener('input', e => formState.monthYear = e.target.value);
   main.querySelector('#f-notes').addEventListener('input', e => formState.notes = e.target.value);
 
+  main.querySelector('#f-consignor').addEventListener('change', e => {
+    formState.consignorCode = e.target.value;
+    formState.pendingNewConsignorName = ''; // picking a real one clears any pending "new" request
+  });
+
   main.querySelector('#f-new-consignor').addEventListener('click', () => {
     const name = prompt('New consignor name:');
     if (!name || !name.trim()) return;
-    const code = ReferenceDataRepository.suggestNextConsignorCode();
-    const rec = ReferenceDataRepository.addConsignor({ name: name.trim(), code });
-    formState.consignorCode = rec.code;
+    // Deliberately does NOT call ReferenceDataRepository.addConsignor()
+    // — that writes straight to the shared consignors dictionary
+    // (referenceData/consignors), and an anonymous rep session can't
+    // do that (docs/firestore.rules only allows isApproved() to write
+    // it — by design, so a random visitor can't spam entries into a
+    // list every staff member relies on). suggestNextConsignorCode()
+    // only *computes* a plausible next code without writing anything;
+    // the actual name goes into the submission's notes so staff
+    // register the real consignor (or match it to an existing one)
+    // during the review this record is already flagged for.
+    formState.consignorCode = ReferenceDataRepository.suggestNextConsignorCode();
+    formState.pendingNewConsignorName = name.trim();
     render();
-    showToast(`Added ${rec.name}`);
+    showToast(`Using "${name.trim()}" — staff will confirm this consignor on review.`);
   });
 
   wirePhotoPicker();
@@ -177,20 +203,57 @@ function wire() {
 }
 
 function wirePhotoPicker() {
+  // render() rebuilds the whole form (e.g. after +Add New Consignor)
+  // and the template always starts #f-photo-preview empty — repaint it
+  // from formState so an already-picked/uploaded photo doesn't
+  // disappear on an unrelated re-render.
+  renderPhotoPreview();
   const takeBtn = main.querySelector('#f-photo-take'), chooseBtn = main.querySelector('#f-photo-choose');
   const takeInput = main.querySelector('#f-photo-input-take'), chooseInput = main.querySelector('#f-photo-input-choose');
   takeBtn.addEventListener('click', () => takeInput.click());
   chooseBtn.addEventListener('click', () => chooseInput.click());
   [takeInput, chooseInput].forEach(input => input.addEventListener('change', () => {
     const file = input.files[0];
+    input.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      formState.listingImageDataUrl = reader.result;
-      main.querySelector('#f-photo-preview').innerHTML = `<img src="${reader.result}" />`;
-    };
-    reader.readAsDataURL(file);
+    if (file.type && !file.type.startsWith('image/')) {
+      showToast(`${file.name} is a ${file.type} file, not a photo.`);
+      return;
+    }
+
+    // Instant local preview — separate from what actually gets
+    // submitted (listingImageUrl), which only exists once the real
+    // Storage upload below finishes.
+    if (formState.listingImagePreviewUrl) URL.revokeObjectURL(formState.listingImagePreviewUrl);
+    formState.listingImagePreviewUrl = URL.createObjectURL(file);
+    formState.listingImageUrl = null;
+    formState.listingImageStatus = 'uploading';
+    renderPhotoPreview();
+
+    const uploadId = crypto.randomUUID();
+    uploadListingImage(uploadId, file).then(result => {
+      formState.listingImageUrl = result.downloadUrl;
+      formState.listingImageStatus = 'complete';
+      renderPhotoPreview();
+    }).catch(err => {
+      formState.listingImageStatus = 'error';
+      renderPhotoPreview();
+      showToast(`Photo upload failed: ${err.message}`);
+    });
   }));
+}
+
+function renderPhotoPreview() {
+  const box = main.querySelector('#f-photo-preview');
+  if (!box) return;
+  const statusHtml = {
+    uploading: '<div class="ru-photo-status">Uploading…</div>',
+    complete: '<div class="ru-photo-status ru-photo-status-ok">Uploaded</div>',
+    error: '<div class="ru-photo-status ru-photo-status-err">Upload failed — try again</div>',
+  }[formState.listingImageStatus] || '';
+  box.innerHTML = formState.listingImagePreviewUrl
+    ? `<img src="${formState.listingImagePreviewUrl}" />${statusHtml}`
+    : '';
 }
 
 function wireVideoPickers() {
@@ -316,6 +379,10 @@ async function onSubmit() {
     showToast('Wait for at least one video to finish uploading');
     return;
   }
+  if (formState.listingImageStatus === 'uploading') {
+    showToast('Still uploading the photo — wait for it to finish before submitting');
+    return;
+  }
 
   const clips = files.filter(f => f.status === 'complete').map(f => ({
     id: 'clip_' + Math.random().toString(36).slice(2, 10),
@@ -329,9 +396,18 @@ async function onSubmit() {
 }
 
 async function createRecord(fields, clips) {
+  // A pending "new consignor" request (see the +Add New Consignor
+  // handler) isn't a real registered consignor yet — surface it
+  // plainly in notes so staff catch it during the review this record
+  // is already flagged for, rather than it silently reading as the
+  // wrong (or a made-up) consignor code.
+  const notes = [
+    formState.pendingNewConsignorName ? `NEW CONSIGNOR REQUESTED: "${formState.pendingNewConsignorName}"` : '',
+    formState.notes.trim(),
+  ].filter(Boolean).join('\n\n');
   return VideoRepository.createVideo({
     ...fields, status: 'ready', isDraft: clips.length === 0,
-    notes: formState.notes.trim(), clips, listingImageUrl: formState.listingImageDataUrl,
+    notes, clips, listingImageUrl: formState.listingImageStatus === 'complete' ? formState.listingImageUrl : null,
   }, 'Rep');
 }
 
@@ -346,7 +422,10 @@ function showSuccess(message) {
   `;
   main.querySelector('#again-btn').addEventListener('click', () => {
     formState.consignorCode = ''; formState.sexCode = ''; formState.sireCode = ''; formState.damCode = '';
-    formState.weight = ''; formState.monthYear = ''; formState.notes = ''; formState.listingImageDataUrl = null;
+    formState.weight = ''; formState.monthYear = ''; formState.notes = '';
+    if (formState.listingImagePreviewUrl) URL.revokeObjectURL(formState.listingImagePreviewUrl);
+    formState.listingImagePreviewUrl = null; formState.listingImageUrl = null; formState.listingImageStatus = 'idle';
+    formState.pendingNewConsignorName = '';
     files.length = 0;
     render();
   });
@@ -361,6 +440,13 @@ async function boot() {
   main.innerHTML = `<div class="ru-card"><p class="hint">Loading…</p></div>`;
   try {
     await ensureAnonymousAuth();
+    // Consignors/sire types/dam types are Firestore-backed (see
+    // repository.js's REFERENCE_LISTS) — without this, the dropdowns
+    // below render from the still-empty in-memory arrays and a rep
+    // has no real consignor/sire/dam to actually pick, on every load.
+    // Allowed for isAnon() too (docs/firestore.rules' referenceData
+    // read rule), unlike the write side addConsignor() needs.
+    await ReferenceDataRepository.preload();
   } catch (err) {
     main.innerHTML = `<div class="ru-card"><p class="hint">Could not start a session (${escapeHtml(err.message)}). Please reload the page.</p></div>`;
     return;

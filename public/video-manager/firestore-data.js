@@ -166,13 +166,23 @@ function stripFileHandles(record) {
  * targeted. Returns the unsubscribe function; repository.js never
  * actually calls it (one subscription for the lifetime of the tab).
  */
-export function subscribeToVideos(onChange) {
+export function subscribeToVideos(onChange, onError) {
   if (!db) return () => {};
   return onSnapshot(collection(db, COLLECTION), snap => {
     const out = [];
     snap.forEach(d => out.push(d.data()));
     onChange(out);
-  }, err => console.error('[video-manager] videoRecords listener error:', err));
+  }, err => {
+    console.error('[video-manager] videoRecords listener error:', err);
+    // Without this, a caller whose first-ever snapshot never arrives
+    // (e.g. a session that can't read this collection, or one whose
+    // token expired mid-subscription) waits on a promise that never
+    // resolves OR rejects — repository.js's ensureLoaded() awaits
+    // exactly that. onError is optional so existing behavior (log and
+    // otherwise do nothing) is unchanged for a caller that doesn't
+    // pass one.
+    if (onError) onError(err);
+  });
 }
 
 export async function fetchVideo(id) {
