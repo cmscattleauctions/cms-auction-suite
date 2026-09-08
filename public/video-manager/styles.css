@@ -454,7 +454,7 @@ td:focus, .vm-cell:focus { outline: none; }
 /* =============================================================
  * GRID VIEW — compact secondary view
  * ============================================================= */
-.vm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; padding-top: 4px; }
+.vm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 10px; padding-top: 4px; } /* min(,100%): a card can't force overflow below 220px+padding */
 .vm-card {
   background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
   overflow: hidden; cursor: pointer; transition: border-color 120ms, box-shadow 120ms;
@@ -882,7 +882,7 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 }
 .vm-compare-modal .vm-modal-header { flex-shrink: 0; }
 .vm-compare-body { flex: 1; overflow-y: auto; padding-top: 16px; }
-.vm-compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+.vm-compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px; } /* min(,100%): a panel can't force overflow below 340px+padding in a narrow modal */
 .vm-compare-panel { position: relative; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; background: var(--bg-surface); }
 .vm-compare-rule-out {
   position: absolute; top: 8px; right: 8px; z-index: 5;

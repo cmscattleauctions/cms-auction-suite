@@ -88,7 +88,7 @@ nav { background: var(--surface); border-bottom: 1px solid var(--border); displa
 .search-box { background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 9px 14px; color: var(--text); font-size: 13px; width: 220px; font-family: 'Barlow', sans-serif; }
 .search-box:focus, .form-input:focus, .form-textarea:focus { outline: none; border-color: var(--blue-light); }
 .count-label { font-size: 12px; color: var(--muted); margin-left: auto; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(600px, 1fr)); gap: 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(600px, 100%), 1fr)); gap: 14px; } /* min(,100%): a card can't force overflow below 600px+padding */
 
 /* Review & Download — results toolbar, Build Summary, banner sections */
 .review-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -136,7 +136,7 @@ details[open] .build-issues-summary::before { content: '▾ '; }
 .img-drop p { font-size: 13px; color: var(--muted); margin-top: 6px; }
 .img-drop svg { width: 32px; height: 32px; stroke: var(--muted); fill: none; }
 .img-preview-thumb { max-height: 80px; max-width: 100%; border-radius: 5px; display: none; margin: 8px auto 0; border: 1px solid var(--border); background:#0e1620; }
-.state-library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.state-library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr)); gap: 12px; } /* min(,100%): a card can't force overflow below 160px+padding */
 .state-lib-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .state-lib-card img { width: 100%; height: 100px; object-fit: contain; background: var(--blue); display: block; padding: 6px; }
 .state-lib-label { padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }

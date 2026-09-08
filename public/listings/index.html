@@ -130,7 +130,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    (same #c-blue etc ids, same updateColorsFromEditor wiring) reached from
    the toolbar's Colors button, so that strip is reclaimed for the catalog
    preview; nothing about what the controls do changed. */
-.modal .color-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.modal .color-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(180px,100%),1fr));gap:10px} /* min(,100%): can't force overflow below 180px+padding in a narrow modal */
 .modal .color-grid .field{margin:0;display:flex;align-items:center;gap:12px;
   padding:10px 12px;border:1px solid #e6e0d4;border-radius:10px;background:#faf8f4;
   transition:border-color .12s}

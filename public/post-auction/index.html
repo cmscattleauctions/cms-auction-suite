@@ -576,7 +576,8 @@
     
     .resultsGrid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      /* min(,100%) so a card can't force overflow on a viewport narrower than 300px + page padding */
+      grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
       gap: 16px;
     }
 
