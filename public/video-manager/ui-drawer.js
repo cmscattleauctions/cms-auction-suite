@@ -943,12 +943,19 @@ function clipsTabHtml(rec) {
 }
 
 function clipCardHtml(c, index, isPlaying) {
+  // The <video> element (and its src) only exists at all for the ONE
+  // clip currently playing — opening the drawer or its Clips tab must
+  // never fetch original clip bytes on its own. Every other clip shows
+  // a plain "click to load" placeholder with the same play-button
+  // affordance; nothing about that placeholder touches c.downloadUrl.
   return `
     <div class="vm-clip-card2 ${isPlaying ? 'is-playing' : ''}" data-clip-id="${c.id}">
       <div class="vm-clip-card2-label">Clip ${index + 1}</div>
       <div class="vm-clip-thumb" ${c.downloadUrl && !isPlaying ? `data-play-clip2="${c.id}" role="button" tabindex="0"` : ''}>
         ${c.downloadUrl
-          ? `<video preload="metadata" muted playsinline data-clip-video="${c.id}" ${isPlaying ? 'controls autoplay' : ''} src="${escapeHtml(c.downloadUrl)}#t=0.5"></video>`
+          ? (isPlaying
+              ? `<video preload="metadata" muted playsinline controls autoplay data-clip-video="${c.id}" src="${escapeHtml(c.downloadUrl)}#t=0.5"></video>`
+              : `<div class="vm-clip-thumb-empty vm-clip-thumb-unloaded"></div>`)
           : `<div class="vm-clip-thumb-empty">No file yet</div>`}
         ${c.downloadUrl && !isPlaying ? `
           <div class="vm-clip-play-btn" title="Play">

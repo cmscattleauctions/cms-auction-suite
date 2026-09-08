@@ -489,7 +489,69 @@ deploy authorization needed for this item specifically.
 
 ## Phase 2 — Performance
 
-- [ ] Video/clip downloads must never happen on browse/Grid/clip-list open — only on explicit Download click; Preview (if kept) is a separate explicit click loading only that one clip
+- [x] Video/clip downloads must never happen on browse/Grid/clip-list open — only on explicit Download click; Preview (if kept) is a separate explicit click loading only that one clip — see detail below
+
+### Original video/clip files must load only on an explicit click
+
+**Finding (user-specified requirement, not from the source audit):**
+browsing records, switching to Grid view, or opening a record's clip
+list must never trigger a download of the original video file —
+only an explicit Download click (or, for a kept Preview feature, a
+separate explicit click loading only that one selected clip).
+
+**Verified against current code:** found two real violations by
+searching every `<video`/`.src =` site touching a clip's `downloadUrl`
+across the Video Manager:
+
+1. **Grid view (`ui-grid.js`)** — every card for a record with an
+   uploaded-but-unpublished clip (no YouTube link yet) created a
+   *hidden* `<video>`, set its `src` to the real Storage
+   `downloadUrl`, and seeked it — purely to capture a static preview
+   frame. This ran automatically, for every such record, the moment
+   Grid view rendered — no click involved. Removed entirely; those
+   cards now always show the existing neutral placeholder icon (same
+   as before for a record with no clip at all). The YouTube-thumbnail
+   path (a small `img` fetch from YouTube's CDN, not the source video)
+   is untouched.
+2. **Drawer Clips tab (`ui-drawer.js`)** — every clip card, for every
+   clip, always rendered a real `<video preload="metadata" src="...">`
+   pointing at that clip's actual file, the moment the Clips tab
+   rendered (drawer open + Clips tab, or any drawer repaint while on
+   that tab) — regardless of whether the user had clicked anything.
+   Now the `<video>` element (and therefore its `src`) only exists for
+   the ONE clip the user has explicitly clicked "Play"/"Preview" on;
+   every other clip shows a plain placeholder box with the existing
+   play-button overlay, and clicking it is what creates the `<video>`
+   element and starts loading, for that clip only. The already-
+   existing "Preview" menu item / play-button click flow is otherwise
+   unchanged — this only changes *when* the byte transfer starts, not
+   the interaction.
+
+Also checked and confirmed already compliant, no changes needed:
+Table view's clip-count cell (shows a number only) and its "N clips"
+popover (filename/duration/icon only, with its own already-explicit
+"Preview" button that `window.open()`s the file only on click); the
+Compare modal (touches no clip/video src at all); the upload flow's
+local-file duration read (`URL.createObjectURL` on a file the user
+just picked from their own device — zero network transfer, opposite
+direction of a download).
+
+**Verified:** live browser test (not committed) importing the real,
+unmodified `renderGrid()` directly from the fixed file, rendering a
+card for a record with a real clip `downloadUrl`, and watching actual
+network activity via `PerformanceObserver` for 1.5s after render —
+**0 requests** to the clip URL; the card correctly showed the
+placeholder + clip-count badge. The drawer fix was verified by direct
+code inspection (the `<video>`/`src` markup is now conditional on
+`isPlaying`, confirmed by re-reading the exact template output for
+both branches) rather than a full live render, since mocking the
+drawer's full `ctx.repo`/Firestore dependency chain wasn't worth the
+setup for a straightforward conditional-template change of the same
+shape already network-verified for Grid. Both touched files
+re-checked as valid syntax.
+
+**Remaining/deploy steps:** none — static-file changes only, ships via
+the normal push/PR/merge like any other code change.
 
 ## Phase 3 — Reliability
 
