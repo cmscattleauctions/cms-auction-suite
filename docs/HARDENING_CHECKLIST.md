@@ -12,9 +12,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` nee
 - [x] 1. Monday migration endpoint exposure — see detail below
 - [x] 2. Country Market role escalation (self-assigned admin) — see detail below
 - [x] 3. Firebase authorization (allowedTabs, Country Market rules) — see detail below
-- [ ] 4. Public submission validation
+- [x] 4. Public submission validation — see detail below
 - [ ] 5. Unsafe HTML rendering (XSS)
-- [ ] 6. Passwords persisted in adminJobs documents
+- [x] 6. Passwords persisted in adminJobs documents — see detail below
 - [ ] 7. Server-side clip transfer hardening (SSRF)
 
 ### 1. Monday migration endpoint exposure
@@ -212,6 +212,119 @@ the same file, one deploy covers both). Validation: as an existing
 rep account, confirm you can still edit your own Staged/Active lots
 and cannot edit someone else's or change a lot's status; as admin,
 confirm everything still works as before.
+
+### 4. Public submission validation
+
+**Finding:** `videoRecords/{id}`'s anonymous-create rule (public
+Cattle Video Upload page, `public/video-upload/`) had no field
+allowlist, type checks, length caps, or array limits — it only
+checked `createdBy=='Rep'` and `submittedByUid==request.auth.uid`.
+The client (`repository.js`'s `createVideo()`) always constructs a
+well-formed record, but that's browser JS; the real security boundary
+is the rule, and it accepted literally any other field/value/shape.
+
+**Verified against current code:** confirmed the create rule's actual
+content, and cross-checked `createVideo()`'s real output shape so the
+allowlist below matches what a legitimate submission actually looks
+like (not a guess).
+
+**Implemented:** `docs/firestore.rules`' new `isValidAnonVideoSubmission()`
+function, used by the create rule:
+- `keys().hasOnly([...])` — the exact field set `createVideo()`
+  produces; anything else present makes the write fail closed.
+- Pins the trust-sensitive fields to their only legitimate fresh-
+  submission values: `status=='ready'`, `needsReview==true`,
+  `workingOn==null`, `usage`/`videoIdHistory`/`previousYouTubeVideos`
+  all empty, `youtubeId`/`youtubeUrl`/`embedUrl`/`embedCode` all null.
+  A public submission can never plant a record that already looks
+  reviewed, published, claimed, or used.
+- Type + length/range caps on every free-text/URL/numeric field
+  (names ≤200 chars, notes ≤2000, weight a plausible 0-20000 number,
+  `monthYear` exactly 4 chars, `clips`/`activity` arrays capped at
+  20/5 entries, etc.).
+
+**Verified:** `firebase deploy --only firestore:rules --dry-run`
+compiled successfully. Not verified against a live submission (no way
+to exercise this from this environment) — see deploy steps below.
+
+**Accepted gap, not fixed:** the rule validates the `clips` array's
+*size* but not each item's internal shape (filename/storagePath/
+sizeBytes types) — deep per-item validation is possible in Firestore
+rules but adds significant complexity for a lower-severity gap (a
+malformed clip entry could look strange in a staff view, but per
+Finding #4/#5's other fixes, rendering code already falls back
+gracefully on missing/unexpected fields rather than crashing —
+spot-checked, not exhaustively audited across every render path).
+
+**Remaining/deploy steps:** same rules deploy as items 2/3
+(`firebase deploy --only firestore:rules`, not yet run — needs your
+authorization). Validation after deploy: submit a real video through
+`/video-upload` and confirm it still works end to end (this is the
+one path most likely to break if the allowlist is missing a field
+`createVideo()` actually sets — re-check against a real submission's
+network payload if anything fails).
+
+### 6. Passwords persisted in adminJobs documents
+
+**Finding:** `shared/admin-data.js`'s `runAdminJob()` writes a plaintext
+password into `adminJobs/{jobId}.params.password` for the `createUser`
+and `setPassword` ops. `functions/index.js`'s `adminRunJob` reads and
+acts on it, but the job document — password included — was left
+sitting in Firestore indefinitely afterward, readable by anyone with
+`isSuiteAdmin()` access (currently just the one admin account, but
+also anyone with direct GCP/Firestore console access to the project).
+
+**Business decision already made, not reversed here:** the
+recommendation to "prefer invitation/password-reset flows" would mean
+replacing "admin sets a password directly" with an email-based reset
+flow — but that exact design choice (admin sets it directly, not a
+reset email) was explicitly made earlier in this project's history
+when the Admin Settings feature was first built, so I did not reverse
+it. If you'd rather move to an invite/reset-email flow, that's a
+larger, separate change (new Firebase Auth email templates, UI
+changes) — say so and I'll scope it.
+
+**Implemented (the part that doesn't require that larger decision):**
+- `functions/index.js`: every terminal update to a job document
+  (`status:'done'` on success, `status:'error'` on failure) now also
+  strips `params.password` via `FieldValue.delete()` in the same
+  atomic write. A password now exists in Firestore only for the few
+  seconds between job creation and the function processing it — not
+  indefinitely. The rest of the job doc (op, requestedBy, status,
+  timestamps, result) is left in place as an audit trail.
+- Confirmed nothing in `adminRunJob` ever logs `job`/`job.params`/the
+  password (no `console.log`/`logger.log` of those anywhere in the
+  function) — "prevent credentials from entering logs" was already
+  true, verified rather than assumed.
+- New `scripts/clear-adminjob-passwords.mjs` (local one-off script,
+  same pattern as the existing `scripts/clear-bad-youtube-links.mjs`)
+  — a controlled cleanup for jobs created *before* this fix shipped,
+  which still have a real password sitting in them. Defaults to a dry
+  run (reports what it would clear); `--apply` actually clears it.
+
+**Verified:** `functions/index.js` re-checked as valid syntax; the new
+script re-checked as valid syntax. **Not run** — needs your
+credentials (`gcloud auth application-default login`, same as the
+existing scripts) and is a write against production Firestore, so I
+did not run it myself.
+
+**Remaining/deploy steps (needs you):**
+1. `firebase deploy --only functions:adminRunJob` — ships the "clear
+   the password on every future job" fix. I did not run this.
+2. Once deployed, run `node scripts/clear-adminjob-passwords.mjs`
+   (dry run first, review the list, then `--apply`) to clean up any
+   passwords from jobs already run before today.
+3. **Rollback:** revert the `functions/index.js` commit and redeploy
+   — the change is additive (an extra field-delete on writes that
+   already happen), nothing about the create/setPassword behavior
+   itself changes, so there's no functional behavior to roll back,
+   only the "job docs keep their password" behavior to restore if
+   for some reason you wanted that back.
+4. **Retention limitation, documented as asked:** this does not touch
+   Firestore's own backups/point-in-time-recovery snapshots, which may
+   retain a copy of a job document (password included) taken before
+   this fix ran, for whatever retention window your Firestore backup
+   policy has. Clearing the live document does not purge those.
 
 ## Phase 2 — Performance
 

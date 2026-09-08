@@ -69,6 +69,64 @@ service cloud.firestore {
     match /appSettings/{key}       { allow read, write: if isApproved(); }
 
     // ── Video Manager ───────────────────────────────────────────
+    // A public, anonymous-write submission is the one place in this
+    // app where the CLIENT is not the security boundary — the upload
+    // page (public/video-upload/) happens to only ever construct a
+    // well-formed record via repository.js's createVideo(), but
+    // that's browser JS; anyone can call the Storage/Firestore SDKs
+    // directly with arbitrary data instead. This mirrors createVideo's
+    // actual output shape (see repository.js) and pins every field a
+    // fresh anonymous submission should never be able to fake its way
+    // out of — it can't submit a record that already looks reviewed,
+    // published, claimed, or used, and every free-text/URL-shaped
+    // field gets a length cap so a malformed submission can't bloat
+    // storage or break a staff view that assumes reasonable sizes.
+    function isValidAnonVideoSubmission() {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+        'id', 'videoId', 'baseVideoId', 'suffix', 'videoIdHistory',
+        'consignorCode', 'consignorName', 'sexCode', 'sireCode', 'damCode',
+        'weight', 'monthYear', 'status', 'isDraft', 'needsReview', 'videoMaker',
+        'createdBy', 'dateAdded', 'lastUpdated', 'notes', 'canvaLink', 'clips',
+        'listingImageUrl', 'submittedByUid', 'youtubeId', 'youtubeUrl',
+        'embedUrl', 'embedCode', 'previousYouTubeVideos', 'videoFormat',
+        'hasTags', 'workingOn', 'usage', 'activity'
+      ])
+        && d.createdBy == 'Rep'
+        && d.submittedByUid == request.auth.uid
+        // Must start in exactly this state — never pre-reviewed,
+        // pre-published, pre-claimed, or with fabricated usage/history.
+        && d.status == 'ready'
+        && d.needsReview == true
+        && d.workingOn == null
+        && d.usage.size() == 0
+        && d.videoIdHistory.size() == 0
+        && d.previousYouTubeVideos.size() == 0
+        && d.youtubeId == null && d.youtubeUrl == null
+        && d.embedUrl == null && d.embedCode == null
+        // Types + length/range caps on everything else.
+        && d.id is string && d.id.size() <= 100
+        && d.videoId is string && d.videoId.size() > 0 && d.videoId.size() <= 60
+        && d.baseVideoId is string && d.baseVideoId.size() > 0 && d.baseVideoId.size() <= 60
+        && (d.suffix == null || (d.suffix is string && d.suffix.size() <= 20))
+        && d.consignorCode is string && d.consignorCode.size() <= 20
+        && d.consignorName is string && d.consignorName.size() <= 200
+        && d.sexCode is string && d.sexCode.size() <= 20
+        && d.sireCode is string && d.sireCode.size() <= 20
+        && d.damCode is string && d.damCode.size() <= 20
+        && d.weight is number && d.weight > 0 && d.weight < 20000
+        && d.monthYear is string && d.monthYear.size() == 4
+        && d.isDraft is bool
+        && d.dateAdded is string && d.lastUpdated is string
+        && d.videoMaker is string && d.videoMaker.size() <= 100
+        && d.notes is string && d.notes.size() <= 2000
+        && (d.canvaLink == null || (d.canvaLink is string && d.canvaLink.size() <= 500))
+        && (d.listingImageUrl == null || (d.listingImageUrl is string && d.listingImageUrl.size() <= 2000))
+        && d.videoFormat is string && d.videoFormat.size() <= 30
+        && d.hasTags is bool
+        && d.clips is list && d.clips.size() <= 20
+        && d.activity is list && d.activity.size() <= 5;
+    }
     match /videoRecords/{id} {
       // Deliberately NOT readable by isAnon(): these documents carry
       // real business data (consignor names, internal notes, activity
@@ -86,9 +144,7 @@ service cloud.firestore {
       // grew, nothing else changed" the way a real update would need.
       // submittedByUid ties every public submission back to a real (if
       // anonymous) Firebase UID for traceability.
-      allow create: if isAnon()
-                    && request.resource.data.createdBy == 'Rep'
-                    && request.resource.data.submittedByUid == request.auth.uid;
+      allow create: if isAnon() && isValidAnonVideoSubmission();
     }
     // Just names/labels for the public form's dropdowns (consignor
     // names, sire/dam type labels) — no business-sensitive data, and

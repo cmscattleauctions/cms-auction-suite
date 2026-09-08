@@ -157,8 +157,16 @@ exports.adminRunJob = onDocumentCreated(
     const job = snap.data();
     const jobRef = snap.ref;
 
+    // createUser/setPassword jobs carry a plaintext password in
+    // params.password (see shared/admin-data.js) — it only needs to
+    // exist for the few seconds it takes this function to read and
+    // act on it. Every terminal update (success or failure) strips it
+    // via FieldValue.delete() rather than leaving it sitting in
+    // Firestore indefinitely; the rest of the job doc (op, requestedBy,
+    // status, timestamps) is left in place as an audit trail.
+    const clearedFields = { 'params.password': admin.firestore.FieldValue.delete() };
     const fail = message =>
-      jobRef.update({ status: 'error', error: message, completedAt: admin.firestore.FieldValue.serverTimestamp() });
+      jobRef.update({ status: 'error', error: message, completedAt: admin.firestore.FieldValue.serverTimestamp(), ...clearedFields });
 
     // Defense in depth beyond docs/firestore.rules — the rules already
     // restrict who can create a job document at all, but this function
@@ -190,12 +198,12 @@ exports.adminRunJob = onDocumentCreated(
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           createdBy: requester.email,
         });
-        await jobRef.update({ status: 'done', result: { uid: userRecord.uid }, completedAt: admin.firestore.FieldValue.serverTimestamp() });
+        await jobRef.update({ status: 'done', result: { uid: userRecord.uid }, completedAt: admin.firestore.FieldValue.serverTimestamp(), ...clearedFields });
       } else if (job.op === 'setPassword') {
         const { uid, password } = job.params || {};
         if (!uid || !password) { await fail('uid and password are required.'); return; }
         await admin.auth().updateUser(uid, { password });
-        await jobRef.update({ status: 'done', completedAt: admin.firestore.FieldValue.serverTimestamp() });
+        await jobRef.update({ status: 'done', completedAt: admin.firestore.FieldValue.serverTimestamp(), ...clearedFields });
       } else {
         await fail(`Unknown op "${job.op}".`);
       }
