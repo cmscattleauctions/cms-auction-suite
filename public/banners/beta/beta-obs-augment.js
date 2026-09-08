@@ -87,8 +87,31 @@ function isBreedTransitionScene(name) {
 /**
  * Build a scene item — same shape/keys as Classic's makeBannerSceneItem,
  * generalized for reuse (video / tags both need this).
+ *
+ * boundsType/bounds/boundsAlign default to OBS_BOUNDS_NONE (0) — the
+ * existing no-op state Classic's own items already ship with (raw
+ * scale/pos only, no box-fit). Tags still use this default: they're
+ * pre-sized PNGs the app itself generated at a known scale, so there's
+ * nothing to "fit." The cattle video item (below) is the one caller
+ * that opts into bounds fitting instead, since — unlike a tag image —
+ * its actual source resolution is never known to this browser-based
+ * generator (the .mp4 lives on the operator's machine at OBS-build
+ * time; this app only writes JSON, it never opens the file).
+ *
+ * bounds_type/bounds/bounds_align field names and the OBS_BOUNDS_*
+ * enum values (SCALE_OUTER = 3) are verified against OBS Studio's own
+ * libobs source (obs.h's enum obs_bounds_type; obs-scene.c's
+ * scene_save_item/scene_load_item and calculate_bounds_data), not
+ * guessed — same standard the rest of this file holds itself to (see
+ * file header). bounds_rel mirrors bounds verbatim (no canvas-center
+ * normalization) — matching how Classic's own scale_rel already
+ * mirrors scale verbatim in this codebase; unlike pos_rel, which IS a
+ * canvas-normalized value, bounds/scale are sizes, not coordinates.
  */
-function makeSourceItem({ sourceName, sourceUuid, itemId, canvasW, canvasH, posX, posY, scaleX = 1, scaleY = 1 }) {
+function makeSourceItem({
+  sourceName, sourceUuid, itemId, canvasW, canvasH, posX, posY,
+  scaleX = 1, scaleY = 1, boundsType = 0, boundsW = 0, boundsH = 0, boundsAlign = 0,
+}) {
   const halfH = canvasH / 2;
   const posRelX = (posX - canvasW / 2) / halfH;
   const posRelY = (posY - canvasH / 2) / halfH;
@@ -100,8 +123,8 @@ function makeSourceItem({ sourceName, sourceUuid, itemId, canvasW, canvasH, posX
     rot: 0.0,
     scale_ref: { x: canvasW, y: canvasH },
     align: 5,
-    bounds_type: 0,
-    bounds_align: 0,
+    bounds_type: boundsType,
+    bounds_align: boundsAlign,
     bounds_crop: false,
     crop_left: 0, crop_top: 0, crop_right: 0, crop_bottom: 0,
     id: itemId,
@@ -110,8 +133,8 @@ function makeSourceItem({ sourceName, sourceUuid, itemId, canvasW, canvasH, posX
     pos_rel: { x: posRelX, y: posRelY },
     scale: { x: scaleX, y: scaleY },
     scale_rel: { x: scaleX, y: scaleY },
-    bounds: { x: 0, y: 0 },
-    bounds_rel: { x: 0, y: 0 },
+    bounds: { x: boundsW, y: boundsH },
+    bounds_rel: { x: boundsW, y: boundsH },
     scale_filter: 'disable',
     blend_method: 'default',
     blend_type: 'normal',
@@ -357,7 +380,7 @@ function applyStingerOverride(scene, transitionDurationMs) {
  *
  * @param baseObsJson  output of Classic's buildObsJson() — untouched
  * @param opts.canvasW/canvasH  must match Classic's CANVAS_W/CANVAS_H
- * @param opts.lotPlans  Map<lotId, { cmsVideoId: string|null, videoScale, tagIds: string[] }>
+ * @param opts.lotPlans  Map<lotId, { cmsVideoId: string|null, tagIds: string[] }>
  * @param opts.uniqueVideoSources  Map<cmsVideoId, localPath>  (FILE dedup for the local-path lookup only — never source sharing, see header)
  * @param opts.tagAssets  Map<tagId, { id, name, localPath, naturalWidth, naturalHeight, contentX, contentY, contentWidth, contentHeight, sortOrder, sizeAdjustPct, verticalOffsetPx }>
  * @param opts.tagLayout  { rightMargin, bottomMargin, spacing, tagHeight, leftMargin? }  (leftMargin defaults to rightMargin)
@@ -453,10 +476,20 @@ export function augmentObsJsonForBeta(baseObsJson, opts) {
       if (localPath) {
         const vsrc = makeMediaSource(localPath, `VIDEO - ${lot}`);
         newSources.push(vsrc);
-        const scale = plan.videoScale || 1;
+        // OBS_BOUNDS_SCALE_OUTER: OBS scales the video (preserving its
+        // real aspect ratio, whatever that turns out to be once it
+        // actually opens the file) to fully cover the 3840x2160 canvas,
+        // cropping any overflow evenly from the center (bounds_align:0).
+        // This replaces a fixed "assumed 1920x1080" scale guess that
+        // was wrong for any video that wasn't exactly that resolution —
+        // OBS knows the file's actual dimensions at load time, this
+        // generator never does, so let OBS do the fitting instead of
+        // us guessing. See makeSourceItem's own comment for the
+        // specific OBS source verification.
         items.unshift(makeSourceItem({
           sourceName: vsrc.name, sourceUuid: vsrc.uuid, itemId: nextId++,
-          canvasW, canvasH, posX: 0, posY: 0, scaleX: scale, scaleY: scale,
+          canvasW, canvasH, posX: 0, posY: 0, scaleX: 1, scaleY: 1,
+          boundsType: 3, boundsW: canvasW, boundsH: canvasH, boundsAlign: 0,
         }));
       }
     }
