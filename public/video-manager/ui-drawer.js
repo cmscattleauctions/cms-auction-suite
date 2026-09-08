@@ -176,7 +176,7 @@ async function paint(ctx) {
   }
 }
 
-function statusLabel(s) { return s === 'ready' ? 'Ready to Make' : s === 'hold' ? 'On Hold' : 'Created'; }
+function statusLabel(s) { return s === 'ready' ? 'Ready to Make' : s === 'hold' ? 'On Hold' : 'Completed'; }
 
 /** Where the currently-open record sits in the table's own filtered/sorted list — so Previous/Next step through what's actually on screen. */
 function navState(ctx) {

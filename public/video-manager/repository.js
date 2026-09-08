@@ -733,7 +733,7 @@ export const VideoRepository = {
     await ensureLoaded();
     const v = videos.find(v => v.id === id);
     if (!v) throw new Error('Video not found');
-    const labels = { ready: 'Ready to Make', hold: 'On Hold', created: 'Created' };
+    const labels = { ready: 'Ready to Make', hold: 'On Hold', created: 'Completed' };
     v.status = status;
     v.isDraft = false;
     logActivity(v, actor, 'status', `Moved to ${labels[status]}`);

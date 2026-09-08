@@ -2,60 +2,104 @@
  * CMS Auction Suite — Theme Tokens
  * -------------------------------------------------------------
  * Single source of truth for colors, type, spacing, radii.
- * Inspired by the Auction Tracker reference: warm off-white
- * canvas, dark sidebar, amber accent, generous whitespace.
+ * Design direction: light workspace, deep navy navigation,
+ * restrained muted-gold branding — organized and purposeful,
+ * built for daily cattle-auction operations rather than a
+ * decorative/western-themed dashboard.
  *
  * All sub-apps inherit these tokens. App-specific overrides
  * live in each app's styles.css and should reference these
- * variables rather than hard-coding values.
+ * variables rather than hard-coding values. Three older modules
+ * (country-market, banners, post-auction) predate this file and
+ * use their own parallel token names in a `light-theme.css`
+ * override loaded after their component CSS — those files were
+ * updated to the same hex values as this one, but won't pick up
+ * changes made only here. Keep the two in sync by hand.
  * ============================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
   /* ----- canvas + surfaces ----- */
-  --bg-canvas:        #f5f1ea;   /* warm off-white page background */
-  --bg-surface:       #ffffff;   /* card / panel surface */
-  --bg-surface-hover: #fafaf7;   /* card hover */
-  --bg-input:         #ffffff;   /* form inputs */
-  --bg-muted:         #f0ece4;   /* subtle wash for dropzones, code blocks */
+  --bg-canvas:        #F4F6F8;   /* workspace background */
+  --bg-surface:       #FFFFFF;   /* cards, forms, menus, drawers */
+  --bg-surface-hover: #EEF2F5;
+  --bg-input:         #FFFFFF;
+  --bg-muted:         #EEF1F4;   /* subtle wash for dropzones, code blocks */
 
-  /* ----- sidebar (dark on light layout) ----- */
-  --sidebar-bg:        #040d17;
-  --sidebar-fg:        #ffffff;
-  --sidebar-fg-muted:  #ffffff;
+  /* ----- sidebar (deep navy) ----- */
+  --sidebar-bg:        #17263D;
+  --sidebar-bg-hover:  #223650;
+  --sidebar-fg:        #FFFFFF;
+  --sidebar-fg-muted:  #AEB9C7;
   --sidebar-divider:   rgba(255, 255, 255, 0.08);
-  --sidebar-active-bg: rgba(202, 138, 4, 0.12);
-  --sidebar-active-fg: #f5d491;       /* amber text on active tab */
-  --sidebar-active-border: #d4a017;
+  /* Active nav item: a translucent gold wash + a lighter gold text
+     tint (not the base --gold swatch) — #A88342 directly on this
+     navy background measures ~4.3:1, just under the 4.5:1 text
+     minimum; this tint measures ~8.3:1. Still reads as "muted gold"
+     next to the sidebar's other gold uses. */
+  --sidebar-active-bg:     rgba(168, 131, 66, 0.16);
+  --sidebar-active-fg:     #D9BC85;
+  --sidebar-active-border: #A88342;
 
   /* ----- borders ----- */
-  --border-subtle: #e6e0d4;
-  --border-strong: #d4cdbd;
-  --border-focus:  #131820;
+  --border-subtle: #DCE2E8;
+  --border-strong: #C3CBD3;
+  --border-focus:  #3478C0;
 
   /* ----- text ----- */
-  --text-primary:   #1a1d23;
-  --text-secondary: #555b66;
-  --text-muted:     #8a8f99;
-  --text-disabled:  #b8bcc4;
+  --text-primary:   #182335;
+  --text-secondary: #526174;
+  --text-muted:     #8A96A3;
+  --text-disabled:  #B7BFC8;
 
-  /* ----- accent (amber, used sparingly) ----- */
-  --accent:         #b8860b;
-  --accent-hover:   #9a7209;
-  --accent-soft:    #f5d491;
-  --accent-bg:      rgba(184, 134, 11, 0.08);
+  /* ----- primary action blue (Save / Upload / Download / main CTAs) ----- */
+  --action-blue:       #294F78;
+  --action-blue-hover:  #203F60;
+  --action-blue-bg:     rgba(41, 79, 120, 0.08);
 
-  /* ----- semantic ----- */
-  --success:    #2d7a4a;
-  --success-bg: #e8f3ec;
-  --warning:    #b45309;
-  --warning-bg: #fef3c7;
-  --danger:     #b91c1c;
-  --danger-bg:  #fee2e2;
-  --info:       #1e40af;
-  --info-bg:    #dbeafe;
+  /* ----- muted gold — branding + meaningful highlights only, never
+     the default action color ----- */
+  --gold:        #A88342;
+  --gold-hover:  #8F6F37;
+  --gold-bg:     #F5EEDF;
+
+  /* ----- legacy alias — kept because it's used throughout theme.css
+     and shell.css for gold-branding accents (auth links, the pending-
+     approval icon, admin-settings button, tag badges); NOT the
+     primary-action color. New code should prefer --gold directly. ----- */
+  --accent:       var(--gold);
+  --accent-hover: var(--gold-hover);
+  --accent-soft:  #D9BC85;
+  --accent-bg:    var(--gold-bg);
+
+  /* ----- focus ring ----- */
+  --focus-ring: #3478C0;
+
+  /* ----- semantic (generic alerts, not the 6 named record-status
+     treatments below) ----- */
+  --success:    #1F7A46;
+  --success-bg: #E3F5EA;
+  --warning:    #8A5A12;
+  --warning-bg: #FBEFDD;
+  --danger:     #B42318;
+  --danger-bg:  #FBE7E5;
+  --info:       #1F4E7A;
+  --info-bg:    #E3ECF5;
+
+  /* ----- named record-status treatments (Video Manager, upload
+     status, save status, etc.) — always pair with a text label,
+     color alone must never be the only signal. Reused by semantic
+     color family, not by literal status name, since different
+     modules have different status vocabularies on the same 6 hues. ----- */
+  --status-blue-fg:  #1F4E7A; --status-blue-bg:  #E3ECF5;  /* e.g. Ready to Make */
+  --status-amber-fg: #8A5A12; --status-amber-bg: #FBEFDD;  /* e.g. On Hold, Needs Review */
+  --status-green-fg: #1F7A46; --status-green-bg: #E3F5EA;  /* e.g. Completed */
+  --status-slate-fg: #526174; --status-slate-bg: #E9ECEF;  /* e.g. Draft */
+  --status-red-fg:   #B42318; --status-red-bg:   #FBE7E5;  /* e.g. Failed/Error */
 
   /* ----- type ----- */
-  --font-sans:  -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+  --font-sans:  'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                 "Helvetica Neue", Arial, sans-serif;
   --font-mono:  ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
                 "Liberation Mono", monospace;
@@ -76,11 +120,11 @@
   --radius-lg: 10px;
   --radius-xl: 14px;
 
-  /* ----- shadows (subtle, this is a calm UI) ----- */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 10px 20px -3px rgba(0, 0, 0, 0.08), 0 4px 8px -4px rgba(0, 0, 0, 0.04);
+  /* ----- shadows (subtle, restrained — reserved for menus/dialogs/drawers) ----- */
+  --shadow-xs: 0 1px 2px rgba(18, 32, 51, 0.04);
+  --shadow-sm: 0 1px 3px rgba(18, 32, 51, 0.07), 0 1px 2px rgba(18, 32, 51, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(18, 32, 51, 0.08), 0 2px 4px -2px rgba(18, 32, 51, 0.04);
+  --shadow-lg: 0 10px 20px -3px rgba(18, 32, 51, 0.10), 0 4px 8px -4px rgba(18, 32, 51, 0.05);
 
   /* ----- layout ----- */
   --sidebar-width: 220px;
@@ -111,11 +155,20 @@ body {
   overflow: hidden;     /* shell manages its own scroll */
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 a {
-  color: var(--accent);
+  color: var(--gold);
   text-decoration: none;
 }
-a:hover { color: var(--accent-hover); text-decoration: underline; }
+a:hover { color: var(--gold-hover); text-decoration: underline; }
 
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
@@ -124,15 +177,35 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
 }
 
-h1 { font-size: 22px; }
+/* Page titles / section titles / body per the typography spec:
+   24-28px semibold page titles, 16-18px semibold section titles. */
+h1 { font-size: 26px; }
 h2 { font-size: 18px; }
 h3 { font-size: 15px; }
 
 p { margin: 0; }
 
+/* Aligned prices, weights, head counts, and dates should line up —
+   opt in with this class (or apply font-variant-numeric directly)
+   rather than a blanket rule, since plenty of numeric-looking text
+   (IDs, phone numbers) shouldn't tabular-align. */
+.tabular-nums, .num {
+  font-variant-numeric: tabular-nums;
+}
+
 /* =============================================================
  * Reusable atoms — buttons, inputs, cards
  * Sub-apps can use these directly to stay consistent.
+ *
+ * Action hierarchy (spec section 6):
+ *   .btn            Secondary — neutral surface with a border.
+ *   .btn-primary    Primary — filled blue. Save / Upload / Download
+ *                    and other main working actions.
+ *   .btn-accent     Restrained gold highlight — branding / rare
+ *                    "meaningful highlight" actions, not a general
+ *                    substitute for Primary.
+ *   .btn-ghost      Tertiary — restrained text/ghost treatment.
+ *   .btn-danger     Destructive — clearly labeled red.
  * ============================================================= */
 
 .btn {
@@ -153,22 +226,22 @@ p { margin: 0; }
   white-space: nowrap;
 }
 .btn:hover    { background: var(--bg-surface-hover); border-color: var(--text-secondary); }
-.btn:focus    { outline: none; border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-bg); }
+.btn:focus-visible { outline: none; border-color: var(--focus-ring); box-shadow: 0 0 0 3px var(--action-blue-bg); }
 .btn:disabled { color: var(--text-disabled); cursor: not-allowed; background: var(--bg-muted); }
 
 .btn-primary {
-  background: var(--text-primary);
+  background: var(--action-blue);
   color: #fff;
-  border-color: var(--text-primary);
+  border-color: var(--action-blue);
 }
-.btn-primary:hover { background: #000; border-color: #000; }
+.btn-primary:hover { background: var(--action-blue-hover); border-color: var(--action-blue-hover); }
 
 .btn-accent {
-  background: var(--accent);
+  background: var(--gold);
   color: #fff;
-  border-color: var(--accent);
+  border-color: var(--gold);
 }
-.btn-accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-accent:hover { background: var(--gold-hover); border-color: var(--gold-hover); }
 
 .btn-ghost {
   background: transparent;
@@ -198,17 +271,17 @@ input[type="date"], input[type="number"], textarea, select {
 }
 input:focus, textarea:focus, select:focus {
   outline: none;
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px var(--accent-bg);
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px var(--action-blue-bg);
 }
 
+/* Sentence case throughout (spec section 3) — labels are no longer
+   force-uppercased; write them in sentence case in markup. */
 label {
   display: block;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--text-secondary);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
   margin-bottom: var(--space-2);
 }
 
@@ -219,16 +292,51 @@ label {
   padding: var(--space-5);
 }
 
+/* Section title inside a card/panel — sentence case, no longer a
+   tiny uppercase eyebrow (spec: avoid tiny text for frequently used
+   information; sentence case for labels). Use .eyebrow below for an
+   actual short supporting tag where uppercase is still appropriate. */
 .card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-3);
+}
+
+/* Short supporting tag/label only (e.g. a phase badge) — this is the
+   narrow case the spec allows uppercase for. Don't reach for this for
+   ordinary section headings. */
+.eyebrow {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-secondary);
-  margin-bottom: var(--space-3);
 }
 
 .muted { color: var(--text-muted); }
+
+/* =============================================================
+ * Status badges — always pair with a text label; never rely on
+ * color alone. See the --status-*-fg/-bg tokens above for the 6
+ * treatments (blue/amber/green/slate/red — "amber" covers both
+ * On Hold and Needs Review, distinguished by their label text).
+ * ============================================================= */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.status-badge--blue  { color: var(--status-blue-fg);  background: var(--status-blue-bg); }
+.status-badge--amber { color: var(--status-amber-fg); background: var(--status-amber-bg); }
+.status-badge--green { color: var(--status-green-fg); background: var(--status-green-bg); }
+.status-badge--slate { color: var(--status-slate-fg); background: var(--status-slate-bg); }
+.status-badge--red   { color: var(--status-red-fg);   background: var(--status-red-bg); }
 
 .no-print {}
 @media print {

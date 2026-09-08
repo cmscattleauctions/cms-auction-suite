@@ -68,15 +68,13 @@
   font: inherit;
   font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
   cursor: pointer;
   text-align: left;
   width: 100%;
   transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
 }
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--sidebar-bg-hover);
   color: var(--sidebar-fg);
 }
 .nav-item.active {
@@ -87,16 +85,16 @@
   border-left: 2px solid var(--sidebar-active-border);
   padding-left: calc(var(--space-3) - 2px);
 }
-/* Video Manager uses blue as its own accent throughout (see
-   video-manager/styles.css) — its active nav state matches that
-   instead of the suite's amber, rather than an amber highlight
-   pointing at a blue-branded app. Every other tab keeps the
-   amber active state above unchanged. */
+/* Video Manager uses the same unified action blue as its own accent
+   throughout (see video-manager/styles.css's --accent) — its active
+   nav state uses a blue tint that matches, rather than the suite's
+   gold, so the sidebar highlight matches the module you're actually
+   in. Every other tab keeps the gold active state above unchanged. */
 .nav-item[data-tab="video-manager"].active {
-  background: rgba(37, 99, 235, 0.12);
-  color: #bcd2fb;
-  border-color: #2563eb;
-  border-left-color: #2563eb;
+  background: var(--action-blue-bg);
+  color: #A9C6E8;
+  border-color: var(--action-blue);
+  border-left-color: var(--action-blue);
 }
 
 .nav-item-icon {
@@ -461,6 +459,55 @@
 @media (min-width: 769px) {
   .mobile-topbar { display: none; }
   .sidebar-backdrop { display: none; }
+}
+
+/* =============================================================
+ * Intermediate widths (769-1024px: a narrow laptop, a tablet in
+ * landscape, a browser window that isn't maximized): the full
+ * 220px labeled sidebar was eating so much of the available width
+ * that the iframed app next to it rendered cramped, well before the
+ * 768px mobile-drawer breakpoint kicked in to fix that. A compact
+ * icon-only rail keeps navigation reachable without the full-width
+ * sidebar or the mobile drawer pattern, which isn't warranted at
+ * these wider-than-phone sizes.
+ * ============================================================= */
+@media (min-width: 769px) and (max-width: 1024px) {
+  :root { --sidebar-width: 64px; }
+
+  .sidebar-brand { justify-content: center; padding: var(--space-4) var(--space-2); }
+  /* No compact (icon-only) logo asset exists yet — the full wordmark
+     just shrinks to fit rather than being cropped or omitted. Not
+     legible at this size; a dedicated small mark would read better
+     here if one gets designed. */
+  .sidebar-brand-logo { max-width: 40px; }
+
+  .nav-section-title { display: none; }
+
+  .nav-item {
+    justify-content: center;
+    padding: 10px;
+  }
+  /* Label text is still present for screen readers/tooltips (see
+     shell.js's aria-label/title on .nav-item) — just visually hidden,
+     not removed, so this stays keyboard- and AT-accessible. */
+  .nav-item > span:not(.nav-item-icon) {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .nav-item.active {
+    padding-left: calc(10px - 2px);
+  }
+
+  .sidebar-user .user-email { display: none; }
+  .admin-settings-btn { font-size: 0; padding: 8px; }
+  .admin-settings-btn::before { content: '⚙'; font-size: 15px; }
+  .signout-btn { font-size: 0; padding: 8px; }
+  .signout-btn::before { content: '⏻'; font-size: 15px; }
 }
 
 /* Sidebar section titles */

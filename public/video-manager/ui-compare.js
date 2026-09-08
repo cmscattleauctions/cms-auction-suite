@@ -79,7 +79,7 @@ export function openCompareModal(records, ctx) {
     const damLabel = ctx.ref.damLabel(r.damCode) || `Code ${r.damCode}`;
     const cattle = cattleSummaryLine({ sexLabel, sireLabel, damLabel, weight: r.weight, monthYear: r.monthYear });
     const formatMeta = ctx.ref.videoFormatMeta(r.videoFormat);
-    const statusWord = r.status === 'created' ? 'Created' : r.status === 'hold' ? 'On Hold' : 'Ready to Make';
+    const statusWord = r.status === 'created' ? 'Completed' : r.status === 'hold' ? 'On Hold' : 'Ready to Make';
 
     return `
       <div class="vm-compare-panel" data-panel-id="${escapeHtml(r.id)}">

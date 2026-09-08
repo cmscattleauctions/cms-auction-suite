@@ -156,12 +156,12 @@ async function renderShell(root, user) {
         <nav class="sidebar-nav" id="sidebar-nav" aria-label="App tabs"></nav>
 
         <div class="sidebar-user">
-          ${isSuiteAdmin ? `<button class="admin-settings-btn" type="button" id="btnOpenAdminSettings">Admin Settings</button>` : ''}
+          ${isSuiteAdmin ? `<button class="admin-settings-btn" type="button" id="btnOpenAdminSettings" title="Admin settings">Admin Settings</button>` : ''}
           <div class="user-pill">
             <span class="user-avatar" aria-hidden="true">${initial}</span>
             <span class="user-email" title="${email}">${email || 'Signed in'}</span>
           </div>
-          <button class="signout-btn" type="button" data-signout>Sign out</button>
+          <button class="signout-btn" type="button" data-signout title="Sign out">Sign out</button>
         </div>
       </aside>
 
@@ -233,7 +233,7 @@ function renderNav() {
       html += `<div class="nav-section-title">${tab.section}</div>`;
     }
     html += `
-    <button class="nav-item" data-tab="${tab.id}" type="button">
+    <button class="nav-item" data-tab="${tab.id}" type="button" aria-label="${tab.label}" title="${tab.label}">
       <span class="nav-item-icon">${iconFor(tab.id)}</span>
       <span>${tab.label}</span>
     </button>`;

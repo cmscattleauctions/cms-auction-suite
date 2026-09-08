@@ -618,7 +618,7 @@ export function openUploadModal(ctx) {
     const sexLabel = ctx.ref.sexLabel(existing.sexCode) || existing.sexCode;
     const sireLabel = ctx.ref.sireLabel(existing.sireCode) || existing.sireCode;
     const damLabel = ctx.ref.damLabel(existing.damCode) || existing.damCode;
-    const statusWord = existing.status === 'created' ? 'Created' : existing.status === 'hold' ? 'On Hold' : 'Ready to Make';
+    const statusWord = existing.status === 'created' ? 'Completed' : existing.status === 'hold' ? 'On Hold' : 'Ready to Make';
     idResult.innerHTML = `
       <div class="vm-id-search-result">
         <div class="vid">${escapeHtml(existing.videoId)}</div>
@@ -1055,7 +1055,7 @@ export function openDeleteConfirmModal(rec, ctx, onDeleted) {
         <div class="row">${escapeHtml(rec.consignorName)}</div>
       </div>
       <div class="vm-delete-warning">
-        <p>This moves the record to <strong>Trash</strong> — it disappears from Ready to Make / On Hold / Created immediately. Nothing is destroyed yet; it can be restored from Trash (Tools menu), or permanently deleted later.</p>
+        <p>This moves the record to <strong>Trash</strong> — it disappears from Ready to Make / On Hold / Completed immediately. Nothing is destroyed yet; it can be restored from Trash (Tools menu), or permanently deleted later.</p>
         <p style="margin-top:8px;">This will also affect:</p>
         <ul>
           <li>${rec.clips.length} source clip${rec.clips.length === 1 ? '' : 's'}</li>

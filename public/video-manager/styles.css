@@ -37,13 +37,17 @@ button { font-family: inherit; cursor: pointer; }
 input, select, textarea { font-family: inherit; }
 
 :root {
-  /* Module-local accent override: this module uses CMS blue rather
-   * than theme.css's default amber. Scoped to this document only
-   * (each sub-app runs in its own iframe) — shared/theme.css is
-   * untouched, so nothing else in the suite is affected. */
-  --accent:       #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-bg:    rgba(37, 99, 235, 0.08);
+  /* Module-local accent override: this module uses blue as its own
+   * accent throughout (buttons, focus states, selected rows, links)
+   * rather than theme.css's --accent (the suite's gold branding
+   * token) — matched to the exact same blue as theme.css's shared
+   * --action-blue so this module's blue is the same blue as every
+   * other module's Save/Upload/Download buttons, not a one-off shade.
+   * Scoped to this document only (each sub-app runs in its own
+   * iframe) — shared/theme.css is untouched. */
+  --accent:       #294F78;
+  --accent-hover: #203F60;
+  --accent-bg:    rgba(41, 79, 120, 0.08);
 
   /* ----- restrained sex tags: plain, understated, no bright pastels ----- */
   --sex-tag-fg: var(--text-secondary);
@@ -65,8 +69,11 @@ input, select, textarea { font-family: inherit; }
 #app { min-height: 100%; display: flex; flex-direction: column; }
 
 /* ----- small local button/badge modifiers layered on theme.css's .btn -----
- * theme.css's own .btn-primary is dark-ink; like Lot #'s / Lot Images, we
- * override it to the CMS blue accent for this module's primary CTAs. */
+ * theme.css's own .btn-primary is already this exact blue (--accent
+ * above is pinned to match it) — kept as an explicit local rule so
+ * this module's primary CTAs stay wired to its own --accent token if
+ * that ever needs to diverge again, not because the color differs
+ * today. */
 .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 .btn-sm { padding: 5px 9px; font-size: 12px; }
@@ -334,11 +341,16 @@ td:focus, .vm-cell:focus { outline: none; }
 .vm-added-cell { line-height: 1.35; font-size: 12px; color: var(--text-primary); }
 .vm-added-by { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
 
-.status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
-.status-pill.status-ready { color: var(--text-secondary); background: var(--bg-muted); }
-.status-pill.status-hold { color: var(--format-legacy-fg); background: var(--format-legacy-bg); }
-.status-pill.status-created { color: var(--format-clean-fg); background: var(--format-clean-bg); }
-.status-pill.status-draft { color: var(--text-muted); background: var(--bg-muted); border: 1px dashed var(--border-strong); }
+/* Matches the suite's shared 6-treatment status-badge system (see
+   shared/theme.css's --status-*-fg/-bg) — Ready to Make is blue,
+   On Hold is amber, Completed is green, Draft is slate. Sentence
+   case and a readable 12px per the typography spec: avoid tiny text
+   for frequently-glanced-at info like this. */
+.status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.status-pill.status-ready { color: var(--status-blue-fg); background: var(--status-blue-bg); }
+.status-pill.status-hold { color: var(--status-amber-fg); background: var(--status-amber-bg); }
+.status-pill.status-created { color: var(--status-green-fg); background: var(--status-green-bg); }
+.status-pill.status-draft { color: var(--status-slate-fg); background: var(--status-slate-bg); border: 1px dashed var(--border-strong); }
 
 /* ----- Source/Video Format badges: restrained, small ----- */
 .format-pill { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; cursor: default; }
