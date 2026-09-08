@@ -612,15 +612,26 @@ function truncateMiddle(str, max = 44) {
 
 function publishingSectionHtml(rec) {
   const ytUrl = cleanYoutubeUrl(rec);
-  // A Ready/On Hold record hasn't actually been made yet, so it can never
-  // have a real published link regardless of what's stored — protects
-  // against ever showing one even if bad data (see extractYoutubeId's
-  // comment) slips in again upstream.
-  const hasRealLink = rec.status === 'created' && !!rec.youtubeUrl;
+  // Show the link whenever one's actually saved, regardless of status —
+  // it used to require status==='created', so saving a link on a Ready/
+  // On Hold record wrote it fine but re-rendered right back to the empty
+  // "paste a link" form, which looked exactly like the save had silently
+  // failed. Completed still gets its own nudge below when the two are
+  // out of sync (link saved, status not moved yet).
+  const hasRealLink = !!rec.youtubeUrl;
+  const suggestMove = hasRealLink && rec.status !== 'created';
   return `
     <div class="vm-drawer-section">
       <div class="vm-drawer-section-title">Publishing</div>
       ${hasRealLink ? `
+        ${suggestMove ? `
+        <div class="vm-id-warning" id="d-suggest-move">
+          <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.4"/><path d="M10 6v4.5l3 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <div>
+            This video has a YouTube link but is still marked ${statusLabel(rec.status)}.
+            <button class="btn-text" id="d-move-to-created" type="button">Move to Completed →</button>
+          </div>
+        </div>` : ''}
         <div class="vm-pub-row">
           <span class="vm-pub-icon vm-pub-icon-youtube">${PUB_ICONS.youtube}</span>
           <div class="vm-pub-main">
@@ -750,7 +761,16 @@ function wirePublishingSection(root, rec, ctx) {
     const ytId = parseYoutubeLink(val);
     if (!ytId) { showToast('Could not read a YouTube link from that'); return; }
     await ctx.repo.setYoutube(rec.id, { youtubeUrl: val.startsWith('http') ? val : `https://youtu.be/${ytId}`, youtubeId: ytId }, 'Staff');
-    ctx.refresh();
+    showToast('YouTube link saved');
+    await ctx.refresh();
+    paint(ctx);
+  });
+
+  const moveToCreatedBtn = root.querySelector('#d-move-to-created');
+  if (moveToCreatedBtn) moveToCreatedBtn.addEventListener('click', async () => {
+    await ctx.repo.setStatus(rec.id, 'created', 'Staff');
+    showToast('Moved to Completed');
+    await ctx.refresh();
     paint(ctx);
   });
 

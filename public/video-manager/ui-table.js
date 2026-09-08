@@ -12,7 +12,7 @@
  * ui-drawer.js's Cattle Information section).
  * ============================================================= */
 
-import { escapeHtml, formatDateShort, formatDuration, cattleSummaryTwoLine, cleanYoutubeUrl } from './format.js';
+import { escapeHtml, formatDateShort, formatDuration, cattleSummaryTwoLine, cleanYoutubeUrl, claimColorClass } from './format.js';
 import { showToast, copyToClipboard } from './toast.js';
 import { handleIdEntryLoop } from './ui-modals.js';
 import { openCompareModal } from './ui-compare.js';
@@ -232,7 +232,7 @@ function editableCell(r, field, display, isEmpty = false) {
 
 function workingOnCell(r) {
   if (r.workingOn) {
-    return `<button class="vm-workingon-chip is-claimed" data-workingon="${r.id}" type="button" title="Click to release">${escapeHtml(r.workingOn)}</button>`;
+    return `<button class="vm-workingon-chip is-claimed ${claimColorClass(r.workingOn)}" data-workingon="${r.id}" type="button" title="Click to release">${escapeHtml(r.workingOn)}</button>`;
   }
   return `<button class="vm-workingon-chip" data-workingon="${r.id}" type="button">Claim</button>`;
 }
@@ -319,8 +319,10 @@ function wireAddRow(tbody, ctx) {
     let suffix = outcome.fields.suffix || null;
     if (outcome.type === 'create-separate') suffix = await ctx.repo.nextSuffixFor(outcome.baseId);
 
+    // Always 'ready', not ctx.state.statusTab — see the matching comment
+    // on the Upload modal's submit handler in ui-modals.js.
     const record = await ctx.repo.createVideo({
-      ...outcome.fields, suffix, status: ctx.state.statusTab,
+      ...outcome.fields, suffix, status: 'ready',
     }, 'Staff');
     showToast(`Created ${record.videoId}`);
     addRowOpen = false;

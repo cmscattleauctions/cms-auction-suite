@@ -338,6 +338,21 @@ exports.adminRunJob = onDocumentCreated(
         if (!uid || !password) { await fail('uid and password are required.'); return; }
         await admin.auth().updateUser(uid, { password });
         await jobRef.update({ status: 'done', completedAt: admin.firestore.FieldValue.serverTimestamp(), ...clearedFields });
+      } else if (job.op === 'deleteUser') {
+        const { uid } = job.params || {};
+        if (!uid) { await fail('uid is required.'); return; }
+        if (uid === job.requestedBy) { await fail('You cannot delete your own account.'); return; }
+        try {
+          await admin.auth().deleteUser(uid);
+        } catch (err) {
+          // A users/{uid} doc with no matching Auth account (a handful of
+          // stale/broken records with no email — likely from an earlier
+          // partial-failure createUser) shouldn't block cleanup; any
+          // other error still should.
+          if (err.code !== 'auth/user-not-found') throw err;
+        }
+        await admin.firestore().doc(`users/${uid}`).delete();
+        await jobRef.update({ status: 'done', completedAt: admin.firestore.FieldValue.serverTimestamp() });
       } else {
         await fail(`Unknown op "${job.op}".`);
       }

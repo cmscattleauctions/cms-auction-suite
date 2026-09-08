@@ -800,6 +800,10 @@ export function openUploadModal(ctx) {
   }
 
   /* ----- submit ----- */
+  // Every record created here is always status:'ready' ("Ready to Make"),
+  // deliberately not ctx.state.statusTab — an upload is raw clips, not a
+  // finished/on-hold video, regardless of which tab happened to be open
+  // when it was uploaded. Same rule in ui-table.js's quick add-row.
   modal.querySelector('#um-submit').addEventListener('click', async () => {
     if (pickedFiles.some(e => e.status === 'uploading')) {
       showToast('Still uploading — wait for clips to finish before submitting');
@@ -834,7 +838,7 @@ export function openUploadModal(ctx) {
         sireCode: matchedExisting.sireCode, damCode: matchedExisting.damCode,
         weight: matchedExisting.weight, monthYear: matchedExisting.monthYear,
       };
-      const record = await ctx.repo.createVideo({ ...fields, suffix, status: ctx.state.statusTab, notes, clips }, 'Staff');
+      const record = await ctx.repo.createVideo({ ...fields, suffix, status: 'ready', notes, clips }, 'Staff');
       showToast(`Created ${record.videoId}`);
       close(); ctx.refresh();
       return;
@@ -860,7 +864,7 @@ export function openUploadModal(ctx) {
 
     let suffix = outcome.fields.suffix || null;
     if (outcome.type === 'create-separate') suffix = await ctx.repo.nextSuffixFor(outcome.baseId);
-    const record = await ctx.repo.createVideo({ ...outcome.fields, suffix, status: ctx.state.statusTab, notes, clips }, 'Staff');
+    const record = await ctx.repo.createVideo({ ...outcome.fields, suffix, status: 'ready', notes, clips }, 'Staff');
     showToast(`Created ${record.videoId}`);
     close();
     ctx.refresh();

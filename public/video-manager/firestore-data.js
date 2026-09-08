@@ -32,7 +32,7 @@ import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebase
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 import {
   getFirestore, collection, doc,
-  getDoc, getDocs, setDoc, deleteDoc, writeBatch,
+  getDoc, setDoc, deleteDoc, writeBatch,
   addDoc, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
@@ -152,13 +152,27 @@ function stripFileHandles(record) {
   };
 }
 
-/** Every document, unfiltered — repository.js does search/filter/sort client-side, same as the old mock version did. 629 documents is trivial for a single read. */
-export async function fetchAllVideos() {
-  if (!db) return [];
-  const snap = await getDocs(collection(db, COLLECTION));
-  const out = [];
-  snap.forEach(d => out.push(d.data()));
-  return out;
+/**
+ * Live query over every document, unfiltered — repository.js does
+ * search/filter/sort client-side, same as the old mock version did.
+ * Calls onChange with the full list on the initial read AND every
+ * time the collection changes after that, including writes from
+ * OTHER tabs/users (staff claiming a video, moving one to Completed,
+ * etc.), not just this tab's own. Firestore's local cache also echoes
+ * this tab's own pending writes back through the same listener
+ * near-instantly, so repository.js relies on this alone rather than a
+ * separate optimistic update. 629 documents is small enough to keep
+ * the whole collection subscribed rather than something more
+ * targeted. Returns the unsubscribe function; repository.js never
+ * actually calls it (one subscription for the lifetime of the tab).
+ */
+export function subscribeToVideos(onChange) {
+  if (!db) return () => {};
+  return onSnapshot(collection(db, COLLECTION), snap => {
+    const out = [];
+    snap.forEach(d => out.push(d.data()));
+    onChange(out);
+  }, err => console.error('[video-manager] videoRecords listener error:', err));
 }
 
 export async function fetchVideo(id) {
