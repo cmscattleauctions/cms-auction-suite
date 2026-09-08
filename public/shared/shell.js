@@ -172,9 +172,9 @@ async function renderShell(root, user) {
     });
   }
 
-  const initial = parseHash(location.hash);
-  const initialTab = TABS.some(t => t.id === initial.tabId) && isTabAllowed(initial.tabId) ? initial.tabId : DEFAULT_TAB;
-  selectTab(initialTab, initial.tabId === initialTab ? initial.route : null);
+  const initialHash = parseHash(location.hash);
+  const initialTab = TABS.some(t => t.id === initialHash.tabId) && isTabAllowed(initialHash.tabId) ? initialHash.tabId : DEFAULT_TAB;
+  selectTab(initialTab, initialHash.tabId === initialTab ? initialHash.route : null);
 
   window.addEventListener('hashchange', () => {
     const { tabId, route } = parseHash(location.hash);
