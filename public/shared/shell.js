@@ -46,6 +46,14 @@ let activeRoute = null;
 // specific account) — set from the current user's users/{uid}.allowedTabs
 // in renderShell() below, via Admin Settings (admin-panel.js).
 let allowedTabIds = null;
+// tabId -> the <iframe> created the first time that tab was opened this
+// session. Switching tabs used to blow away #content's innerHTML and
+// recreate the iframe from scratch every time, which reset every
+// sub-app's in-page state (filters, search text, scroll position, an
+// open drawer) on every trip away and back. Now a tab's iframe is
+// created once and just hidden/shown — reset only in renderShell() on
+// a fresh boot (sign-in/out), since #content itself is rebuilt then.
+let iframes = new Map();
 
 /** "tab" or "tab/route" -> { tabId, route } — route may contain its own
  *  encoded content but never another "/", so splitting on the first
@@ -160,6 +168,12 @@ async function renderShell(root, user) {
       <main class="content" id="content"></main>
     </div>
   `;
+
+  // A fresh renderShell() rebuilds #content from scratch (root.innerHTML
+  // above), which detaches any iframes from a previous session (e.g.
+  // sign-out then a different account signing in) — drop the stale
+  // references so selectTab() doesn't try to reuse detached elements.
+  iframes = new Map();
 
   renderNav();
   wireSignOut();
@@ -368,24 +382,49 @@ function selectTab(tabId, route = null) {
   }
 
   const contentEl = document.getElementById('content');
-  if (tab.ready) {
-    const sep = tab.src.includes('?') ? '&' : '?';
-    const src = route ? `${tab.src}${sep}route=${encodeURIComponent(route)}` : tab.src;
-    contentEl.innerHTML = `
-      <iframe class="app-frame" src="${src}" title="${tab.label}"
-              referrerpolicy="no-referrer"></iframe>
-    `;
-  } else {
-    contentEl.innerHTML = `
-      <div class="placeholder">
-        <div class="card placeholder-card">
-          <div class="card-title">${tab.label}</div>
-          <h2>Not yet wired up</h2>
-          <p class="muted">This tab is in progress.</p>
-        </div>
+
+  // Not-ready placeholder tabs aren't iframes at all — same single
+  // shared placeholder element every time, just re-labeled and shown.
+  if (!tab.ready) {
+    contentEl.querySelectorAll(':scope > iframe.app-frame').forEach(f => { f.hidden = true; });
+    let placeholder = contentEl.querySelector(':scope > .placeholder');
+    if (!placeholder) {
+      placeholder = document.createElement('div');
+      placeholder.className = 'placeholder';
+      contentEl.appendChild(placeholder);
+    }
+    placeholder.hidden = false;
+    placeholder.innerHTML = `
+      <div class="card placeholder-card">
+        <div class="card-title">${tab.label}</div>
+        <h2>Not yet wired up</h2>
+        <p class="muted">This tab is in progress.</p>
       </div>
     `;
+    return;
   }
+
+  contentEl.querySelector(':scope > .placeholder')?.remove();
+
+  let iframe = iframes.get(tabId);
+  if (!iframe) {
+    // Only applied on first creation — a tab's own reported sub-route
+    // (see wireSubAppRouting()) keeps living inside its already-mounted
+    // iframe from here on, same as any other in-page state, rather than
+    // being re-applied via URL on every tab switch.
+    const sep = tab.src.includes('?') ? '&' : '?';
+    const src = route ? `${tab.src}${sep}route=${encodeURIComponent(route)}` : tab.src;
+    iframe = document.createElement('iframe');
+    iframe.className = 'app-frame';
+    iframe.src = src;
+    iframe.title = tab.label;
+    iframe.referrerPolicy = 'no-referrer';
+    contentEl.appendChild(iframe);
+    iframes.set(tabId, iframe);
+  }
+  contentEl.querySelectorAll(':scope > iframe.app-frame').forEach(f => {
+    f.hidden = f !== iframe;
+  });
 }
 
 /* =============================================================

@@ -784,6 +784,7 @@ deploy authorization needed for this item specifically.
 ## Phase 2 — Performance
 
 - [x] Video/clip downloads must never happen on browse/Grid/clip-list open — only on explicit Download click; Preview (if kept) is a separate explicit click loading only that one clip — see detail below
+- [~] Remaining performance work (review item 8): state-preserving module navigation — done; deferred heavy dependencies — one page done (listings), 4 more identified not done; pagination/virtualization/server-side queries/lightweight initial records — not done, needs its own scoping — see detail below
 
 ### Original video/clip files must load only on an explicit click
 
@@ -846,6 +847,119 @@ re-checked as valid syntax.
 
 **Remaining/deploy steps:** none — static-file changes only, ships via
 the normal push/PR/merge like any other code change.
+
+### Follow-up: remaining performance work (review item 8) — partial, representative sample
+
+**Finding:** the review's item 8 asked for lightweight initial records,
+appropriate queries, pagination/virtualization, state-preserving module
+navigation, deferred heavy dependencies, and bounded thumbnail loading,
+"while preserving the confirmed zero-original-media-before-click
+behavior." Two of these are now done; the rest are an honest, explicit
+gap — not silently claimed complete.
+
+**1. State-preserving module navigation — done.** The shell
+(`shared/shell.js`) used to destroy and recreate each sub-app's
+`<iframe>` from scratch on every tab switch (`selectTab()` replaced
+`#content`'s whole `innerHTML`), which silently reset every sub-app's
+own in-page state — filters, search text, scroll position, an open
+drawer — every time you left a tab and came back, even within the same
+session. Each tab's iframe is now created once and kept mounted (in a
+module-level `Map`); switching tabs just toggles the `hidden` attribute
+between iframes instead of tearing one down. A fresh sign-in/out still
+rebuilds `#content` from scratch (and the `Map` is reset then), and an
+actual browser reload still starts fresh, same as before — this only
+fixes losing state on ordinary in-app tab switching. Needed a small
+explicit `.app-frame[hidden]{display:none}` CSS override, since the
+existing `.app-frame{display:block}` rule has equal specificity to the
+browser's built-in `[hidden]` rule and would otherwise win by
+author-vs-user-agent origin precedence.
+
+**Verified:** syntax-checked via `.mjs` copy. The exact `hidden`→
+`display:none` mechanism was confirmed live in a real Chrome tab
+(`getComputedStyle` before/after setting `.hidden = true` on a real
+`.app-frame` element, using the actual shipped stylesheet) — `block` →
+`none` as expected. The full authenticated click-through (sign in,
+switch tabs, confirm a Video Manager filter/search/scroll position
+survives a round trip to another tab and back) was **not** performed —
+this environment has no test staff credentials to sign in with, and
+entering real production credentials wasn't appropriate here. The
+mechanism itself (persistent-iframe-with-hidden-toggle) is standard and
+was traced by hand through every call site (`renderShell`, `selectTab`,
+`wireSubAppRouting`'s postMessage handler, `subapp-url.js`'s
+`readInitialRoute`/`reportRoute` contract) to confirm nothing else
+assumed the iframe gets recreated on every switch.
+
+**Known minor trade-off, not a regression:** a sub-app's own reported
+sub-route (e.g. Video Manager's status tab, via `reportRoute()`) used
+to be re-applied via the iframe's `?route=` query string on every tab
+switch; now it's only applied once, when that tab's iframe is first
+created this session, since after that the iframe's own in-memory state
+already reflects it directly (arguably more correct — it reflects
+exactly what's on screen, not a snapshot re-derived from a route
+string). The one edge case this doesn't cover: using the browser's
+own Back/Forward buttons to move between two different sub-routes of
+an *already-open* tab won't re-navigate that tab's live iframe. This
+is a narrow case (most sub-apps don't push distinct browser history
+entries per internal action) and is a reasonable trade for the much
+more common and disruptive bug this fixes.
+
+**2. Deferred heavy dependencies — one representative fix, not exhaustive.**
+`listings/index.html` loaded `jspdf` (~180KB) and `html2canvas`
+(~200KB) as blocking `<script>` tags on every page load, even though
+they're only used by `exportPDF()` — someone browsing or editing the
+catalog and never clicking Export paid for both downloads anyway. Both
+are now loaded on demand: a new `ensurePdfLibs()` injects both scripts
+the first time `exportPDF()` runs (cached in a module promise so a
+second export doesn't re-fetch), with a toast-and-abort if the load
+fails instead of the previous silent crash on `window.jspdf` being
+undefined.
+
+**Verified live in the real browser** (not just traced): loaded
+`listings/index.html` fresh and confirmed via `window.jspdf`/
+`window.html2canvas` both `undefined` immediately after load, then
+called `ensurePdfLibs()` directly and confirmed both became defined
+and usable (`window.jspdf.jsPDF` a function, `window.html2canvas` a
+function) afterward. Did not click all the way through a full PDF
+export in this pass — the library-loading mechanism itself is what
+changed, not `exportPDF()`'s PDF-generation logic, which is untouched.
+
+**Other pages with the same pattern, not yet touched — explicit,
+listed gap:** `country-market`, `banners`, and `lot-images` all load
+`jszip` unconditionally (only needed for a ZIP-download action);
+`post-auction` loads `pdf-lib` + `jszip` unconditionally. PapaParse
+(loaded on every listings/banners/country-market/lot-numbers/
+lot-images/post-auction/results page) was deliberately left eager
+everywhere — CSV ingest is core, frequent, near-immediate-on-load
+functionality on most of these pages, not a deferrable action the way
+PDF/ZIP export is. If you want the same deferred-load treatment applied
+to the remaining ZIP/PDF-lib pages, say so — it's the same mechanical
+pattern applied per file, not a new design decision each time.
+
+**3. Not done — lightweight initial records, appropriate queries,
+pagination/virtualization, bounded thumbnail loading:** Video Manager's
+`subscribeToVideos()` still subscribes to the entire `videoRecords`
+collection unfiltered (~629 documents today, per that file's own
+comment) and `repository.js` still does all search/filter/sort
+client-side over the full in-memory list — this was an existing,
+deliberate design decision in the codebase (not introduced this pass),
+and genuinely rearchitecting it to server-side paged queries would be a
+significant, higher-risk change to the app's core data-loading model,
+not a surgical fix — inconsistent with "do not rewrite the whole app."
+Table/grid rendering also still renders every matched row into the DOM
+at once rather than virtualizing to only the visible window. "Bounded
+thumbnail loading" is effectively already covered by the Phase 2 fix
+above (Grid view no longer auto-captures video thumbnails from source
+files at all — the remaining thumbnail source, YouTube's own CDN image,
+is small and only for records that already have a YouTube link). If
+pagination/virtualization of the Video Manager table/grid is a priority
+given the current ~629-record scale, say so and I'll scope it as its
+own dedicated change — it touches search/filter/sort/keyboard-nav
+interaction, not just rendering, so it deserves to be planned and
+verified on its own rather than folded into this pass.
+
+**Remaining/deploy steps:** none for what's implemented — static-file
+changes only. The "not done" items above have no deploy step because
+nothing was built yet.
 
 ## Phase 3 — Reliability
 
