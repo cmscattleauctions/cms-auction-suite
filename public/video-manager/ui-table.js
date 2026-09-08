@@ -12,7 +12,7 @@
  * ui-drawer.js's Cattle Information section).
  * ============================================================= */
 
-import { escapeHtml, formatDateShort, formatDuration, cattleSummaryTwoLine, cleanYoutubeUrl } from './format.js';
+import { escapeHtml, formatDateShort, formatDuration, cattleSummaryTwoLine, cleanYoutubeUrl, claimColorClass } from './format.js';
 import { showToast, copyToClipboard } from './toast.js';
 import { handleIdEntryLoop } from './ui-modals.js';
 import { openCompareModal } from './ui-compare.js';
@@ -222,7 +222,7 @@ function editableCell(r, field, display, isEmpty = false) {
 
 function workingOnCell(r) {
   if (r.workingOn) {
-    return `<button class="vm-workingon-chip is-claimed" data-workingon="${r.id}" type="button" title="Click to release">${escapeHtml(r.workingOn)}</button>`;
+    return `<button class="vm-workingon-chip is-claimed ${claimColorClass(r.workingOn)}" data-workingon="${r.id}" type="button" title="Click to release">${escapeHtml(r.workingOn)}</button>`;
   }
   return `<button class="vm-workingon-chip" data-workingon="${r.id}" type="button">Claim</button>`;
 }

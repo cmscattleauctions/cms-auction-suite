@@ -398,6 +398,20 @@ td:focus, .vm-cell:focus { outline: none; }
 .vm-workingon-chip:hover { border-color: var(--border-strong); }
 .vm-workingon-chip.is-claimed { background: var(--format-clean-bg); border-color: var(--format-clean-fg); color: var(--format-clean-fg); }
 
+/* Per-person claim colors (format.js's claimColorClass hashes a staff
+   name to one of these 8) — deliberately a separate palette from
+   --format-* above, which already means something else (video format,
+   exceptions). Light bg + a matching darker border/text, same shape as
+   every other pill/chip in this app. */
+.vm-workingon-chip.is-claimed.claim-color-0 { background: #e0e7ff; border-color: #3730a3; color: #3730a3; }
+.vm-workingon-chip.is-claimed.claim-color-1 { background: #cffafe; border-color: #0e7490; color: #0e7490; }
+.vm-workingon-chip.is-claimed.claim-color-2 { background: #fae8ff; border-color: #86198f; color: #86198f; }
+.vm-workingon-chip.is-claimed.claim-color-3 { background: #fef3c7; border-color: #92400e; color: #92400e; }
+.vm-workingon-chip.is-claimed.claim-color-4 { background: #dbeafe; border-color: #1e40af; color: #1e40af; }
+.vm-workingon-chip.is-claimed.claim-color-5 { background: #ffe4e6; border-color: #9f1239; color: #9f1239; }
+.vm-workingon-chip.is-claimed.claim-color-6 { background: #ecfccb; border-color: #3f6212; color: #3f6212; }
+.vm-workingon-chip.is-claimed.claim-color-7 { background: #f3e8ff; border-color: #6b21a8; color: #6b21a8; }
+
 .vm-row-action:hover { text-decoration: underline; }
 
 .vm-addrow-row td { padding: 8px 10px; background: var(--bg-muted); }
@@ -662,15 +676,37 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 /* =============================================================
  * MODALS
  * ============================================================= */
-.vm-modal-backdrop { position: fixed; inset: 0; background: rgba(19,24,32,0.45); z-index: 200; display: grid; place-items: center; padding: 24px; animation: vmFadeIn 140ms ease; }
-.vm-modal { width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+/* overflow-y:auto + align-items:safe center (not plain grid place-items,
+   which has no scroll fallback at all here): centering an item taller
+   than its fixed-position, viewport-filling container clips whatever's
+   off both the top AND bottom with zero way to reach it — there's no
+   scroll container wrapping it, just position:fixed;inset:0. "safe"
+   falls back to top-alignment once the modal doesn't fit, so the WHOLE
+   modal (header through footer) scrolls within the backdrop instead of
+   only whatever .vm-modal-body's own internal scroll can reach — the
+   fallback that actually matters once the viewport is short enough
+   (a phone with the keyboard open, mainly) that the modal doesn't fit
+   even at its own max-height. */
+.vm-modal-backdrop { position: fixed; inset: 0; background: rgba(19,24,32,0.45); z-index: 200; display: flex; align-items: safe center; justify-content: center; overflow-y: auto; padding: 24px; animation: vmFadeIn 140ms ease; }
+/* Header and footer stay pinned, only the body scrolls — a growing
+   body (e.g. the upload modal's file list) used to just push the
+   footer's submit button below the fold with the whole modal as one
+   scroll unit, which on a short/keyboard-shrunk mobile viewport made
+   it effectively unreachable. Same fix shape as .vm-compare-modal
+   below, generalized to every modal built on this class. */
+.vm-modal {
+  width: 100%; max-width: 520px; max-height: 88vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+}
 .vm-modal.vm-modal-wide { max-width: 720px; }
-.vm-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); }
+.vm-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
 .vm-modal-header h2 { font-size: 15px; }
 .vm-modal-header p.field-hint { margin: 2px 0 0; }
 .vm-modal-close { background: none; border: none; color: var(--text-secondary); font-size: 20px; }
-.vm-modal-body { padding: 18px 20px; }
-.vm-modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--border-subtle); }
+.vm-modal-body { padding: 18px 20px; overflow-y: auto; flex: 1; min-height: 0; }
+.vm-modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--border-subtle); flex-shrink: 0; }
 
 /* ----- Upload modal: ID search + existing-record preview ----- */
 .vm-id-search-result {

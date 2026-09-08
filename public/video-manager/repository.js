@@ -55,9 +55,33 @@ let videos = [];
 let loadPromise = null;
 const emitter = createEmitter();
 
+/**
+ * First call opens a live Firestore subscription (see
+ * FirestoreData.subscribeToVideos) instead of a one-time fetch, and
+ * keeps it open for the rest of the tab's life — every subsequent
+ * snapshot (this tab's own writes AND every other tab/user's) updates
+ * `videos` and emits 'videos-changed', which app.js's existing
+ * subscribe()-based refresh() already reacts to. This is what makes
+ * "someone else claimed/completed a video" show up without a manual
+ * refresh. The returned promise still resolves once, with the first
+ * snapshot, so every `await ensureLoaded()` call site below is
+ * unchanged — they're just awaiting "loaded at least once", not
+ * "loaded exactly once".
+ */
 function ensureLoaded() {
   if (!loadPromise) {
-    loadPromise = FirestoreData.fetchAllVideos().then(list => { videos = list; return videos; });
+    loadPromise = new Promise(resolve => {
+      let gotFirst = false;
+      FirestoreData.subscribeToVideos(list => {
+        videos = list;
+        if (!gotFirst) {
+          gotFirst = true;
+          resolve(videos);
+        } else {
+          emitter.emit({ type: 'videos-changed' });
+        }
+      });
+    });
   }
   return loadPromise;
 }

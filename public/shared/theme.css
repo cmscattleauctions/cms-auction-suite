@@ -177,6 +177,13 @@ p { margin: 0; }
 }
 .btn-ghost:hover { background: var(--bg-muted); color: var(--text-primary); }
 
+.btn-danger {
+  background: var(--bg-surface);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.btn-danger:hover { background: var(--danger-bg); }
+
 input[type="text"], input[type="email"], input[type="password"],
 input[type="date"], input[type="number"], textarea, select {
   width: 100%;
