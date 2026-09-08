@@ -76,14 +76,14 @@ function render() {
           <label>Sire Type</label>
           <select id="f-sire">
             <option value="">Select…</option>
-            ${sires.map(s => `<option value="${s.code}" ${formState.sireCode === s.code ? 'selected' : ''}>${s.label}</option>`).join('')}
+            ${sires.map(s => `<option value="${s.code}" ${formState.sireCode === s.code ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('')}
           </select>
         </div>
         <div class="field">
           <label>Dam Type</label>
           <select id="f-dam">
             <option value="">Select…</option>
-            ${dams.map(s => `<option value="${s.code}" ${formState.damCode === s.code ? 'selected' : ''}>${s.label}</option>`).join('')}
+            ${dams.map(s => `<option value="${s.code}" ${formState.damCode === s.code ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('')}
           </select>
         </div>
       </div>

@@ -1332,6 +1332,43 @@ function readSettingsUI(){
 
 /* ===== text helpers (auto-bold rules) ===== */
 function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+/* Narrow allowlist sanitizer for the few fields (desc/notes/seller)
+ * where a staff member's contenteditable edit is expected to carry
+ * real formatting (bold from applyBoldRules, <br> line breaks) — a
+ * blanket esc() would show literal "&lt;strong&gt;" instead of bold
+ * text, so those fields can't just be escaped like every other cell.
+ * Uses DOMParser (not innerHTML on a live element) specifically
+ * because it's inert — parsed content never loads resources or fires
+ * event handlers, so a crafted <img onerror=...> can't execute just
+ * by being parsed here. Keeps only these tags, strips every
+ * attribute even on kept tags (a class/style/href is never needed for
+ * plain bold/italic/line-break formatting), and drops anything else
+ * while preserving its text content so the words aren't lost, only
+ * the unsafe markup around them. */
+const RICH_TEXT_ALLOWED_TAGS = new Set(['STRONG','B','EM','I','U','BR']);
+function sanitizeRichText(html){
+  const doc=new DOMParser().parseFromString(String(html==null?'':html),'text/html');
+  function clean(node){
+    const out=document.createDocumentFragment();
+    node.childNodes.forEach(child=>{
+      if(child.nodeType===Node.TEXT_NODE){
+        out.appendChild(document.createTextNode(child.textContent));
+      }else if(child.nodeType===Node.ELEMENT_NODE){
+        if(RICH_TEXT_ALLOWED_TAGS.has(child.tagName)){
+          const el=document.createElement(child.tagName);
+          el.appendChild(clean(child));
+          out.appendChild(el);
+        }else{
+          out.appendChild(clean(child));
+        }
+      }
+    });
+    return out;
+  }
+  const wrapper=document.createElement('div');
+  wrapper.appendChild(clean(doc.body));
+  return wrapper.innerHTML;
+}
 function nl(s){return esc(s).replace(/\\n|\n/g,'<br>');}
 function flat(s){return esc((s||'').replace(/\\n|\n|\r/g,' ').replace(/\s+/g,' ').trim());}
 /* Preserve newlines that came from a spreadsheet cell (Excel/Sheets export them
@@ -1447,7 +1484,7 @@ function displayLotNumber(lot){
   return raw;
 }
 function descHTML(lot){
-  if(lotEdit(lot,'desc')!=null) return lotEdit(lot,'desc');
+  if(lotEdit(lot,'desc')!=null) return sanitizeRichText(lotEdit(lot,'desc'));
   const n=parseInt(lot.loadCount)||0;
   const load=lot.loadCount?`<strong>${esc(lot.loadCount)} Load${n===1?'':'s'}</strong> of `:'';
   let breed=flat(lot.breed);
@@ -1455,11 +1492,12 @@ function descHTML(lot){
 }
 function notesHTML(lot){
   let html=lotEdit(lot,'notes');
-  if(html==null) html=[lot.desc1,lot.desc2].filter(Boolean).map(multi).join('<br>');
+  if(html!=null) return sanitizeRichText(applyBoldRules(html));
+  html=[lot.desc1,lot.desc2].filter(Boolean).map(multi).join('<br>');
   return applyBoldRules(html);
 }
 function sellerHTML(lot){
-  if(lotEdit(lot,'seller')!=null) return lotEdit(lot,'seller');
+  if(lotEdit(lot,'seller')!=null) return sanitizeRichText(lotEdit(lot,'seller'));
   return `<span class="seller-name">${esc(lot.consignor)}</span>`+(lot.location?`<i>${esc(lot.location)}</i>`:'');
 }
 
@@ -2007,17 +2045,17 @@ function legacyLotRowHTML(lot,li,b,bi,page,grid,cols,alt){
     else if(c==='seller'){cls+=' seller';v=sellerHTML(lot);}
     else if(c==='head'){cls+=' head ctr';v=esc(lotEdit(lot,'head')??lot.head);}
     else if(c==='desc'){cls+=' desc';v=descHTML(lot);}
-    else if(c==='sex'){cls+=' sex ctr';v=(lotEdit(lot,'sex')??flat(lot.sex));}
+    else if(c==='sex'){cls+=' sex ctr';v=lotEdit(lot,'sex')!=null?esc(lotEdit(lot,'sex')):flat(lot.sex);}
     else if(c==='basewt'){cls+=' basewt ctr';
-      v=lotEdit(lot,'basewt')??(lot.basewt?esc(lot.basewt)+'#':'');}
+      v=lotEdit(lot,'basewt')!=null?esc(lotEdit(lot,'basewt')):(lot.basewt?esc(lot.basewt)+'#':'');}
     else if(c==='delivery'){cls+=' delivery ctr';v=esc(lotEdit(lot,'delivery')??lot.delivery);}
     else if(c==='shrink'){cls+=' shrink ctr';v=esc(lotEdit(lot,'shrink')??lot.shrink);}
-    else if(c==='slide'){cls+=' slide ctr';v=(lotEdit(lot,'slide')??flat(lot.slide));}
+    else if(c==='slide'){cls+=' slide ctr';v=lotEdit(lot,'slide')!=null?esc(lotEdit(lot,'slide')):flat(lot.slide);}
     else if(c==='notes'){cls+=' notes';v=notesHTML(lot);}
     else if(c==='price'){cls+=' price ctr';
-      v=lotEdit(lot,'price')??(lot.price?esc(lot.price):'');}
+      v=lotEdit(lot,'price')!=null?esc(lotEdit(lot,'price')):(lot.price?esc(lot.price):'');}
     else if(c==='poPrice'){cls+=' price po-price ctr';
-      v=lotEdit(lot,'poPrice')??(lot.poPrice?esc(lot.poPrice):'');}
+      v=lotEdit(lot,'poPrice')!=null?esc(lotEdit(lot,'poPrice')):(lot.poPrice?esc(lot.poPrice):'');}
     const sc=lotCellScale(lot,c);
     const cellScale=sc&&sc!==1?` style="font-size:${sc}em !important"`:'';
     const hlCls=lotCellHL(lot,c)?' cell-hl':'';

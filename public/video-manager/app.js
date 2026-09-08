@@ -12,6 +12,7 @@ import { renderGrid } from './ui-grid.js';
 import { openDrawer, closeDrawer } from './ui-drawer.js';
 import { openUploadModal, openCsvImportModal, openVideoIdManagerModal, openStaffManagerModal, openTrashModal } from './ui-modals.js';
 import { readInitialRoute, reportRoute } from '../shared/subapp-url.js';
+import { escapeHtml } from './format.js';
 
 const state = {
   statusTab: 'created', // "Completed" — the default view staff actually want first; boot() below overrides this from the URL when a reload is restoring a specific tab
@@ -320,13 +321,13 @@ function renderFiltersPanel() {
       <div>
         <label>Sire</label>
         <select id="f-sire"><option value="">All</option>
-          ${sires.map(s => `<option value="${s.code}">${s.code}- ${s.label}</option>`).join('')}
+          ${sires.map(s => `<option value="${s.code}">${s.code}- ${escapeHtml(s.label)}</option>`).join('')}
         </select>
       </div>
       <div>
         <label>Dam</label>
         <select id="f-dam"><option value="">All</option>
-          ${dams.map(s => `<option value="${s.code}">${s.code}- ${s.label}</option>`).join('')}
+          ${dams.map(s => `<option value="${s.code}">${s.code}- ${escapeHtml(s.label)}</option>`).join('')}
         </select>
       </div>
     </div>

@@ -13,7 +13,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` nee
 - [x] 2. Country Market role escalation (self-assigned admin) — see detail below
 - [x] 3. Firebase authorization (allowedTabs, Country Market rules) — see detail below
 - [x] 4. Public submission validation — see detail below
-- [ ] 5. Unsafe HTML rendering (XSS)
+- [x] 5. Unsafe HTML rendering (XSS) — see detail below
 - [x] 6. Passwords persisted in adminJobs documents — see detail below
 - [x] 7. Server-side clip transfer hardening (SSRF) — see detail below
 
@@ -409,6 +409,83 @@ resolution in real time.
    one path most likely to reveal a wrong assumption about Monday's
    asset URLs (e.g. if they ever use plain http, or a multi-hop
    redirect chain longer than one hop).
+
+### 5. Unsafe HTML rendering (XSS)
+
+**Finding:** swept `record IDs, reference dictionaries, filters,
+imported content, and saved Listings edits` across every app under
+`public/` for `.innerHTML =` assignments interpolating unescaped
+user-controlled or Firestore/CSV-sourced data.
+
+**Verified against current code:** most of the codebase (country-
+market, post-auction, shared, video-manager's table/drawer/modals,
+lot-images, lot-numbers, results, banners) already consistently uses
+an `escapeHtml`/`esc` helper — spot-checked broadly, confirmed clean.
+Two real, confirmed gaps found and fixed:
+
+**5a. `public/listings/index.html` — inconsistent escaping on
+staff-typed inline cell edits (highest severity of the two).** The
+sheet renderer's per-column value builder had the exact right pattern
+(`esc(lotEdit(lot,field) ?? fallback)`) on 3 columns (head, delivery,
+shrink) but NOT on 5 more (sex, basewt, slide, price, poPrice) or the
+3 rich-text columns (desc, notes, seller) — same repeated pattern,
+proving it was an oversight, not a design choice. A staff member's
+typed `contenteditable` edit is stored verbatim in the shared
+`listingProjects/{id}` Firestore doc (any approved user can open, edit,
+and re-save a teammate's listing, per this repo's own README) and
+rendered via `.innerHTML=` for whoever next opens that project.
+- The 5 plain-value columns: fixed to match the already-correct
+  pattern (`esc()` wraps the whole expression, not just the fallback
+  branch) — straightforward, no behavior change for legitimate values.
+- desc/notes/seller are different: `applyBoldRules()` deliberately
+  produces `<strong>` markup, and `notesHTML` joins values with
+  `<br>` — a blanket `esc()` would show literal `&lt;strong&gt;`
+  instead of bold text, breaking real, intended formatting. New
+  `sanitizeRichText()` (narrow allowlist: `strong/b/em/i/u/br`, zero
+  attributes preserved even on allowed tags, everything else stripped
+  but its *text content* kept) — matches the finding's own instruction
+  to "sanitize rich text through a narrow allowlist where formatting
+  must remain" rather than just escaping it away. Uses `DOMParser`
+  (not `.innerHTML` on a live element) specifically because parsed
+  DOMParser documents are inert — they never load resources or fire
+  event handlers, so a crafted `<img onerror=...>` can't execute
+  merely by being parsed.
+
+**5b. Sire/dam reference-dictionary labels rendered unescaped in 3
+files**, one of them the **public, unauthenticated** rep-upload page:
+`video-upload/app.js`, `video-manager/app.js` (missing the
+`escapeHtml` import entirely — added), `video-manager/ui-modals.js`.
+`SIRE_TYPES`/`DAM_TYPES` are Firestore-backed and staff-editable (via
+the Video ID Manager); `SEX_TYPES` is genuinely static/hardcoded
+(confirmed absent from the mutable `REFERENCE_LISTS` map) so left
+alone — was a real candidate, ruled out by tracing it, not assumed.
+
+**Verified:** built a standalone test page (not committed) exercising
+`sanitizeRichText()` against 9 payloads — `<img onerror>`, `<script>`,
+`<svg onload>`, a `javascript:` link, an allowlisted tag carrying a
+malicious `onclick` attribute, plain text with `&`/`<`/`"`, and
+legitimate `<strong>`/`<br>`/nested-tag formatting — via a real
+browser (Chrome, this session's `claude-in-chrome` tool). Every
+malicious payload was stripped with **zero handler execution**
+(explicitly checked, not just eyeballed the output string); every
+legitimate formatting case rendered correctly. All 6 touched `.js`/
+`.html` files re-checked as valid syntax.
+
+**Not done — noted, not silently skipped:** per-item validation of
+`clips`/`activity` array contents in the Video Manager's rendering
+code (only top-level array size is validated in the Firestore rules
+from item 4, not each item's shape) — lower severity, and this
+codebase's rendering already showed a defensive fallback pattern
+(`?? ''`, `escapeHtml(undefined)` safely coerces) everywhere spot-
+checked, so this is a residual-gap note, not a known live bug.
+`banners/index.html`'s classic (non-module) inline scripts were not
+audited this pass — different code pattern than every other app's ES
+modules, would need its own dedicated look if you want it covered.
+
+**Remaining/deploy steps:** none — these are static-file changes with
+no Firestore rules/Cloud Function component, so a normal push/PR/merge
+(same as any other code change in this repo) ships them; no separate
+deploy authorization needed for this item specifically.
 
 ## Phase 2 — Performance
 

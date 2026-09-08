@@ -572,8 +572,8 @@ export function openUploadModal(ctx) {
           <div><label>Weight</label><input type="number" id="um-b-weight" placeholder="450" /></div>
         </div>
         <div class="field-row">
-          <div><label>Sire</label><select id="um-b-sire"><option value="">Select…</option>${sires.map(s => `<option value="${s.code}">${s.code}- ${s.label}</option>`).join('')}</select></div>
-          <div><label>Dam</label><select id="um-b-dam"><option value="">Select…</option>${dams.map(s => `<option value="${s.code}">${s.code}- ${s.label}</option>`).join('')}</select></div>
+          <div><label>Sire</label><select id="um-b-sire"><option value="">Select…</option>${sires.map(s => `<option value="${s.code}">${s.code}- ${escapeHtml(s.label)}</option>`).join('')}</select></div>
+          <div><label>Dam</label><select id="um-b-dam"><option value="">Select…</option>${dams.map(s => `<option value="${s.code}">${s.code}- ${escapeHtml(s.label)}</option>`).join('')}</select></div>
         </div>
         <div class="field"><label>Month / Year</label><input type="month" id="um-b-monthyear" /></div>
         <div class="vm-generated-id-box is-placeholder" id="um-b-preview">
