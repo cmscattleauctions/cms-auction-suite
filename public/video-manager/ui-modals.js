@@ -1111,8 +1111,8 @@ export function openTrashModal(ctx) {
           <div class="row">${escapeHtml(r.consignorName)} · Deleted ${formatDate(r.deletedAt)}${r.deletedBy ? ` by ${escapeHtml(r.deletedBy)}` : ''}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
-          <button class="btn btn-sm" data-restore="${r.id}" type="button">Restore</button>
-          <button class="btn btn-sm btn-danger" data-purge="${r.id}" type="button">Delete Permanently</button>
+          <button class="btn btn-sm" data-restore="${escapeHtml(r.id)}" type="button">Restore</button>
+          <button class="btn btn-sm btn-danger" data-purge="${escapeHtml(r.id)}" type="button">Delete Permanently</button>
         </div>
       </div>
     `).join('');

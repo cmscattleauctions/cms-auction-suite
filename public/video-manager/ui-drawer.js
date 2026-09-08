@@ -969,12 +969,12 @@ function clipCardHtml(c, index, isPlaying) {
   // a plain "click to load" placeholder with the same play-button
   // affordance; nothing about that placeholder touches c.downloadUrl.
   return `
-    <div class="vm-clip-card2 ${isPlaying ? 'is-playing' : ''}" data-clip-id="${c.id}">
+    <div class="vm-clip-card2 ${isPlaying ? 'is-playing' : ''}" data-clip-id="${escapeHtml(c.id)}">
       <div class="vm-clip-card2-label">Clip ${index + 1}</div>
-      <div class="vm-clip-thumb" ${c.downloadUrl && !isPlaying ? `data-play-clip2="${c.id}" role="button" tabindex="0"` : ''}>
+      <div class="vm-clip-thumb" ${c.downloadUrl && !isPlaying ? `data-play-clip2="${escapeHtml(c.id)}" role="button" tabindex="0"` : ''}>
         ${c.downloadUrl
           ? (isPlaying
-              ? `<video preload="metadata" muted playsinline controls autoplay data-clip-video="${c.id}" src="${escapeHtml(c.downloadUrl)}#t=0.5"></video>`
+              ? `<video preload="metadata" muted playsinline controls autoplay data-clip-video="${escapeHtml(c.id)}" src="${escapeHtml(c.downloadUrl)}#t=0.5"></video>`
               : `<div class="vm-clip-thumb-empty vm-clip-thumb-unloaded"></div>`)
           : `<div class="vm-clip-thumb-empty">No file yet</div>`}
         ${c.downloadUrl && !isPlaying ? `
@@ -988,11 +988,11 @@ function clipCardHtml(c, index, isPlaying) {
         <span>${formatBytes(c.sizeBytes)}</span>
       </div>
       <div class="vm-clip-card2-actions">
-        <button class="btn btn-sm btn-ghost" data-download-clip2="${c.id}" type="button">Download</button>
+        <button class="btn btn-sm btn-ghost" data-download-clip2="${escapeHtml(c.id)}" type="button">Download</button>
         <span class="vm-overflow">
-          <button class="vm-overflow-btn" data-clip-more="${c.id}" type="button" title="More">⋯</button>
+          <button class="vm-overflow-btn" data-clip-more="${escapeHtml(c.id)}" type="button" title="More">⋯</button>
           <div class="vm-overflow-menu" id="clip-menu-${escapeHtml(c.id)}" hidden>
-            <button data-play-clip2="${c.id}" type="button">${isPlaying ? 'Stop preview' : 'Preview'}</button>
+            <button data-play-clip2="${escapeHtml(c.id)}" type="button">${isPlaying ? 'Stop preview' : 'Preview'}</button>
           </div>
         </span>
       </div>

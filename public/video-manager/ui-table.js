@@ -68,7 +68,7 @@ export function renderTable(container, records, ctx) {
  * comparison so staff can decide which one to actually use.
  * ============================================================= */
 function compareCheckboxCell(r) {
-  return `<input type="checkbox" class="vm-compare-check" data-compare="${r.id}" ${compareSelection.has(r.id) ? 'checked' : ''} title="Select to compare" />`;
+  return `<input type="checkbox" class="vm-compare-check" data-compare="${escapeHtml(r.id)}" ${compareSelection.has(r.id) ? 'checked' : ''} title="Select to compare" />`;
 }
 
 function paintCompareBar(ctx) {
@@ -169,10 +169,10 @@ function cattleCell(r, ctx) {
 
 function clipsCell(r) {
   if (!r.clips.length) {
-    return `<div class="vm-clips-cell"><span class="vm-clips-empty">—</span><button class="vm-clips-addlink" data-add-files="${r.id}" type="button">Add clips</button></div>`;
+    return `<div class="vm-clips-cell"><span class="vm-clips-empty">—</span><button class="vm-clips-addlink" data-add-files="${escapeHtml(r.id)}" type="button">Add clips</button></div>`;
   }
   return `
-    <button class="vm-clips-trigger" data-clips-trigger="${r.id}" type="button" title="View clips">
+    <button class="vm-clips-trigger" data-clips-trigger="${escapeHtml(r.id)}" type="button" title="View clips">
       <div class="vm-clips-count">${r.clips.length} clip${r.clips.length === 1 ? '' : 's'}</div>
     </button>`;
 }
@@ -201,15 +201,15 @@ function usageCell(r) {
 
 function publishedCell(r) {
   if (!r.youtubeUrl) {
-    return `<span class="vm-cell" data-editable="true" data-id="${r.id}" data-field="videoLink" tabindex="0" title="Not published yet — paste a YouTube link"><span class="is-empty is-unpublished">Paste YouTube link…</span></span>`;
+    return `<span class="vm-cell" data-editable="true" data-id="${escapeHtml(r.id)}" data-field="videoLink" tabindex="0" title="Not published yet — paste a YouTube link"><span class="is-empty is-unpublished">Paste YouTube link…</span></span>`;
   }
   return `
     <span class="yt-actions">
-      <button class="btn-icon-square" data-open-yt="${r.id}" title="Open YouTube Video">
+      <button class="btn-icon-square" data-open-yt="${escapeHtml(r.id)}" title="Open YouTube Video">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.6 7.2s-.2-1.5-.8-2.2c-.8-.9-1.7-.9-2.1-1C15.9 3.8 12 3.8 12 3.8h0s-3.9 0-6.7.2c-.4 0-1.3.1-2.1 1-.6.7-.8 2.2-.8 2.2S2.2 9 2.2 10.7v1.6c0 1.8.2 3.5.2 3.5s.2 1.5.8 2.2c.8.9 1.9.9 2.4 1 1.7.2 7.4.2 7.4.2s3.9 0 6.7-.2c.4 0 1.3-.1 2.1-1 .6-.7.8-2.2.8-2.2s.2-1.8.2-3.5v-1.6c0-1.8-.2-3.5-.2-3.5ZM9.9 14.6V8.4l5.4 3.1-5.4 3.1Z"/></svg>
       </button>
-      <button class="btn-icon-square" data-copy-embed="${r.id}" title="Copy Embed Code">&lt;/&gt;</button>
-      <button class="btn-icon-square" data-copy-link="${r.id}" title="Copy YouTube Link">
+      <button class="btn-icon-square" data-copy-embed="${escapeHtml(r.id)}" title="Copy Embed Code">&lt;/&gt;</button>
+      <button class="btn-icon-square" data-copy-link="${escapeHtml(r.id)}" title="Copy YouTube Link">
         <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M3 10.5H2.5A1.5 1.5 0 0 1 1 9V2.5A1.5 1.5 0 0 1 2.5 1H9A1.5 1.5 0 0 1 10.5 2.5V3" stroke="currentColor" stroke-width="1.3"/></svg>
       </button>
     </span>`;
@@ -225,16 +225,16 @@ function addedCell(r) {
 }
 
 function editableCell(r, field, display, isEmpty = false) {
-  return `<span class="vm-cell" data-editable="true" data-id="${r.id}" data-field="${field}" tabindex="0">${
+  return `<span class="vm-cell" data-editable="true" data-id="${escapeHtml(r.id)}" data-field="${field}" tabindex="0">${
     isEmpty ? '<span class="is-empty">—</span>' : (display || '<span class="is-empty">—</span>')
   }</span>`;
 }
 
 function workingOnCell(r) {
   if (r.workingOn) {
-    return `<button class="vm-workingon-chip is-claimed ${claimColorClass(r.workingOn)}" data-workingon="${r.id}" type="button" title="Click to release">${escapeHtml(r.workingOn)}</button>`;
+    return `<button class="vm-workingon-chip is-claimed ${claimColorClass(r.workingOn)}" data-workingon="${escapeHtml(r.id)}" type="button" title="Click to release">${escapeHtml(r.workingOn)}</button>`;
   }
-  return `<button class="vm-workingon-chip" data-workingon="${r.id}" type="button">Claim</button>`;
+  return `<button class="vm-workingon-chip" data-workingon="${escapeHtml(r.id)}" type="button">Claim</button>`;
 }
 
 /* =============================================================
@@ -246,7 +246,7 @@ function workingOnCell(r) {
  * ============================================================= */
 function readyRowHtml(r, ctx, showWorkingOn) {
   return `
-    <tr data-id="${r.id}" class="${rowExceptionClass(r, 'ready')} ${ctx.state.selectedId === r.id ? 'is-selected' : ''}">
+    <tr data-id="${escapeHtml(r.id)}" class="${rowExceptionClass(r, 'ready')} ${ctx.state.selectedId === r.id ? 'is-selected' : ''}">
       <td class="vm-col-check">${compareCheckboxCell(r)}</td>
       <td>${identityCell(r, 'ready')}</td>
       <td class="vm-col-cattle">${cattleCell(r, ctx)}</td>
@@ -259,7 +259,7 @@ function readyRowHtml(r, ctx, showWorkingOn) {
 
 function createdRowHtml(r, ctx) {
   return `
-    <tr data-id="${r.id}" class="${rowExceptionClass(r, 'created')} ${ctx.state.selectedId === r.id ? 'is-selected' : ''}">
+    <tr data-id="${escapeHtml(r.id)}" class="${rowExceptionClass(r, 'created')} ${ctx.state.selectedId === r.id ? 'is-selected' : ''}">
       <td class="vm-col-check">${compareCheckboxCell(r)}</td>
       <td>${identityCell(r, 'created')}</td>
       <td class="vm-col-cattle">${cattleCell(r, ctx)}</td>
@@ -491,7 +491,7 @@ function openClipsPopover(anchorEl, rec, ctx) {
         <svg class="vm-popover-clip-icon" viewBox="0 0 24 24" fill="none"><path d="M4 6h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6"/><path d="M17 10.5 22 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
         <span class="vm-popover-clip-name">${escapeHtml(c.filename)}</span>
         <span class="vm-popover-clip-dur">${formatDuration(c.durationSec)}</span>
-        <button class="vm-popover-play" data-play-clip="${c.id}" type="button" title="Preview"><svg viewBox="0 0 12 12" fill="currentColor"><path d="M3 2l7 4-7 4V2z"/></svg></button>
+        <button class="vm-popover-play" data-play-clip="${escapeHtml(c.id)}" type="button" title="Preview"><svg viewBox="0 0 12 12" fill="currentColor"><path d="M3 2l7 4-7 4V2z"/></svg></button>
       </div>
     `).join('')}
     <div class="vm-popover-footer"><button class="btn btn-sm btn-block" id="pop-download-all" type="button">Download All</button></div>

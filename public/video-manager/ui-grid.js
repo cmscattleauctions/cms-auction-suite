@@ -62,7 +62,7 @@ function cardHtml(r, ctx) {
   const cattle = cattleSummaryLine({ sexLabel, sireLabel, damLabel, weight: r.weight, monthYear: r.monthYear });
 
   return `
-    <div class="vm-card" data-id="${r.id}">
+    <div class="vm-card" data-id="${escapeHtml(r.id)}">
       ${previewHtml(r, originalClips)}
       <div class="vm-card-body">
         <div class="vm-card-id">${escapeHtml(r.videoId)}${r.isDraft ? '<span class="vm-row-flag draft">Draft</span>' : ''}</div>

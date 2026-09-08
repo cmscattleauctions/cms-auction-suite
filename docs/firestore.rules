@@ -81,6 +81,30 @@ service cloud.firestore {
     // published, claimed, or used, and every free-text/URL-shaped
     // field gets a length cap so a malformed submission can't bloat
     // storage or break a staff view that assumes reasonable sizes.
+    // One clip entry from a fresh anonymous submission — matches the
+    // exact shape public/video-upload/app.js's createRecord() builds.
+    // Firestore rules have no loop/recursion construct, so "validate
+    // every item in a list" has to be unrolled as explicit indexed
+    // checks below (isValidAnonVideoSubmission's d.clips.size() < N ||
+    // isValidClip(d.clips[N-1]) chain) rather than expressed as a
+    // single .every()-style call — there isn't one in this language.
+    function isValidClip(c) {
+      return c.keys().hasOnly(['id', 'filename', 'swatch', 'durationSec', 'sizeBytes', 'uploader', 'uploadedAt', 'isOriginal', 'storagePath', 'downloadUrl'])
+        && c.id is string && c.id.matches('^clip_[a-z0-9]{1,20}$')
+        && c.filename is string && c.filename.size() > 0 && c.filename.size() <= 260
+        && c.swatch is number
+        && (c.durationSec == null || c.durationSec is number)
+        && c.sizeBytes is number && c.sizeBytes > 0 && c.sizeBytes <= 2147483648
+        && c.uploader == 'Rep'
+        && c.uploadedAt is string
+        && c.isOriginal == true
+        // Matches docs/storage.rules' own videoClips/{recordId}/{fileName}
+        // path shape — a clip claiming to live somewhere else in Storage
+        // is not a shape createRecord() ever produces.
+        && c.storagePath is string && c.storagePath.matches('^videoClips/.*')
+        && (c.downloadUrl == null || (c.downloadUrl is string && c.downloadUrl.size() <= 2000));
+    }
+
     function isValidAnonVideoSubmission() {
       let d = request.resource.data;
       return d.keys().hasOnly([
@@ -104,8 +128,16 @@ service cloud.firestore {
         && d.previousYouTubeVideos.size() == 0
         && d.youtubeId == null && d.youtubeUrl == null
         && d.embedUrl == null && d.embedCode == null
-        // Types + length/range caps on everything else.
-        && d.id is string && d.id.size() <= 100
+        // Types + length/range caps on everything else. id specifically
+        // is pinned to the exact shape generateInternalId() produces
+        // (video-id.js) — "vid_" + 8 lowercase alphanumeric chars —
+        // not just capped at 100 chars: this id is rendered as a raw
+        // HTML data-* attribute value in several places in the Video
+        // Manager UI (ui-table.js/ui-grid.js/ui-drawer.js — now also
+        // escaped there as defense in depth, but a submission should
+        // never be able to get an attribute-breakout payload into this
+        // field in the first place).
+        && d.id is string && d.id.matches('^vid_[a-z0-9]{8}$')
         && d.videoId is string && d.videoId.size() > 0 && d.videoId.size() <= 60
         && d.baseVideoId is string && d.baseVideoId.size() > 0 && d.baseVideoId.size() <= 60
         && (d.suffix == null || (d.suffix is string && d.suffix.size() <= 20))
@@ -124,7 +156,29 @@ service cloud.firestore {
         && (d.listingImageUrl == null || (d.listingImageUrl is string && d.listingImageUrl.size() <= 2000))
         && d.videoFormat is string && d.videoFormat.size() <= 30
         && d.hasTags is bool
-        && d.clips is list && d.clips.size() <= 20
+        // Capped at 15 (down from a bare size-only cap of 20, matched
+        // client-side in video-upload/app.js so a rep who picks more
+        // gets a clear warning up front instead of a confusing
+        // permission-denied after they've already uploaded files) —
+        // still generous for a phone-based rep submission, and bounded
+        // enough that validating each entry's actual shape below stays
+        // a mechanical (if repetitive) list rather than unbounded.
+        && d.clips is list && d.clips.size() <= 15
+        && (d.clips.size() < 1  || isValidClip(d.clips[0]))
+        && (d.clips.size() < 2  || isValidClip(d.clips[1]))
+        && (d.clips.size() < 3  || isValidClip(d.clips[2]))
+        && (d.clips.size() < 4  || isValidClip(d.clips[3]))
+        && (d.clips.size() < 5  || isValidClip(d.clips[4]))
+        && (d.clips.size() < 6  || isValidClip(d.clips[5]))
+        && (d.clips.size() < 7  || isValidClip(d.clips[6]))
+        && (d.clips.size() < 8  || isValidClip(d.clips[7]))
+        && (d.clips.size() < 9  || isValidClip(d.clips[8]))
+        && (d.clips.size() < 10 || isValidClip(d.clips[9]))
+        && (d.clips.size() < 11 || isValidClip(d.clips[10]))
+        && (d.clips.size() < 12 || isValidClip(d.clips[11]))
+        && (d.clips.size() < 13 || isValidClip(d.clips[12]))
+        && (d.clips.size() < 14 || isValidClip(d.clips[13]))
+        && (d.clips.size() < 15 || isValidClip(d.clips[14]))
         && d.activity is list && d.activity.size() <= 5;
     }
     match /videoRecords/{id} {
@@ -225,19 +279,26 @@ service cloud.firestore {
     }
     match /profiles/{uid} {
       // Approved users can read all profiles, and can create their own
-      // on first login — but never as admin. A role escalation is a
-      // trusted-process action (an existing Country Market admin, or
-      // the suite admin as a bootstrap/recovery path if Country Market
-      // ever has zero admins, promotes someone via the Admin page
-      // afterwards) — never something a new profile can grant itself.
-      // Previously this had no role restriction on create at all: any
-      // approved suite user (rep, video staff, anyone) could create
-      // their own profile with role:'admin' directly via the SDK,
-      // bypassing the app's client-side "first user becomes admin"
-      // check entirely, since that check was never enforced here.
+      // on first login — but never as admin, and never with a rep_name
+      // already filled in. Both are trusted-process actions (an
+      // existing Country Market admin, or the suite admin as a
+      // bootstrap/recovery path, sets them afterwards via the Admin
+      // page) — never something a new profile can grant itself.
+      //
+      // rep_name matters as much as role here: cmLots' own ownership
+      // check (see below) trusts `lot.rep == the caller's rep_name`
+      // as a stable identity. Before this, create had no restriction
+      // on rep_name at all — the real app UI always creates it empty
+      // (see country-market/firestore-adapter.js's ensureProfile()),
+      // but a direct SDK call could set rep_name to an EXISTING rep's
+      // name on a brand-new account and inherit edit rights over every
+      // lot that rep owns. Requiring it empty at creation means the
+      // only way a profile's rep_name is ever non-empty is an admin
+      // having deliberately set it via update, below.
       allow read:   if isApproved();
       allow create: if isApproved() && request.auth.uid == uid
-                    && request.resource.data.role == 'rep';
+                    && request.resource.data.role == 'rep'
+                    && request.resource.data.rep_name == '';
       allow update: if isApproved() && (cmIsAdmin() || isSuiteAdmin());
       allow delete: if false;
     }

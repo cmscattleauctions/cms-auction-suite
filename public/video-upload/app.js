@@ -215,6 +215,11 @@ function wireVideoPickers() {
   });
 }
 
+// Matches docs/firestore.rules' own cap on the anon-submission create
+// rule's clips array — warn here, before someone spends their mobile
+// data uploading a file that would just get rejected at submit time.
+const MAX_CLIPS_PER_SUBMISSION = 15;
+
 function addVideoFile(file) {
   // The <input accept="video/*"> only filters the OS/photo picker — drag
   // and drop, and some pickers' "All Files" fallback, bypass it, so
@@ -222,6 +227,10 @@ function addVideoFile(file) {
   // and fail there with a bare permission error.
   if (file.type && !file.type.startsWith('video/')) {
     showToast(`${file.name} is a ${file.type} file, not a video — skipped.`);
+    return;
+  }
+  if (files.length >= MAX_CLIPS_PER_SUBMISSION) {
+    showToast(`${file.name} skipped — this submission already has the max of ${MAX_CLIPS_PER_SUBMISSION} videos. Submit this batch, then add the rest separately.`);
     return;
   }
   const entry = { file, progress: 0, status: 'uploading', storagePath: null, downloadUrl: null, error: null, uploadId: crypto.randomUUID() };

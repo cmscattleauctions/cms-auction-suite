@@ -68,8 +68,9 @@ function sanitizeFilename(name) {
  * which Node's global fetch doesn't expose a supported way to do. This
  * closes the realistic threat model here (a malicious/compromised
  * approved account pointing this at a static internal address), not a
- * network-level adversary controlling DNS — flagged as an accepted
- * residual gap in docs/HARDENING_CHECKLIST.md.
+ * network-level adversary controlling DNS — flagged as a known,
+ * unclosed limitation in docs/HARDENING_CHECKLIST.md, not something
+ * accepted as fine to leave.
  */
 function isPrivateOrReservedIp(ip) {
   const type = net.isIP(ip);

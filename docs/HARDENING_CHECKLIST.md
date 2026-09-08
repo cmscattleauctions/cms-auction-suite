@@ -7,6 +7,25 @@ that needs your credentials, or a decision only you can make).
 
 Status legend: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` needs your input
 
+**IMPORTANT — branch note (found and fixed mid-pass):** the earlier
+version of this checklist described a live Firestore subscription for
+`videoRecords` as already shipped. That work was real, but it lived on
+a SEPARATE, never-merged PR (#73) — this branch (`security/phase1-
+hardening`, PR #74) was cut from `main` after #72, which does not
+include #73. That's why a review of this branch's own files showed
+`getDocs()`/one-time-cache instead: not incorrect documentation, a
+genuine branch/snapshot mismatch. Fixed by merging PR #73's branch
+into this one (commit `f2e975b`) — the live-sync code is now actually
+present here, resolved conflicts checked line-by-line, both branches'
+changes confirmed intact after the merge. PR #73 should be closed once
+this PR merges, since its content is now included here.
+
+**Also corrected per explicit instruction:** nothing below is labeled
+"accepted" unless you said so. Two earlier entries used that word
+loosely (the SSRF DNS-rebinding residual gap, the buyer-field
+document-granularity gap) — reworded to "known limitation, not yet
+closed" / "flagged for your decision" throughout.
+
 ## Phase 1 — Security
 
 - [x] 1. Monday migration endpoint exposure — see detail below
@@ -95,6 +114,42 @@ below for exactly what to check after deploy.
    maintaining an auth gate on unused code — that's a call only you can
    make; I hardened rather than removed because I can't confirm
    migration completion from the code alone.
+
+### 2a. Follow-up: rep-name impersonation (found in review, fixed)
+
+**Finding:** the role-escalation fix above closed self-assigned admin,
+but the create rule still let a brand-new profile set ANY `rep_name` —
+and `cmLots`' ownership rule (item 3 below) trusts `lot.rep == caller's
+rep_name` as a stable identity. A new account could set `rep_name` to
+match an EXISTING rep's name and inherit edit rights over every lot
+that rep owns. The real app UI always creates `rep_name: ""` (only an
+admin fills it in later, via `update`) — the rule just didn't enforce
+that.
+
+**Implemented:** `docs/firestore.rules`' create rule now also requires
+`request.resource.data.rep_name == ''` — a new profile can never have
+a non-empty rep_name; only an admin (via the already admin-gated
+`update`) can set one. New `scripts/audit-country-market-rep-names.mjs`
+(read-only, dry-run, same pattern as the other cleanup scripts) —
+checks EXISTING profiles for a rep_name shared by more than one
+account (which could only have happened before this fix shipped) and
+reports it for you to review; doesn't change anything itself, since
+resolving a real collision needs a human decision.
+
+**Verified:** `firestore:rules --dry-run` compiled successfully; script
+re-checked as valid syntax. Not run against live data (needs your
+`gcloud` credentials).
+
+**Requires your decision, not implemented:** whether lot ownership
+should move off `rep_name` (a mutable, admin-assigned string) onto a
+stable `uid`-based identity instead — a real schema change (`lot.rep`
+would need to become `lot.repUid` or similar, migrating every existing
+lot, and `app.js`'s ownership-display code would need updating to look
+up a rep's current display name from their uid instead of storing the
+name on the lot). The rep-name-impersonation vulnerability itself is
+fully closed by the fix above; this would be a further structural
+improvement, not a remaining hole. I did not do this migration without
+your go-ahead, per "do not rewrite... simply to address these issues."
 
 ### 2. Country Market role escalation
 
@@ -197,8 +252,8 @@ accounts who shouldn't see the rest of the suite's data) are already
 covered by Country Market's own admin/rep role check, which **is**
 enforced in rules independent of `allowedTabs`.
 
-**Also flagged, not fixed (accepted gap, needs a schema change to
-close):** `cmLots.buyer` is visible to any approved user with direct
+**Also flagged, not fixed (a known limitation you have not accepted —
+needs a schema change to close, your decision on priority):** `cmLots.buyer` is visible to any approved user with direct
 SDK access even though the UI hides it from reps (`canViewBuyer()`).
 Firestore rules can't filter individual fields out of a document read
 — only whole-document access. Closing this needs moving `buyer` into
@@ -382,7 +437,8 @@ allowed). `functions/index.js` re-checked as valid syntax;
 against a live Monday transfer** — no way to exercise the actual
 `transferClip` function from this environment.
 
-**Accepted residual gap, documented rather than silently left:** this
+**Known limitation, not closed (your call on priority) — documented
+rather than silently left:** this
 does not fully close a DNS-rebinding race — the hostname could
 legitimately re-resolve to a different IP between this check and
 `fetch()`'s own internal resolution moments later. Fully closing that
@@ -409,6 +465,57 @@ resolution in real time.
    one path most likely to reveal a wrong assumption about Monday's
    asset URLs (e.g. if they ever use plain http, or a multi-hop
    redirect chain longer than one hop).
+
+### 5a. Follow-up: record/clip IDs unescaped in attributes, clip entries not individually validated (found in review, fixed)
+
+**Finding:** the first XSS pass covered TEXT-node content but missed
+ATTRIBUTE-context injection: `r.id`/`c.id` were interpolated raw into
+`data-*` attributes (`data-id`, `data-workingon`, `data-clip-id`,
+`data-play-clip`, etc.) across `ui-table.js`, `ui-grid.js`,
+`ui-drawer.js`, `ui-compare.js`, and `ui-modals.js`'s Trash modal — an
+`id` containing a `"` could break out of the attribute. Separately,
+item 4's anon-submission rule checked `clips` was a list under a size
+cap but never validated individual clip entries' shape or content.
+
+**Implemented:**
+- `docs/firestore.rules`: `id` now must match `^vid_[a-z0-9]{8}$` —
+  the exact shape `generateInternalId()` (`video-id.js`) actually
+  produces — instead of just "any string ≤100 chars." New
+  `isValidClip()` validates each clip entry's real shape (id format,
+  filename/uploader/storagePath type+length, `isOriginal==true`,
+  `storagePath` must start with `videoClips/` matching
+  `docs/storage.rules`' own path convention), unrolled as explicit
+  indexed checks for up to 15 clips (Firestore rules have no loop/
+  recursion construct — see the comment above `isValidClip` for why
+  it's written this way) — cap lowered from a bare 20 to 15, with a
+  matching client-side warning added in `video-upload/app.js` so a rep
+  who picks more gets clear feedback instead of a confusing rejection
+  at submit time.
+- Every raw `${r.id}`/`${c.id}` attribute interpolation found (13 in
+  `ui-table.js`, 1 in `ui-grid.js`, 6 in `ui-drawer.js`, 4 in
+  `ui-compare.js`, 2 in `ui-modals.js`) now goes through `escapeHtml()`
+  — this is defense in depth beyond the rule fix above, since it also
+  covers ids from OTHER write paths that aren't rule-constrained the
+  same way (staff writes, the Monday migration import, which is just
+  `allow write: if isApproved()` with no field validation). One
+  `querySelector` usage in `ui-compare.js` used `CSS.escape()` instead,
+  matching this codebase's existing pattern in `admin-panel.js` — a
+  selector string has different escaping needs than HTML.
+
+**Verified:** live browser test (not committed) — imported the real,
+unmodified `renderGrid()`/`renderTable()`, rendered a record whose
+`id` was `x" onmouseover="window.__xss=1" data-evil="`, dispatched a
+real `mouseover` event on the resulting card/row, confirmed the
+handler never fired, and inspected the actual serialized
+`outerHTML` to confirm the `"` characters were correctly turned into
+`&quot;` (the payload sits inertly inside one attribute value, not as
+a separate `onmouseover` attribute). `firestore:rules --dry-run`
+compiled successfully. All touched files re-checked as valid syntax.
+
+**Remaining/deploy steps:** the rules change ships with the same
+`firestore:rules` deploy as every other rules item in this pass — not
+yet run. The rendering-escaping fixes are static-file changes, ship
+via normal push/PR/merge.
 
 ### 5. Unsafe HTML rendering (XSS)
 
