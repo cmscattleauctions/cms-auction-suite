@@ -52,7 +52,7 @@ export function openCompareModal(records, ctx) {
     modal.querySelector('.vm-modal-close').addEventListener('click', close);
     const grid = modal.querySelector('.vm-compare-grid');
     active.forEach(r => {
-      const panelEl = grid.querySelector(`[data-panel-id="${r.id}"]`);
+      const panelEl = grid.querySelector(`[data-panel-id="${CSS.escape(r.id)}"]`);
       if (panelEl) wirePanel(panelEl, r);
     });
   }
@@ -79,11 +79,11 @@ export function openCompareModal(records, ctx) {
     const damLabel = ctx.ref.damLabel(r.damCode) || `Code ${r.damCode}`;
     const cattle = cattleSummaryLine({ sexLabel, sireLabel, damLabel, weight: r.weight, monthYear: r.monthYear });
     const formatMeta = ctx.ref.videoFormatMeta(r.videoFormat);
-    const statusWord = r.status === 'created' ? 'Created' : r.status === 'hold' ? 'On Hold' : 'Ready to Make';
+    const statusWord = r.status === 'created' ? 'Completed' : r.status === 'hold' ? 'On Hold' : 'Ready to Make';
 
     return `
-      <div class="vm-compare-panel" data-panel-id="${r.id}">
-        <button class="vm-compare-rule-out" data-rule-out="${r.id}" type="button" title="Rule out — remove from comparison">&times;</button>
+      <div class="vm-compare-panel" data-panel-id="${escapeHtml(r.id)}">
+        <button class="vm-compare-rule-out" data-rule-out="${escapeHtml(r.id)}" type="button" title="Rule out — remove from comparison">&times;</button>
         <div class="vm-compare-media">
           ${r.embedUrl
             ? `<iframe src="${escapeHtml(r.embedUrl)}" title="${escapeHtml(r.videoId)}" frameborder="0" allow="autoplay" allowfullscreen></iframe>`
@@ -97,7 +97,7 @@ export function openCompareModal(records, ctx) {
             <span class="status-pill status-${r.status}">${statusWord}</span>
             ${r.videoFormat && r.videoFormat !== 'unknown' ? `<span class="format-pill ${{clean:'format-clean','legacy-tagged':'format-legacy','needs-redo':'format-redo'}[r.videoFormat] || ''}">${escapeHtml(formatMeta ? formatMeta.short : r.videoFormat)}</span>` : ''}
           </div>
-          <button class="btn btn-primary btn-sm btn-block" data-use-video="${r.id}" type="button" style="margin-top:8px;">Use This Video</button>
+          <button class="btn btn-primary btn-sm btn-block" data-use-video="${escapeHtml(r.id)}" type="button" style="margin-top:8px;">Use This Video</button>
         </div>
       </div>`;
   }

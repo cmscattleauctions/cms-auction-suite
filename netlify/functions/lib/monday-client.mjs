@@ -85,11 +85,18 @@ export async function mondayQuery(query, variables = {}) {
   return json.data;
 }
 
-/** Standard JSON response helper — keeps every action's output shape consistent. */
+/** Standard JSON response helper — keeps every action's output shape consistent.
+ *  no-store: this endpoint returns internal business data (consignor
+ *  names, signed clip download URLs) gated to one admin account — a
+ *  shared/CDN/browser cache holding a copy would undo that gate for
+ *  whoever next requests the same URL from the same cache. */
 export function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
     status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+    },
   });
 }
 

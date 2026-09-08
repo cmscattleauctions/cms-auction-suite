@@ -402,6 +402,35 @@ async function fetchLots() {
   return data;
 }
 
+/**
+ * Buyer identity lives in its own admin-only-readable Firestore
+ * collection (cmLotBuyers/{lotId}), not on the lot document itself —
+ * see docs/firestore.rules. Admins get it joined onto their in-memory
+ * state.lots right after loading (loadApp() below), one bulk read,
+ * so every existing lot.buyer render call site (contracts, the sale
+ * info panel, table cells) keeps working completely unchanged; reps
+ * never issue this read at all (the rule would reject it anyway), so
+ * their in-memory lots simply never get a .buyer set, matching
+ * canViewBuyer()'s existing UI intent.
+ */
+async function joinLotBuyers(lots) {
+  if (!isAdmin() || !lots.length) return;
+  const { data, error } = await getDb().from('cmLotBuyers').select('*');
+  if (error) { console.warn('[CMS] Could not load buyer identities:', error); return; }
+  const byId = new Map((data || []).map(row => [String(row.id), row.buyer]));
+  lots.forEach(l => { if (byId.has(String(l.id))) l.buyer = byId.get(String(l.id)); });
+}
+
+/** Admin-only — sets/updates the buyer on file for one lot. */
+async function setLotBuyer(id, buyer) {
+  return getDb().from('cmLotBuyers').upsert({ id, buyer }, { onConflict: 'id' });
+}
+
+/** Admin-only — clears the buyer on file for one lot (moving it away from Sold). */
+async function clearLotBuyer(id) {
+  return getDb().from('cmLotBuyers').delete().eq('id', id);
+}
+
 async function insertLot(lot) {
   requirePerm(canCreateLot(), "You do not have permission to create lots.");
   const normErr = normalizeLot(lot);
@@ -1688,9 +1717,19 @@ function getDocsForLot(l, auctionName, auctionDate, userIsAdmin) {
     docs.push({ label: 'Contract Details', html: () => contractDetailsHTML(l, auctionName, auctionDate) });
     docs.push({ label: 'Consignor Trade Conf.', html: () => tradeConfirmHTML(l, 'consignor', auctionName, auctionDate) });
     docs.push({ label: 'Rep Trade Conf.', html: () => tradeConfirmHTML(l, 'rep', auctionName, auctionDate) });
-    docs.push({ label: "Buyer's Contract", html: () => buyersContractHTML(l, auctionName, auctionDate) });
     docs.push({ label: "Seller's Contract", html: () => sellersContractHTML(l, auctionName, auctionDate) });
-    docs.push({ label: 'Buyer Recap', html: () => buyerRecapHTML(l, auctionName, auctionDate) });
+    // Buyer identity is admin-only (see canViewBuyer()) — these two
+    // document types exist specifically to carry it, so they're the
+    // one place that boundary has to be enforced at generation time
+    // too, not just in the table cell. userIsAdmin was already being
+    // passed into this function but never actually checked; every rep
+    // who could reach "Generate Documents" for a sold lot could
+    // already download the Buyer's Contract and Buyer Recap through
+    // the normal UI, regardless of canViewBuyer()'s intent.
+    if (userIsAdmin) {
+      docs.push({ label: "Buyer's Contract", html: () => buyersContractHTML(l, auctionName, auctionDate) });
+      docs.push({ label: 'Buyer Recap', html: () => buyerRecapHTML(l, auctionName, auctionDate) });
+    }
   }
   return docs;
 }
@@ -1747,6 +1786,8 @@ async function loadApp() {
     if (isAdmin()) {
       step = 'profiles';
       state.profiles = await fetchProfiles();
+      step = 'buyer identities';
+      await joinLotBuyers(state.lots);
     }
   } catch (e) {
     console.error('[CMS] loadApp failed at:', step, e);
@@ -1798,6 +1839,15 @@ function setupRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'lots' }, async (payload) => {
       if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
         const lot = dbToLot(payload.new);
+        // buyer isn't part of the cmLots document anymore (see
+        // joinLotBuyers()'s doc comment) — dbToLot() naturally leaves
+        // it undefined, so without this a realtime update to ANY
+        // field on a lot would wipe out its already-joined buyer for
+        // admins until the next full reload. Carry the existing
+        // in-memory value forward; setLotBuyer()/clearLotBuyer()'s own
+        // callers already keep it correct when it actually changes.
+        const existing = getLot(lot.id);
+        if (existing && 'buyer' in existing) lot.buyer = existing.buyer;
         upsertLot(lot);
         if (state.ui.activeLotId === lot.id) renderLDP(lot.id);
       } else if (payload.eventType === 'DELETE') {
@@ -3900,11 +3950,12 @@ async function doChangeStatus(id, newStatus) {
     changes.soldSt = 'waiting';
     if (!lot.soldDate) changes.soldDate = new Date().toISOString().split('T')[0];
   } else {
-    // Moving away from Sold — clear all sale fields
+    // Moving away from Sold — clear all sale fields. Buyer lives in
+    // cmLotBuyers now (see joinLotBuyers()'s doc comment), cleared
+    // separately below rather than as part of this cmLots patch.
     changes.soldSt    = null;
     changes.soldDate  = null;
     changes.price     = null;
-    changes.buyer     = null;
     changes.down      = null;
     changes.soldNotes = null;
     changes.shipDate  = null;
@@ -3918,6 +3969,7 @@ async function doChangeStatus(id, newStatus) {
   }
   try {
     const updated = await updateLot(id, changes);
+    if (newStatus !== STATUS.SOLD) { await clearLotBuyer(id); updated.buyer = ''; }
     upsertLot(updated);
     await logActivity(id, `Status changed to ${newStatus}`, getUserDisplayName());
     toast(`Lot moved to ${newStatus}`);
@@ -4107,7 +4159,11 @@ async function saveSaleInfo(id) {
   const shipDate= document.getElementById('sale-ship-inp')?.value || '';
   if (!isPO && !price) { toast('Enter a sale price or check PO', true); return; }
   try {
-    const updated = await updateLot(id, { price, buyer, down, soldNotes: notes, soldDate: date, shipDate });
+    // Buyer identity is stored separately (cmLotBuyers, admin-only —
+    // see joinLotBuyers()'s doc comment) — not part of the cmLots patch.
+    const updated = await updateLot(id, { price, down, soldNotes: notes, soldDate: date, shipDate });
+    if (buyer) await setLotBuyer(id, buyer); else await clearLotBuyer(id);
+    updated.buyer = buyer;
     upsertLot(updated);
     await logActivity(id, 'Sale info updated', getUserDisplayName());
     toast('Sale info saved');

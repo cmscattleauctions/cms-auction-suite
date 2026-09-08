@@ -10,17 +10,70 @@ import { resolveVideoIdEntry, CODE_KIND_LABELS, CODE_KIND_SHORT_LABELS } from '.
 import { buildBaseId, formatMonthYear, parseVideoId, monthYearToInputValue, inputValueToMonthYear } from './video-id.js';
 import * as StorageData from './storage-data.js';
 
-/* ----- generic modal shell ----- */
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/* ----- generic modal shell -----
+ * Every Video Manager modal (upload, collision resolution, new
+ * consignor, CSV import, Video ID Manager, etc.) goes through this one
+ * function, so its dialog behavior (spec section 9: correct initial
+ * focus, focus containment while open, focus restoration on close,
+ * Escape dismissal) only needs to be implemented once here rather than
+ * per modal. */
 function mountModal(innerHtml, { wide = false } = {}) {
   const root = document.getElementById('vm-modal-root');
+  const previouslyFocused = document.activeElement;
   const backdrop = document.createElement('div');
   backdrop.className = 'vm-modal-backdrop';
-  backdrop.innerHTML = `<div class="vm-modal ${wide ? 'vm-modal-wide' : ''}">${innerHtml}</div>`;
+  backdrop.innerHTML = `<div class="vm-modal ${wide ? 'vm-modal-wide' : ''}" role="dialog" aria-modal="true" tabindex="-1">${innerHtml}</div>`;
   root.appendChild(backdrop);
   backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
-  function close() { backdrop.remove(); }
+
+  function close() {
+    backdrop.removeEventListener('keydown', onKeydown);
+    backdrop.remove();
+    // Restore focus to whatever opened this modal — if that element is
+    // itself gone (e.g. the row it was on got removed by a refresh),
+    // activeElement just falls back to <body>, which is fine.
+    if (previouslyFocused && previouslyFocused.isConnected && previouslyFocused.focus) {
+      previouslyFocused.focus();
+    }
+  }
+
+  function focusableEls() {
+    return Array.from(modal.querySelectorAll(FOCUSABLE_SELECTOR)).filter(el => el.offsetParent !== null);
+  }
+
+  function onKeydown(e) {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      close();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    // Focus containment: cycle within the modal's own focusable elements
+    // instead of letting Tab/Shift+Tab escape to the page underneath.
+    const els = focusableEls();
+    if (!els.length) { e.preventDefault(); return; }
+    const first = els[0], last = els[els.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault(); first.focus();
+    }
+  }
+  backdrop.addEventListener('keydown', onKeydown);
+
   const modal = backdrop.querySelector('.vm-modal');
   modal.querySelectorAll('[data-modal-close]').forEach(b => b.addEventListener('click', close));
+
+  // Initial focus: the first real input/button inside the modal reads
+  // better than the modal shell itself for a form-first dialog: staff
+  // can start typing/acting immediately. Falls back to the modal
+  // container (still focusable via tabindex="-1" above) if the modal
+  // has no focusable content of its own yet (e.g. still loading).
+  const firstFocusable = focusableEls()[0];
+  (firstFocusable || modal).focus();
+
   return { backdrop, modal, close };
 }
 
@@ -572,8 +625,8 @@ export function openUploadModal(ctx) {
           <div><label>Weight</label><input type="number" id="um-b-weight" placeholder="450" /></div>
         </div>
         <div class="field-row">
-          <div><label>Sire</label><select id="um-b-sire"><option value="">Select…</option>${sires.map(s => `<option value="${s.code}">${s.code}- ${s.label}</option>`).join('')}</select></div>
-          <div><label>Dam</label><select id="um-b-dam"><option value="">Select…</option>${dams.map(s => `<option value="${s.code}">${s.code}- ${s.label}</option>`).join('')}</select></div>
+          <div><label>Sire</label><select id="um-b-sire"><option value="">Select…</option>${sires.map(s => `<option value="${s.code}">${s.code}- ${escapeHtml(s.label)}</option>`).join('')}</select></div>
+          <div><label>Dam</label><select id="um-b-dam"><option value="">Select…</option>${dams.map(s => `<option value="${s.code}">${s.code}- ${escapeHtml(s.label)}</option>`).join('')}</select></div>
         </div>
         <div class="field"><label>Month / Year</label><input type="month" id="um-b-monthyear" /></div>
         <div class="vm-generated-id-box is-placeholder" id="um-b-preview">
@@ -618,7 +671,7 @@ export function openUploadModal(ctx) {
     const sexLabel = ctx.ref.sexLabel(existing.sexCode) || existing.sexCode;
     const sireLabel = ctx.ref.sireLabel(existing.sireCode) || existing.sireCode;
     const damLabel = ctx.ref.damLabel(existing.damCode) || existing.damCode;
-    const statusWord = existing.status === 'created' ? 'Created' : existing.status === 'hold' ? 'On Hold' : 'Ready to Make';
+    const statusWord = existing.status === 'created' ? 'Completed' : existing.status === 'hold' ? 'On Hold' : 'Ready to Make';
     idResult.innerHTML = `
       <div class="vm-id-search-result">
         <div class="vid">${escapeHtml(existing.videoId)}</div>
@@ -800,6 +853,10 @@ export function openUploadModal(ctx) {
   }
 
   /* ----- submit ----- */
+  // Every record created here is always status:'ready' ("Ready to Make"),
+  // deliberately not ctx.state.statusTab — an upload is raw clips, not a
+  // finished/on-hold video, regardless of which tab happened to be open
+  // when it was uploaded. Same rule in ui-table.js's quick add-row.
   modal.querySelector('#um-submit').addEventListener('click', async () => {
     if (pickedFiles.some(e => e.status === 'uploading')) {
       showToast('Still uploading — wait for clips to finish before submitting');
@@ -834,7 +891,7 @@ export function openUploadModal(ctx) {
         sireCode: matchedExisting.sireCode, damCode: matchedExisting.damCode,
         weight: matchedExisting.weight, monthYear: matchedExisting.monthYear,
       };
-      const record = await ctx.repo.createVideo({ ...fields, suffix, status: ctx.state.statusTab, notes, clips }, 'Staff');
+      const record = await ctx.repo.createVideo({ ...fields, suffix, status: 'ready', notes, clips }, 'Staff');
       showToast(`Created ${record.videoId}`);
       close(); ctx.refresh();
       return;
@@ -860,7 +917,7 @@ export function openUploadModal(ctx) {
 
     let suffix = outcome.fields.suffix || null;
     if (outcome.type === 'create-separate') suffix = await ctx.repo.nextSuffixFor(outcome.baseId);
-    const record = await ctx.repo.createVideo({ ...outcome.fields, suffix, status: ctx.state.statusTab, notes, clips }, 'Staff');
+    const record = await ctx.repo.createVideo({ ...outcome.fields, suffix, status: 'ready', notes, clips }, 'Staff');
     showToast(`Created ${record.videoId}`);
     close();
     ctx.refresh();
@@ -1051,7 +1108,7 @@ export function openDeleteConfirmModal(rec, ctx, onDeleted) {
         <div class="row">${escapeHtml(rec.consignorName)}</div>
       </div>
       <div class="vm-delete-warning">
-        <p>This moves the record to <strong>Trash</strong> — it disappears from Ready to Make / On Hold / Created immediately. Nothing is destroyed yet; it can be restored from Trash (Tools menu), or permanently deleted later.</p>
+        <p>This moves the record to <strong>Trash</strong> — it disappears from Ready to Make / On Hold / Completed immediately. Nothing is destroyed yet; it can be restored from Trash (Tools menu), or permanently deleted later.</p>
         <p style="margin-top:8px;">This will also affect:</p>
         <ul>
           <li>${rec.clips.length} source clip${rec.clips.length === 1 ? '' : 's'}</li>
@@ -1107,8 +1164,8 @@ export function openTrashModal(ctx) {
           <div class="row">${escapeHtml(r.consignorName)} · Deleted ${formatDate(r.deletedAt)}${r.deletedBy ? ` by ${escapeHtml(r.deletedBy)}` : ''}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
-          <button class="btn btn-sm" data-restore="${r.id}" type="button">Restore</button>
-          <button class="btn btn-sm btn-danger" data-purge="${r.id}" type="button">Delete Permanently</button>
+          <button class="btn btn-sm" data-restore="${escapeHtml(r.id)}" type="button">Restore</button>
+          <button class="btn btn-sm btn-danger" data-purge="${escapeHtml(r.id)}" type="button">Delete Permanently</button>
         </div>
       </div>
     `).join('');

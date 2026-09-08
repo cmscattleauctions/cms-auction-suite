@@ -6,8 +6,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Archivo+Black&family=Kaushan+Script&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!-- jsPDF + html2canvas (~600KB combined) are only needed for PDF export
+     (exportPDF(), below) — not for browsing/editing the catalog, which is
+     most page visits. Loaded on demand by ensurePdfLibs() the first time
+     someone actually clicks Export, instead of on every page load. -->
 <!-- Shared Firebase data layer (projects + settings). Loaded as a module; exposed as window.CMSData. -->
 <script>
 window.cmsDataReady = new Promise(function(res){
@@ -1332,6 +1334,43 @@ function readSettingsUI(){
 
 /* ===== text helpers (auto-bold rules) ===== */
 function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+/* Narrow allowlist sanitizer for the few fields (desc/notes/seller)
+ * where a staff member's contenteditable edit is expected to carry
+ * real formatting (bold from applyBoldRules, <br> line breaks) — a
+ * blanket esc() would show literal "&lt;strong&gt;" instead of bold
+ * text, so those fields can't just be escaped like every other cell.
+ * Uses DOMParser (not innerHTML on a live element) specifically
+ * because it's inert — parsed content never loads resources or fires
+ * event handlers, so a crafted <img onerror=...> can't execute just
+ * by being parsed here. Keeps only these tags, strips every
+ * attribute even on kept tags (a class/style/href is never needed for
+ * plain bold/italic/line-break formatting), and drops anything else
+ * while preserving its text content so the words aren't lost, only
+ * the unsafe markup around them. */
+const RICH_TEXT_ALLOWED_TAGS = new Set(['STRONG','B','EM','I','U','BR']);
+function sanitizeRichText(html){
+  const doc=new DOMParser().parseFromString(String(html==null?'':html),'text/html');
+  function clean(node){
+    const out=document.createDocumentFragment();
+    node.childNodes.forEach(child=>{
+      if(child.nodeType===Node.TEXT_NODE){
+        out.appendChild(document.createTextNode(child.textContent));
+      }else if(child.nodeType===Node.ELEMENT_NODE){
+        if(RICH_TEXT_ALLOWED_TAGS.has(child.tagName)){
+          const el=document.createElement(child.tagName);
+          el.appendChild(clean(child));
+          out.appendChild(el);
+        }else{
+          out.appendChild(clean(child));
+        }
+      }
+    });
+    return out;
+  }
+  const wrapper=document.createElement('div');
+  wrapper.appendChild(clean(doc.body));
+  return wrapper.innerHTML;
+}
 function nl(s){return esc(s).replace(/\\n|\n/g,'<br>');}
 function flat(s){return esc((s||'').replace(/\\n|\n|\r/g,' ').replace(/\s+/g,' ').trim());}
 /* Preserve newlines that came from a spreadsheet cell (Excel/Sheets export them
@@ -1447,7 +1486,7 @@ function displayLotNumber(lot){
   return raw;
 }
 function descHTML(lot){
-  if(lotEdit(lot,'desc')!=null) return lotEdit(lot,'desc');
+  if(lotEdit(lot,'desc')!=null) return sanitizeRichText(lotEdit(lot,'desc'));
   const n=parseInt(lot.loadCount)||0;
   const load=lot.loadCount?`<strong>${esc(lot.loadCount)} Load${n===1?'':'s'}</strong> of `:'';
   let breed=flat(lot.breed);
@@ -1455,11 +1494,12 @@ function descHTML(lot){
 }
 function notesHTML(lot){
   let html=lotEdit(lot,'notes');
-  if(html==null) html=[lot.desc1,lot.desc2].filter(Boolean).map(multi).join('<br>');
+  if(html!=null) return sanitizeRichText(applyBoldRules(html));
+  html=[lot.desc1,lot.desc2].filter(Boolean).map(multi).join('<br>');
   return applyBoldRules(html);
 }
 function sellerHTML(lot){
-  if(lotEdit(lot,'seller')!=null) return lotEdit(lot,'seller');
+  if(lotEdit(lot,'seller')!=null) return sanitizeRichText(lotEdit(lot,'seller'));
   return `<span class="seller-name">${esc(lot.consignor)}</span>`+(lot.location?`<i>${esc(lot.location)}</i>`:'');
 }
 
@@ -2007,17 +2047,17 @@ function legacyLotRowHTML(lot,li,b,bi,page,grid,cols,alt){
     else if(c==='seller'){cls+=' seller';v=sellerHTML(lot);}
     else if(c==='head'){cls+=' head ctr';v=esc(lotEdit(lot,'head')??lot.head);}
     else if(c==='desc'){cls+=' desc';v=descHTML(lot);}
-    else if(c==='sex'){cls+=' sex ctr';v=(lotEdit(lot,'sex')??flat(lot.sex));}
+    else if(c==='sex'){cls+=' sex ctr';v=lotEdit(lot,'sex')!=null?esc(lotEdit(lot,'sex')):flat(lot.sex);}
     else if(c==='basewt'){cls+=' basewt ctr';
-      v=lotEdit(lot,'basewt')??(lot.basewt?esc(lot.basewt)+'#':'');}
+      v=lotEdit(lot,'basewt')!=null?esc(lotEdit(lot,'basewt')):(lot.basewt?esc(lot.basewt)+'#':'');}
     else if(c==='delivery'){cls+=' delivery ctr';v=esc(lotEdit(lot,'delivery')??lot.delivery);}
     else if(c==='shrink'){cls+=' shrink ctr';v=esc(lotEdit(lot,'shrink')??lot.shrink);}
-    else if(c==='slide'){cls+=' slide ctr';v=(lotEdit(lot,'slide')??flat(lot.slide));}
+    else if(c==='slide'){cls+=' slide ctr';v=lotEdit(lot,'slide')!=null?esc(lotEdit(lot,'slide')):flat(lot.slide);}
     else if(c==='notes'){cls+=' notes';v=notesHTML(lot);}
     else if(c==='price'){cls+=' price ctr';
-      v=lotEdit(lot,'price')??(lot.price?esc(lot.price):'');}
+      v=lotEdit(lot,'price')!=null?esc(lotEdit(lot,'price')):(lot.price?esc(lot.price):'');}
     else if(c==='poPrice'){cls+=' price po-price ctr';
-      v=lotEdit(lot,'poPrice')??(lot.poPrice?esc(lot.poPrice):'');}
+      v=lotEdit(lot,'poPrice')!=null?esc(lotEdit(lot,'poPrice')):(lot.poPrice?esc(lot.poPrice):'');}
     const sc=lotCellScale(lot,c);
     const cellScale=sc&&sc!==1?` style="font-size:${sc}em !important"`:'';
     const hlCls=lotCellHL(lot,c)?' cell-hl':'';
@@ -2571,8 +2611,33 @@ function exportName(kind){
   if(kind==='results')return `${base}-Results.pdf`;
   return `${base}-Listings.pdf`;
 }
+let _pdfLibsPromise=null;
+function loadScript(src){
+  return new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src=src;
+    s.onload=()=>resolve();
+    s.onerror=()=>reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(s);
+  });
+}
+function ensurePdfLibs(){
+  if(!_pdfLibsPromise){
+    _pdfLibsPromise=Promise.all([
+      loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'),
+      loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'),
+    ]).catch(err=>{ _pdfLibsPromise=null; throw err; }); // allow retry on a flaky load
+  }
+  return _pdfLibsPromise;
+}
 async function exportPDF(kind=S.sheetMode||'default'){
   toast('Rendering PDF…');
+  try{
+    await ensurePdfLibs();
+  }catch(err){
+    toast('Could not load the PDF engine — check your connection and try again.');
+    return;
+  }
   if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
   saveModeLayout();
   await new Promise(r=>setTimeout(r,80));

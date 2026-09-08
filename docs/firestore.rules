@@ -69,6 +69,118 @@ service cloud.firestore {
     match /appSettings/{key}       { allow read, write: if isApproved(); }
 
     // ── Video Manager ───────────────────────────────────────────
+    // A public, anonymous-write submission is the one place in this
+    // app where the CLIENT is not the security boundary — the upload
+    // page (public/video-upload/) happens to only ever construct a
+    // well-formed record via repository.js's createVideo(), but
+    // that's browser JS; anyone can call the Storage/Firestore SDKs
+    // directly with arbitrary data instead. This mirrors createVideo's
+    // actual output shape (see repository.js) and pins every field a
+    // fresh anonymous submission should never be able to fake its way
+    // out of — it can't submit a record that already looks reviewed,
+    // published, claimed, or used, and every free-text/URL-shaped
+    // field gets a length cap so a malformed submission can't bloat
+    // storage or break a staff view that assumes reasonable sizes.
+    // One clip entry from a fresh anonymous submission — matches the
+    // exact shape public/video-upload/app.js's createRecord() builds.
+    // Firestore rules have no loop/recursion construct, so "validate
+    // every item in a list" has to be unrolled as explicit indexed
+    // checks below (isValidAnonVideoSubmission's d.clips.size() < N ||
+    // isValidClip(d.clips[N-1]) chain) rather than expressed as a
+    // single .every()-style call — there isn't one in this language.
+    function isValidClip(c) {
+      return c.keys().hasOnly(['id', 'filename', 'swatch', 'durationSec', 'sizeBytes', 'uploader', 'uploadedAt', 'isOriginal', 'storagePath', 'downloadUrl'])
+        && c.id is string && c.id.matches('^clip_[a-z0-9]{1,20}$')
+        && c.filename is string && c.filename.size() > 0 && c.filename.size() <= 260
+        && c.swatch is number
+        && (c.durationSec == null || c.durationSec is number)
+        && c.sizeBytes is number && c.sizeBytes > 0 && c.sizeBytes <= 2147483648
+        && c.uploader == 'Rep'
+        && c.uploadedAt is string
+        && c.isOriginal == true
+        // Matches docs/storage.rules' own videoClips/{recordId}/{fileName}
+        // path shape — a clip claiming to live somewhere else in Storage
+        // is not a shape createRecord() ever produces.
+        && c.storagePath is string && c.storagePath.matches('^videoClips/.*')
+        && (c.downloadUrl == null || (c.downloadUrl is string && c.downloadUrl.size() <= 2000));
+    }
+
+    function isValidAnonVideoSubmission() {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+        'id', 'videoId', 'baseVideoId', 'suffix', 'videoIdHistory',
+        'consignorCode', 'consignorName', 'sexCode', 'sireCode', 'damCode',
+        'weight', 'monthYear', 'status', 'isDraft', 'needsReview', 'videoMaker',
+        'createdBy', 'dateAdded', 'lastUpdated', 'notes', 'canvaLink', 'clips',
+        'listingImageUrl', 'submittedByUid', 'youtubeId', 'youtubeUrl',
+        'embedUrl', 'embedCode', 'previousYouTubeVideos', 'videoFormat',
+        'hasTags', 'workingOn', 'usage', 'activity'
+      ])
+        && d.createdBy == 'Rep'
+        && d.submittedByUid == request.auth.uid
+        // Must start in exactly this state — never pre-reviewed,
+        // pre-published, pre-claimed, or with fabricated usage/history.
+        && d.status == 'ready'
+        && d.needsReview == true
+        && d.workingOn == null
+        && d.usage.size() == 0
+        && d.videoIdHistory.size() == 0
+        && d.previousYouTubeVideos.size() == 0
+        && d.youtubeId == null && d.youtubeUrl == null
+        && d.embedUrl == null && d.embedCode == null
+        // Types + length/range caps on everything else. id specifically
+        // is pinned to the exact shape generateInternalId() produces
+        // (video-id.js) — "vid_" + 8 lowercase alphanumeric chars —
+        // not just capped at 100 chars: this id is rendered as a raw
+        // HTML data-* attribute value in several places in the Video
+        // Manager UI (ui-table.js/ui-grid.js/ui-drawer.js — now also
+        // escaped there as defense in depth, but a submission should
+        // never be able to get an attribute-breakout payload into this
+        // field in the first place).
+        && d.id is string && d.id.matches('^vid_[a-z0-9]{8}$')
+        && d.videoId is string && d.videoId.size() > 0 && d.videoId.size() <= 60
+        && d.baseVideoId is string && d.baseVideoId.size() > 0 && d.baseVideoId.size() <= 60
+        && (d.suffix == null || (d.suffix is string && d.suffix.size() <= 20))
+        && d.consignorCode is string && d.consignorCode.size() <= 20
+        && d.consignorName is string && d.consignorName.size() <= 200
+        && d.sexCode is string && d.sexCode.size() <= 20
+        && d.sireCode is string && d.sireCode.size() <= 20
+        && d.damCode is string && d.damCode.size() <= 20
+        && d.weight is number && d.weight > 0 && d.weight < 20000
+        && d.monthYear is string && d.monthYear.size() == 4
+        && d.isDraft is bool
+        && d.dateAdded is string && d.lastUpdated is string
+        && d.videoMaker is string && d.videoMaker.size() <= 100
+        && d.notes is string && d.notes.size() <= 2000
+        && (d.canvaLink == null || (d.canvaLink is string && d.canvaLink.size() <= 500))
+        && (d.listingImageUrl == null || (d.listingImageUrl is string && d.listingImageUrl.size() <= 2000))
+        && d.videoFormat is string && d.videoFormat.size() <= 30
+        && d.hasTags is bool
+        // Capped at 15 (down from a bare size-only cap of 20, matched
+        // client-side in video-upload/app.js so a rep who picks more
+        // gets a clear warning up front instead of a confusing
+        // permission-denied after they've already uploaded files) —
+        // still generous for a phone-based rep submission, and bounded
+        // enough that validating each entry's actual shape below stays
+        // a mechanical (if repetitive) list rather than unbounded.
+        && d.clips is list && d.clips.size() <= 15
+        && (d.clips.size() < 1  || isValidClip(d.clips[0]))
+        && (d.clips.size() < 2  || isValidClip(d.clips[1]))
+        && (d.clips.size() < 3  || isValidClip(d.clips[2]))
+        && (d.clips.size() < 4  || isValidClip(d.clips[3]))
+        && (d.clips.size() < 5  || isValidClip(d.clips[4]))
+        && (d.clips.size() < 6  || isValidClip(d.clips[5]))
+        && (d.clips.size() < 7  || isValidClip(d.clips[6]))
+        && (d.clips.size() < 8  || isValidClip(d.clips[7]))
+        && (d.clips.size() < 9  || isValidClip(d.clips[8]))
+        && (d.clips.size() < 10 || isValidClip(d.clips[9]))
+        && (d.clips.size() < 11 || isValidClip(d.clips[10]))
+        && (d.clips.size() < 12 || isValidClip(d.clips[11]))
+        && (d.clips.size() < 13 || isValidClip(d.clips[12]))
+        && (d.clips.size() < 14 || isValidClip(d.clips[13]))
+        && (d.clips.size() < 15 || isValidClip(d.clips[14]))
+        && d.activity is list && d.activity.size() <= 5;
+    }
     match /videoRecords/{id} {
       // Deliberately NOT readable by isAnon(): these documents carry
       // real business data (consignor names, internal notes, activity
@@ -86,9 +198,7 @@ service cloud.firestore {
       // grew, nothing else changed" the way a real update would need.
       // submittedByUid ties every public submission back to a real (if
       // anonymous) Firebase UID for traceability.
-      allow create: if isAnon()
-                    && request.resource.data.createdBy == 'Rep'
-                    && request.resource.data.submittedByUid == request.auth.uid;
+      allow create: if isAnon() && isValidAnonVideoSubmission();
     }
     // Just names/labels for the public form's dropdowns (consignor
     // names, sire/dam type labels) — no business-sensitive data, and
@@ -109,17 +219,78 @@ service cloud.firestore {
     // transferClip Cloud Function (see functions/index.js); only that
     // function (via the Admin SDK, which bypasses these rules) is ever
     // allowed to update a job after it's created, so a client can't
-    // fake a "done" result for itself.
+    // fake a "done" result for itself. Scoped to isSuiteAdmin() (not
+    // isApproved()): this job type only ever exists to make the
+    // transferClip function fetch a client-supplied publicUrl
+    // server-side — see that function's SSRF hardening — so it's
+    // scoped to the one account allowed to run migrations, matching
+    // the requester re-check transferClip itself now does. No regular
+    // staff workflow creates this job type.
     match /clipTransferJobs/{jobId} {
-      allow read:   if isApproved();
-      allow create: if isApproved()
+      allow read:   if isSuiteAdmin();
+      allow create: if isSuiteAdmin()
                     && request.resource.data.requestedBy == request.auth.uid
                     && request.resource.data.status == 'pending';
       allow update, delete: if false;
     }
 
     // ── Country Market ─────────────────────────────────────────
-    match /cmLots/{id}        { allow read, write: if isApproved(); }
+    // app.js's own permission model (canEditLot/canDeleteLot/
+    // canChangeStatus/canViewBuyer) already draws these exact lines —
+    // this just makes the rules actually enforce them, since the old
+    // blanket `write: if isApproved()` let any approved suite user
+    // edit/delete/change-status on ANY lot (not just their own) via a
+    // direct SDK call, bypassing the app's UI-only restriction
+    // entirely. Buyer-field visibility (read) and tamper-resistance
+    // (write) can't be fully enforced here — Firestore rules are
+    // document-granular, not field-granular, and `buyer` isn't present
+    // on every lot (only once sold, so a presence-safe equality check
+    // on it adds real complexity for a partial guarantee). An approved
+    // rep with direct SDK access can therefore still read, or write
+    // over, a lot's buyer field even though the UI hides/blocks that.
+    // Closing this fully needs moving `buyer` into a separate, admin-
+    // only-readable document — a real schema change, out of scope for
+    // this pass (flagged in docs/HARDENING_CHECKLIST.md).
+    function cmRepName() {
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.rep_name;
+    }
+    match /cmLots/{id} {
+      allow read:   if isApproved();
+      allow create: if isApproved();
+      allow update: if isApproved() && (
+        cmIsAdmin() ||
+        (
+          resource.data.rep == cmRepName()
+          && resource.data.status in ['Staged', 'Active']
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.rep == resource.data.rep
+          // Buyer identity is admin-only to set (app.js's own
+          // requirePerm(canChangeStatus(), 'Only admins can edit sale
+          // information.') already keeps the real UI from ever
+          // offering this to a rep) — this is the server-side version
+          // of that same boundary, so a direct SDK call can't bypass
+          // it. Presence-safe: buyer isn't set on every lot (only once
+          // sold), so this checks it neither appears nor disappears,
+          // and where it already exists its value can't change,
+          // without assuming the field exists at all.
+          && (('buyer' in request.resource.data) == ('buyer' in resource.data))
+          && (!('buyer' in resource.data) || request.resource.data.buyer == resource.data.buyer)
+        )
+      );
+      allow delete: if isApproved() && cmIsAdmin();
+    }
+    // Buyer identity, split out of cmLots into its own admin-only-
+    // readable collection — Firestore rules are document-granular, not
+    // field-granular, so this is the only way to make canViewBuyer()'s
+    // UI-only boundary (reps never see a lot's buyer) hold up against
+    // direct SDK/API access too. One doc per lot that's ever had a
+    // buyer (id matches the lot's own id); app.js joins this onto
+    // state.lots client-side for admins only after loading lots (see
+    // loadApp()) rather than touching every render call site that
+    // reads lot.buyer, so contract/report generation stays unchanged.
+    match /cmLotBuyers/{lotId} {
+      allow read, write: if isApproved() && cmIsAdmin();
+    }
     match /cmActivityLog/{id} { allow read, write: if isApproved(); }
     match /cmConsignors/{id} {
       allow read:  if isApproved();
@@ -130,11 +301,28 @@ service cloud.firestore {
       allow write: if isApproved() && cmIsAdmin();
     }
     match /profiles/{uid} {
-      // Approved users can read all profiles; you can create your own
-      // (first-login bootstrap); only admins can change roles.
+      // Approved users can read all profiles, and can create their own
+      // on first login — but never as admin, and never with a rep_name
+      // already filled in. Both are trusted-process actions (an
+      // existing Country Market admin, or the suite admin as a
+      // bootstrap/recovery path, sets them afterwards via the Admin
+      // page) — never something a new profile can grant itself.
+      //
+      // rep_name matters as much as role here: cmLots' own ownership
+      // check (see below) trusts `lot.rep == the caller's rep_name`
+      // as a stable identity. Before this, create had no restriction
+      // on rep_name at all — the real app UI always creates it empty
+      // (see country-market/firestore-adapter.js's ensureProfile()),
+      // but a direct SDK call could set rep_name to an EXISTING rep's
+      // name on a brand-new account and inherit edit rights over every
+      // lot that rep owns. Requiring it empty at creation means the
+      // only way a profile's rep_name is ever non-empty is an admin
+      // having deliberately set it via update, below.
       allow read:   if isApproved();
-      allow create: if isApproved() && request.auth.uid == uid;
-      allow update: if isApproved() && cmIsAdmin();
+      allow create: if isApproved() && request.auth.uid == uid
+                    && request.resource.data.role == 'rep'
+                    && request.resource.data.rep_name == '';
+      allow update: if isApproved() && (cmIsAdmin() || isSuiteAdmin());
       allow delete: if false;
     }
   }

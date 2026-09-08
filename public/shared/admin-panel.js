@@ -106,6 +106,7 @@ function renderUsers(users) {
           <div><label>Role</label><input type="text" id="newUserRole" placeholder="e.g. Staff, Rep, Admin"></div>
         </div>
         <label style="margin-top:10px;">Tabs this person can open</label>
+        <p class="admin-msg muted" style="margin:2px 0 8px;">Hides tabs from their sidebar — most of the suite's shared data is not further restricted per account, so treat this as decluttering navigation, not as a data-access boundary.</p>
         <div class="admin-tab-chips" id="newUserTabs">${tabChipsHtml('newUser', null)}</div>
         <button type="button" class="btn btn-primary" id="btnAddUser" style="margin-top:12px;">Create Account</button>
         <p class="admin-msg muted" id="addUserMsg"></p>
@@ -124,6 +125,7 @@ function renderUsers(users) {
 
 function userRowHtml(u) {
   const approved = u.approved === true;
+  const isSelf = (u.email || '').toLowerCase() === AdminData.SUITE_ADMIN_EMAIL;
   return `
     <details class="admin-user-row" data-uid="${esc(u.uid)}">
       <summary class="admin-user-summary">
@@ -137,10 +139,12 @@ function userRowHtml(u) {
           <div><label>Set New Password</label><input type="password" class="password-input" placeholder="Leave blank to skip"></div>
         </div>
         <label style="margin-top:10px;">Tabs this person can open</label>
+        <p class="admin-msg muted" style="margin:2px 0 8px;">Hides tabs from their sidebar — most of the suite's shared data is not further restricted per account, so treat this as decluttering navigation, not as a data-access boundary.</p>
         <div class="admin-tab-chips">${tabChipsHtml('u-' + u.uid, u.allowedTabs)}</div>
         <div class="admin-row-actions">
           <button type="button" class="btn ${approved ? 'btn-ghost' : 'btn-accent'} btn-toggle-approved">${approved ? 'Unapprove' : 'Approve'}</button>
           <button type="button" class="btn btn-primary btn-save-row">Save Changes</button>
+          ${isSelf ? '' : '<button type="button" class="btn btn-danger btn-delete-row">Delete User</button>'}
         </div>
         <p class="admin-msg muted row-msg"></p>
       </div>
@@ -163,6 +167,23 @@ function wireUserRow(u) {
       msg.textContent = err.message;
       msg.style.color = 'var(--danger)';
       btn.disabled = false;
+    }
+  });
+
+  const deleteBtn = row.querySelector('.btn-delete-row');
+  if (deleteBtn) deleteBtn.addEventListener('click', async () => {
+    const label = u.email || `user ${u.uid}`;
+    if (!confirm(`Delete ${label}? This removes their sign-in and cannot be undone.`)) return;
+    deleteBtn.disabled = true;
+    msg.style.color = '';
+    msg.textContent = 'Deleting…';
+    try {
+      await AdminData.deleteUserAccount(u.uid);
+      await refresh();
+    } catch (err) {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = err.message;
+      deleteBtn.disabled = false;
     }
   });
 

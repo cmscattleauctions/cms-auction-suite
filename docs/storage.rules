@@ -28,7 +28,20 @@ service firebase.storage {
     // per file, must actually be a video. This is the real backstop
     // behind the app's own pre-flight size checks.
     match /videoClips/{recordId}/{fileName} {
-      allow read: if isApproved();
+      // isAnon() also needs read: storage-data.js's uploadClip() (used
+      // by BOTH the staff upload flow and the public rep page) calls
+      // getDownloadURL() right after the upload finishes to hand back
+      // a usable link — without read access here, that call was
+      // rejected for every anonymous uploader, which made the whole
+      // upload look like it had failed (it hadn't — the bytes were
+      // already safely in Storage, just impossible to get a URL back
+      // for). No new confidentiality boundary is given up by this: an
+      // anonymous session can already CREATE (fully control the
+      // content of) any path under here, and every one of these clips
+      // is destined to become a published, public marketing video once
+      // staff reviews it — there was never a real secret here for
+      // isApproved()-only read to be protecting.
+      allow read: if isApproved() || isAnon();
       allow write: if isApproved()
                    && request.resource.size < 2 * 1024 * 1024 * 1024
                    && request.resource.contentType.matches('video/.*');
@@ -43,6 +56,23 @@ service firebase.storage {
       allow create: if isAnon()
                     && request.resource.size < 2 * 1024 * 1024 * 1024
                     && request.resource.contentType.matches('video/.*');
+    }
+
+    // Public rep-upload listing photo — was previously read as a local
+    // base64 data URL and stored inline on the videoRecords document
+    // (often several MB of text); now uploaded here like a clip, with
+    // just the resulting download URL stored on the record instead
+    // (see storage-data.js's uploadListingImage() and its own comment
+    // for why, and docs/firestore.rules' listingImageUrl length cap,
+    // sized for a real URL rather than inline image data).
+    match /listingImages/{recordId}/{fileName} {
+      allow read: if isApproved() || isAnon();
+      allow write: if isApproved()
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow create: if isAnon()
+                    && request.resource.size < 10 * 1024 * 1024
+                    && request.resource.contentType.matches('image/.*');
     }
 
     // Beta OBS Builder — verification tag images (small, PNG/SVG).

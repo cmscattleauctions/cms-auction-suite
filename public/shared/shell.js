@@ -46,6 +46,14 @@ let activeRoute = null;
 // specific account) — set from the current user's users/{uid}.allowedTabs
 // in renderShell() below, via Admin Settings (admin-panel.js).
 let allowedTabIds = null;
+// tabId -> the <iframe> created the first time that tab was opened this
+// session. Switching tabs used to blow away #content's innerHTML and
+// recreate the iframe from scratch every time, which reset every
+// sub-app's in-page state (filters, search text, scroll position, an
+// open drawer) on every trip away and back. Now a tab's iframe is
+// created once and just hidden/shown — reset only in renderShell() on
+// a fresh boot (sign-in/out), since #content itself is rebuilt then.
+let iframes = new Map();
 
 /** "tab" or "tab/route" -> { tabId, route } — route may contain its own
  *  encoded content but never another "/", so splitting on the first
@@ -148,18 +156,24 @@ async function renderShell(root, user) {
         <nav class="sidebar-nav" id="sidebar-nav" aria-label="App tabs"></nav>
 
         <div class="sidebar-user">
-          ${isSuiteAdmin ? `<button class="admin-settings-btn" type="button" id="btnOpenAdminSettings">Admin Settings</button>` : ''}
+          ${isSuiteAdmin ? `<button class="admin-settings-btn" type="button" id="btnOpenAdminSettings" title="Admin settings">Admin Settings</button>` : ''}
           <div class="user-pill">
             <span class="user-avatar" aria-hidden="true">${initial}</span>
             <span class="user-email" title="${email}">${email || 'Signed in'}</span>
           </div>
-          <button class="signout-btn" type="button" data-signout>Sign out</button>
+          <button class="signout-btn" type="button" data-signout title="Sign out">Sign out</button>
         </div>
       </aside>
 
       <main class="content" id="content"></main>
     </div>
   `;
+
+  // A fresh renderShell() rebuilds #content from scratch (root.innerHTML
+  // above), which detaches any iframes from a previous session (e.g.
+  // sign-out then a different account signing in) — drop the stale
+  // references so selectTab() doesn't try to reuse detached elements.
+  iframes = new Map();
 
   renderNav();
   wireSignOut();
@@ -219,7 +233,7 @@ function renderNav() {
       html += `<div class="nav-section-title">${tab.section}</div>`;
     }
     html += `
-    <button class="nav-item" data-tab="${tab.id}" type="button">
+    <button class="nav-item" data-tab="${tab.id}" type="button" aria-label="${tab.label}" title="${tab.label}">
       <span class="nav-item-icon">${iconFor(tab.id)}</span>
       <span>${tab.label}</span>
     </button>`;
@@ -330,10 +344,15 @@ function svg(strings) {
  * ============================================================= */
 
 function selectTab(tabId, route = null) {
-  // Defense in depth beyond renderNav()'s filtering — catches a disallowed
-  // tab reached via a typed/bookmarked #hash, not just a click. Falls back
-  // to this user's first allowed tab (own security rules inside each
-  // sub-app remain the real data boundary; this is a workflow guard).
+  // Catches a disallowed tab reached via a typed/bookmarked #hash, not
+  // just a click — falls back to this user's first allowed tab. This
+  // (and allowedTabs generally) is navigation-only: most of the
+  // suite's Firestore collections are gated by isApproved() alone, not
+  // per-account, so hiding a tab here does not stop its data from
+  // being reachable directly via the SDK by any other approved user.
+  // Treat this as decluttering someone's sidebar, not as a security
+  // boundary — see docs/HARDENING_CHECKLIST.md's Firebase-authorization
+  // item for which collections this is and isn't true for.
   if (!isTabAllowed(tabId)) {
     const fallback = TABS.find(t => isTabAllowed(t.id));
     if (!fallback || fallback.id === tabId) return;
@@ -363,24 +382,49 @@ function selectTab(tabId, route = null) {
   }
 
   const contentEl = document.getElementById('content');
-  if (tab.ready) {
-    const sep = tab.src.includes('?') ? '&' : '?';
-    const src = route ? `${tab.src}${sep}route=${encodeURIComponent(route)}` : tab.src;
-    contentEl.innerHTML = `
-      <iframe class="app-frame" src="${src}" title="${tab.label}"
-              referrerpolicy="no-referrer"></iframe>
-    `;
-  } else {
-    contentEl.innerHTML = `
-      <div class="placeholder">
-        <div class="card placeholder-card">
-          <div class="card-title">${tab.label}</div>
-          <h2>Not yet wired up</h2>
-          <p class="muted">This tab is in progress.</p>
-        </div>
+
+  // Not-ready placeholder tabs aren't iframes at all — same single
+  // shared placeholder element every time, just re-labeled and shown.
+  if (!tab.ready) {
+    contentEl.querySelectorAll(':scope > iframe.app-frame').forEach(f => { f.hidden = true; });
+    let placeholder = contentEl.querySelector(':scope > .placeholder');
+    if (!placeholder) {
+      placeholder = document.createElement('div');
+      placeholder.className = 'placeholder';
+      contentEl.appendChild(placeholder);
+    }
+    placeholder.hidden = false;
+    placeholder.innerHTML = `
+      <div class="card placeholder-card">
+        <div class="card-title">${tab.label}</div>
+        <h2>Not yet wired up</h2>
+        <p class="muted">This tab is in progress.</p>
       </div>
     `;
+    return;
   }
+
+  contentEl.querySelector(':scope > .placeholder')?.remove();
+
+  let iframe = iframes.get(tabId);
+  if (!iframe) {
+    // Only applied on first creation — a tab's own reported sub-route
+    // (see wireSubAppRouting()) keeps living inside its already-mounted
+    // iframe from here on, same as any other in-page state, rather than
+    // being re-applied via URL on every tab switch.
+    const sep = tab.src.includes('?') ? '&' : '?';
+    const src = route ? `${tab.src}${sep}route=${encodeURIComponent(route)}` : tab.src;
+    iframe = document.createElement('iframe');
+    iframe.className = 'app-frame';
+    iframe.src = src;
+    iframe.title = tab.label;
+    iframe.referrerPolicy = 'no-referrer';
+    contentEl.appendChild(iframe);
+    iframes.set(tabId, iframe);
+  }
+  contentEl.querySelectorAll(':scope > iframe.app-frame').forEach(f => {
+    f.hidden = f !== iframe;
+  });
 }
 
 /* =============================================================

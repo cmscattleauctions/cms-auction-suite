@@ -6,41 +6,41 @@
  * ============================================================= */
 
 :root {
-  --bg:      #f5f1ea;
+  --bg:      #F4F6F8;
   --card:    #ffffff;
-  --text:    #1a1d23;
-  --muted:   #6b7280;
-  --line:    #e6e0d4;
-  --accent:  #2563a3;
-  --accent2: #1e4f87;
-  --shadow:  0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+  --text:    #182335;
+  --muted:   #526174;
+  --line:    #DCE2E8;
+  --accent:  #294F78;
+  --accent2: #203F60;
+  --shadow:  0 1px 3px rgba(18,32,51,.07), 0 4px 12px rgba(18,32,51,.04);
 
   /* Inline-style theme variables (premium dark theme redesign) */
-  --bg-darkest: #ebe5d8;
-  --bg-dark:    #f0ece4;
+  --bg-darkest: #E9ECEF;
+  --bg-dark:    #EEF1F4;
   --bg-panel:   #ffffff;
   --bg-card:    #ffffff;
-  --bg-card-hover: #fafaf7;
+  --bg-card-hover: #EEF2F5;
   --bg-input:   #ffffff;
-  --border-subtle: #efe9dc;
-  --border-strong: #d4cdbd;
-  --text-primary:   #1a1d23;
-  --text-secondary: #555b66;
-  --text-muted:     #8a8f99;
-  --accent-blue:        #2563a3;
-  --accent-blue-hover:  #1e4f87;
-  --accent-blue-subtle: rgba(37, 99, 163, 0.08);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --border-subtle: #DCE2E8;
+  --border-strong: #C3CBD3;
+  --text-primary:   #182335;
+  --text-secondary: #526174;
+  --text-muted:     #8A96A3;
+  --accent-blue:        #294F78;
+  --accent-blue-hover:  #203F60;
+  --accent-blue-subtle: rgba(41, 79, 120, 0.08);
+  --shadow-sm: 0 1px 2px rgba(18, 32, 51, 0.04);
+  --shadow-md: 0 1px 3px rgba(18, 32, 51, 0.07), 0 1px 2px rgba(18, 32, 51, 0.04);
+  --shadow-lg: 0 4px 12px rgba(18, 32, 51, 0.08), 0 2px 4px rgba(18, 32, 51, 0.04);
 }
 
-/* Body had two radial-gradient blue glows. Replace with subtle
- * warm glow so the canvas isn't dead-flat but stays calm. */
+/* Body had two radial-gradient blue glows. Replace with a subtle
+ * gold + blue wash matching the suite's branding accent. */
 body {
   background:
-    radial-gradient(1200px 800px at 20% 0%, rgba(184, 134, 11, 0.06), transparent 50%),
-    radial-gradient(900px 600px at 80% 20%, rgba(37, 99, 163, 0.04), transparent 55%),
+    radial-gradient(1200px 800px at 20% 0%, rgba(168, 131, 66, 0.06), transparent 50%),
+    radial-gradient(900px 600px at 80% 20%, rgba(41, 79, 120, 0.04), transparent 55%),
     var(--bg);
 }
 
@@ -82,7 +82,7 @@ input, textarea, select {
 input:focus, textarea:focus, select:focus {
   border-color: var(--text);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.08);
+  box-shadow: 0 0 0 3px rgba(168, 131, 66, 0.08);
 }
 
 /* Generic backgrounds the original styles tuned for dark */
@@ -115,9 +115,9 @@ input:focus, textarea:focus, select:focus {
 }
 .btnDanger,
 .btn-danger {
-  background: #b91c1c;
+  background: #B42318;
   color: #fff;
-  border-color: #b91c1c;
+  border-color: #B42318;
 }
 
 /* Tables */
@@ -125,7 +125,7 @@ table { color: var(--text); }
 th, td { border-color: var(--line); }
 th { background: rgba(0, 0, 0, 0.03); }
 tbody tr:nth-child(even) { background: rgba(0, 0, 0, 0.02); }
-tbody tr:hover { background: rgba(184, 134, 11, 0.04); }
+tbody tr:hover { background: rgba(168, 131, 66, 0.04); }
 
 /* Hide the auth page entirely now that the suite shell handles auth.
  * The init code already routes around it (Phase 3 change), but this
@@ -152,9 +152,9 @@ a:hover { color: var(--accent2); }
 
 /* Result chips, status pills — re-tune if dark-theme rgba values
  * are used. These are common patterns in this app. */
-.statusGood { color: #2d7a4a; background: rgba(45, 122, 74, 0.1); }
-.statusWarn { color: #b45309; background: rgba(180, 83, 9, 0.1); }
-.statusBad  { color: #b91c1c; background: rgba(185, 28, 28, 0.1); }
+.statusGood { color: #1F7A46; background: rgba(31, 122, 70, 0.1); }
+.statusWarn { color: #8A5A12; background: rgba(138, 90, 18, 0.1); }
+.statusBad  { color: #B42318; background: rgba(180, 35, 24, 0.1); }
 
 /* =============================================================
  * Phase 5: Mode-based section visibility

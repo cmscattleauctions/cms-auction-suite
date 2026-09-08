@@ -83,3 +83,19 @@ export function cattleSummaryTwoLine({ sexLabel, sireLabel, damLabel, weight, mo
     line2: `${weight} lb · ${formatMonthYearShort(monthYear)}`,
   };
 }
+
+/**
+ * Deterministic "claim-color-N" class (N 0-7, see styles.css) for a
+ * staff name — same name always lands on the same color, so at a
+ * glance in the Working On column you can tell who's who without
+ * reading every chip. Not the app's existing --format-* palette
+ * (clean/legacy/redo/unknown) on purpose — those already mean
+ * something else (video format, exceptions) and reusing them here
+ * would make an unrelated chip look like it's signaling that.
+ */
+export function claimColorClass(name) {
+  const str = String(name || '');
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  return `claim-color-${Math.abs(hash) % 8}`;
+}

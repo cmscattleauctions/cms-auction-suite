@@ -13,51 +13,52 @@
  * ============================================================= */
 
 :root {
-  /* Surfaces */
-  --bg:       #f5f1ea;     /* warm off-white canvas */
-  --surface:  #ffffff;     /* card */
-  --surface2: #f0ece4;     /* muted wash for inputs, dropzones */
-  --border:   #e6e0d4;
+  /* Surfaces — suite workspace tokens */
+  --bg:       #F4F6F8;
+  --surface:  #FFFFFF;
+  --surface2: #EEF1F4;     /* muted wash for inputs, dropzones */
+  --border:   #DCE2E8;
 
   /* Text */
-  --text:  #1a1d23;
-  --muted: #6b7280;
+  --text:  #182335;
+  --muted: #526174;
 
-  /* Accent — the app's blue, retuned for white backgrounds */
-  --blue:       #2563a3;
-  --blue-light: #1e4f87;
+  /* Accent — the app's primary blue, now the suite's shared action blue */
+  --blue:       #294F78;
+  --blue-light: #203F60;
 
-  /* Status colors — kept but slightly desaturated for light bg */
-  --green:  #2d7a4a;
-  --red:    #b91c1c;
-  --yellow: #b45309;
+  /* Status colors — aligned to the suite's shared semantic tokens */
+  --green:  #1F7A46;
+  --red:    #B42318;
+  --yellow: #8A5A12;
 }
 
 /* Some app rules use rgba() with hard-coded blue values that don't
- * pull from variables. Override those tinted backgrounds here. */
+ * pull from variables. Override those tinted backgrounds here —
+ * rgba(41, 79, 120, *) is the suite's --action-blue as rgb(). */
 .upload-zone:hover,
-.upload-zone.drag-over { background: rgba(37, 99, 163, 0.05); }
+.upload-zone.drag-over { background: rgba(41, 79, 120, 0.05); }
 
-.toggle-btn.active   { background: rgba(37, 99, 163, 0.08); }
-.flow-step.active    { background: rgba(37, 99, 163, 0.08); }
-.flow-step.done      { background: rgba(45, 122, 74, 0.10); }
-.style-pick-card.active { background: rgba(37, 99, 163, 0.06); }
-.banner-kind-chip.transition { background: rgba(37, 99, 163, 0.12); color: var(--blue); }
-.banner-kind-chip.option     { background: rgba(45, 122, 74, 0.14); color: var(--green); }
-.info-banner    { background: rgba(37, 99, 163, 0.05); border-color: rgba(37, 99, 163, 0.18); }
+.toggle-btn.active   { background: rgba(41, 79, 120, 0.08); }
+.flow-step.active    { background: rgba(41, 79, 120, 0.08); }
+.flow-step.done      { background: rgba(31, 122, 70, 0.10); }
+.style-pick-card.active { background: rgba(41, 79, 120, 0.06); }
+.banner-kind-chip.transition { background: rgba(41, 79, 120, 0.12); color: var(--blue); }
+.banner-kind-chip.option     { background: rgba(31, 122, 70, 0.14); color: var(--green); }
+.info-banner    { background: rgba(41, 79, 120, 0.05); border-color: rgba(41, 79, 120, 0.18); }
 .info-banner strong { color: var(--blue); }
 .info-banner code   { background: rgba(0, 0, 0, 0.06); color: var(--text); }
-.status-chip { background: rgba(37, 99, 163, 0.10); color: var(--blue); }
-.status-chip.warn { background: rgba(180, 83, 9, 0.10); color: var(--yellow); }
-.status-chip.good { background: rgba(45, 122, 74, 0.12); color: var(--green); }
+.status-chip { background: rgba(41, 79, 120, 0.10); color: var(--blue); }
+.status-chip.warn { background: rgba(138, 90, 18, 0.10); color: var(--yellow); }
+.status-chip.good { background: rgba(31, 122, 70, 0.12); color: var(--green); }
 
 /* Toasts — were dark green/red on dark bg */
-.toast        { background: #e8f3ec; border-color: #b9d8c4; color: #1f5132; }
-.toast.error  { background: #fdecec; border-color: #e6b9b9; color: #842c2c; }
+.toast        { background: #E3F5EA; border-color: #b9d8c4; color: #1F7A46; }
+.toast.error  { background: #FBE7E5; border-color: #e6b9b9; color: #B42318; }
 
-/* Alert banner (warning yellow) */
-.alert-banner { background: #fff8e6; border-color: #ecd9a3; color: #8a5b00; }
-.missing-badge { background: #fff8e6; color: #8a5b00; border-color: #ecd9a3; }
+/* Alert banner (warning amber) */
+.alert-banner { background: #FBEFDD; border-color: #ecd9a3; color: #8A5A12; }
+.missing-badge { background: #FBEFDD; color: #8A5A12; border-color: #ecd9a3; }
 
 /* Banner card preview shells — keep dark bg since canvases are
  * designed against dark; otherwise the canvas content washes out */

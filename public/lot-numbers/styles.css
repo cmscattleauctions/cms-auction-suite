@@ -46,12 +46,10 @@ html, body {
   border: 1px solid transparent;
   cursor: pointer;
 }
-.btn-primary {
-  background: var(--accent);
-  color: #fff;
-}
-.btn-primary:hover { background: var(--accent-hover); }
-.btn-primary:disabled { background: var(--text-disabled); cursor: default; }
+/* .btn-primary is shared/theme.css's blue primary-action button —
+   left undeclared here so it doesn't shadow that shared definition
+   with this app's --accent (the suite's gold branding token, not
+   the primary-action color). */
 .btn-secondary {
   background: var(--bg-surface);
   color: var(--text-primary);

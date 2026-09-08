@@ -98,3 +98,10 @@ export function createUserAccount({ email, password, role, allowedTabs }) {
 export function setUserPassword(uid, password) {
   return runAdminJob('setPassword', { uid, password });
 }
+
+/** Deletes both the Auth account and the users/{uid} Firestore doc — via
+ *  the Admin SDK (same job pattern as above) since deleting someone
+ *  else's Auth account isn't something the client SDK can do at all. */
+export function deleteUserAccount(uid) {
+  return runAdminJob('deleteUser', { uid });
+}

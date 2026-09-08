@@ -141,8 +141,12 @@ async function paint(ctx) {
   root.querySelector('#vm-drawer-prev')?.addEventListener('click', () => navigateDrawer(-1, ctx));
   root.querySelector('#vm-drawer-next')?.addEventListener('click', () => navigateDrawer(1, ctx));
   root.querySelectorAll('[data-move]').forEach(btn => btn.addEventListener('click', async () => {
-    await ctx.repo.setStatus(rec.id, btn.dataset.move, 'Staff');
-    showToast('Status updated');
+    try {
+      await ctx.repo.setStatus(rec.id, btn.dataset.move, 'Staff');
+      showToast('Status updated');
+    } catch (err) {
+      showToast(err.message || 'Could not update status — try again');
+    }
     ctx.refresh();
     paint(ctx);
   }));
@@ -172,7 +176,7 @@ async function paint(ctx) {
   }
 }
 
-function statusLabel(s) { return s === 'ready' ? 'Ready to Make' : s === 'hold' ? 'On Hold' : 'Created'; }
+function statusLabel(s) { return s === 'ready' ? 'Ready to Make' : s === 'hold' ? 'On Hold' : 'Completed'; }
 
 /** Where the currently-open record sits in the table's own filtered/sorted list — so Previous/Next step through what's actually on screen. */
 function navState(ctx) {
@@ -612,15 +616,26 @@ function truncateMiddle(str, max = 44) {
 
 function publishingSectionHtml(rec) {
   const ytUrl = cleanYoutubeUrl(rec);
-  // A Ready/On Hold record hasn't actually been made yet, so it can never
-  // have a real published link regardless of what's stored — protects
-  // against ever showing one even if bad data (see extractYoutubeId's
-  // comment) slips in again upstream.
-  const hasRealLink = rec.status === 'created' && !!rec.youtubeUrl;
+  // Show the link whenever one's actually saved, regardless of status —
+  // it used to require status==='created', so saving a link on a Ready/
+  // On Hold record wrote it fine but re-rendered right back to the empty
+  // "paste a link" form, which looked exactly like the save had silently
+  // failed. Completed still gets its own nudge below when the two are
+  // out of sync (link saved, status not moved yet).
+  const hasRealLink = !!rec.youtubeUrl;
+  const suggestMove = hasRealLink && rec.status !== 'created';
   return `
     <div class="vm-drawer-section">
       <div class="vm-drawer-section-title">Publishing</div>
       ${hasRealLink ? `
+        ${suggestMove ? `
+        <div class="vm-id-warning" id="d-suggest-move">
+          <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.4"/><path d="M10 6v4.5l3 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <div>
+            This video has a YouTube link but is still marked ${statusLabel(rec.status)}.
+            <button class="btn-text" id="d-move-to-created" type="button">Move to Completed →</button>
+          </div>
+        </div>` : ''}
         <div class="vm-pub-row">
           <span class="vm-pub-icon vm-pub-icon-youtube">${PUB_ICONS.youtube}</span>
           <div class="vm-pub-main">
@@ -749,8 +764,25 @@ function wirePublishingSection(root, rec, ctx) {
     const val = root.querySelector('#d-yt-input').value.trim();
     const ytId = parseYoutubeLink(val);
     if (!ytId) { showToast('Could not read a YouTube link from that'); return; }
-    await ctx.repo.setYoutube(rec.id, { youtubeUrl: val.startsWith('http') ? val : `https://youtu.be/${ytId}`, youtubeId: ytId }, 'Staff');
-    ctx.refresh();
+    try {
+      await ctx.repo.setYoutube(rec.id, { youtubeUrl: val.startsWith('http') ? val : `https://youtu.be/${ytId}`, youtubeId: ytId }, 'Staff');
+      showToast('YouTube link saved');
+    } catch (err) {
+      showToast(err.message || 'Could not save — try again');
+    }
+    await ctx.refresh();
+    paint(ctx);
+  });
+
+  const moveToCreatedBtn = root.querySelector('#d-move-to-created');
+  if (moveToCreatedBtn) moveToCreatedBtn.addEventListener('click', async () => {
+    try {
+      await ctx.repo.setStatus(rec.id, 'created', 'Staff');
+      showToast('Moved to Completed');
+    } catch (err) {
+      showToast(err.message || 'Could not update status — try again');
+    }
+    await ctx.refresh();
     paint(ctx);
   });
 
@@ -943,12 +975,19 @@ function clipsTabHtml(rec) {
 }
 
 function clipCardHtml(c, index, isPlaying) {
+  // The <video> element (and its src) only exists at all for the ONE
+  // clip currently playing — opening the drawer or its Clips tab must
+  // never fetch original clip bytes on its own. Every other clip shows
+  // a plain "click to load" placeholder with the same play-button
+  // affordance; nothing about that placeholder touches c.downloadUrl.
   return `
-    <div class="vm-clip-card2 ${isPlaying ? 'is-playing' : ''}" data-clip-id="${c.id}">
+    <div class="vm-clip-card2 ${isPlaying ? 'is-playing' : ''}" data-clip-id="${escapeHtml(c.id)}">
       <div class="vm-clip-card2-label">Clip ${index + 1}</div>
-      <div class="vm-clip-thumb" ${c.downloadUrl && !isPlaying ? `data-play-clip2="${c.id}" role="button" tabindex="0"` : ''}>
+      <div class="vm-clip-thumb" ${c.downloadUrl && !isPlaying ? `data-play-clip2="${escapeHtml(c.id)}" role="button" tabindex="0"` : ''}>
         ${c.downloadUrl
-          ? `<video preload="metadata" muted playsinline data-clip-video="${c.id}" ${isPlaying ? 'controls autoplay' : ''} src="${escapeHtml(c.downloadUrl)}#t=0.5"></video>`
+          ? (isPlaying
+              ? `<video preload="metadata" muted playsinline controls autoplay data-clip-video="${escapeHtml(c.id)}" src="${escapeHtml(c.downloadUrl)}#t=0.5"></video>`
+              : `<div class="vm-clip-thumb-empty vm-clip-thumb-unloaded"></div>`)
           : `<div class="vm-clip-thumb-empty">No file yet</div>`}
         ${c.downloadUrl && !isPlaying ? `
           <div class="vm-clip-play-btn" title="Play">
@@ -961,11 +1000,11 @@ function clipCardHtml(c, index, isPlaying) {
         <span>${formatBytes(c.sizeBytes)}</span>
       </div>
       <div class="vm-clip-card2-actions">
-        <button class="btn btn-sm btn-ghost" data-download-clip2="${c.id}" type="button">Download</button>
+        <button class="btn btn-sm btn-ghost" data-download-clip2="${escapeHtml(c.id)}" type="button">Download</button>
         <span class="vm-overflow">
-          <button class="vm-overflow-btn" data-clip-more="${c.id}" type="button" title="More">⋯</button>
+          <button class="vm-overflow-btn" data-clip-more="${escapeHtml(c.id)}" type="button" title="More">⋯</button>
           <div class="vm-overflow-menu" id="clip-menu-${escapeHtml(c.id)}" hidden>
-            <button data-play-clip2="${c.id}" type="button">${isPlaying ? 'Stop preview' : 'Preview'}</button>
+            <button data-play-clip2="${escapeHtml(c.id)}" type="button">${isPlaying ? 'Stop preview' : 'Preview'}</button>
           </div>
         </span>
       </div>

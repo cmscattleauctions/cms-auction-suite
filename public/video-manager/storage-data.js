@@ -35,6 +35,7 @@ export const configured = FIREBASE_CONFIGURED;
 // here too so a bad file is rejected before spending any time/bandwidth
 // uploading it, not just after Storage rejects the write.
 export const MAX_CLIP_BYTES = 2 * 1024 * 1024 * 1024; // 2GB
+export const MAX_LISTING_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB — matches docs/storage.rules' listingImages cap
 
 let storage = null;
 if (FIREBASE_CONFIGURED) {
@@ -74,6 +75,46 @@ export function uploadClip(recordId, file, { onProgress } = {}) {
   // otherwise store an empty/off-spec contentType, which fails the same
   // Storage rule the same way an actual non-video file does.
   const contentType = file.type && file.type.startsWith('video/') ? file.type : 'video/mp4';
+  const task = uploadBytesResumable(fileRef, file, { contentType });
+
+  return new Promise((resolve, reject) => {
+    task.on(
+      'state_changed',
+      snap => { if (onProgress) onProgress(snap.totalBytes ? (snap.bytesTransferred / snap.totalBytes) * 100 : 0); },
+      reject,
+      async () => {
+        try {
+          const downloadUrl = await getDownloadURL(fileRef);
+          resolve({ storagePath: path, downloadUrl, sizeBytes: file.size });
+        } catch (err) { reject(err); }
+      }
+    );
+  });
+}
+
+/**
+ * Upload one listing photo to Storage under listingImages/{recordId}/ —
+ * used by the public video-upload page. Previously this app read the
+ * photo as a local base64 data URL and stored the WHOLE thing directly
+ * in the videoRecords document's listingImageUrl field — often several
+ * MB of text for a real phone photo, which both bloats every document
+ * read for no reason and doesn't fit a sane server-side length cap
+ * (docs/firestore.rules caps listingImageUrl at 2000 chars, matching
+ * what a real Storage download URL actually looks like). Same
+ * resumable-upload shape as uploadClip() above; resolves { storagePath,
+ * downloadUrl, sizeBytes }.
+ */
+export function uploadListingImage(recordId, file, { onProgress } = {}) {
+  const s = requireStorage();
+  if (file.type && !file.type.startsWith('image/')) {
+    return Promise.reject(new Error(`${file.name} is a ${file.type} file, not an image.`));
+  }
+  if (file.size > MAX_LISTING_IMAGE_BYTES) {
+    return Promise.reject(new Error(`${file.name} is larger than the 10MB photo limit`));
+  }
+  const path = `listingImages/${recordId}/${Date.now()}-${sanitizeFilename(file.name)}`;
+  const fileRef = ref(s, path);
+  const contentType = file.type && file.type.startsWith('image/') ? file.type : 'image/jpeg';
   const task = uploadBytesResumable(fileRef, file, { contentType });
 
   return new Promise((resolve, reject) => {
