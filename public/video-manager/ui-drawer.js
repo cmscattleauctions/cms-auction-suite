@@ -141,8 +141,12 @@ async function paint(ctx) {
   root.querySelector('#vm-drawer-prev')?.addEventListener('click', () => navigateDrawer(-1, ctx));
   root.querySelector('#vm-drawer-next')?.addEventListener('click', () => navigateDrawer(1, ctx));
   root.querySelectorAll('[data-move]').forEach(btn => btn.addEventListener('click', async () => {
-    await ctx.repo.setStatus(rec.id, btn.dataset.move, 'Staff');
-    showToast('Status updated');
+    try {
+      await ctx.repo.setStatus(rec.id, btn.dataset.move, 'Staff');
+      showToast('Status updated');
+    } catch (err) {
+      showToast(err.message || 'Could not update status — try again');
+    }
     ctx.refresh();
     paint(ctx);
   }));
@@ -760,16 +764,24 @@ function wirePublishingSection(root, rec, ctx) {
     const val = root.querySelector('#d-yt-input').value.trim();
     const ytId = parseYoutubeLink(val);
     if (!ytId) { showToast('Could not read a YouTube link from that'); return; }
-    await ctx.repo.setYoutube(rec.id, { youtubeUrl: val.startsWith('http') ? val : `https://youtu.be/${ytId}`, youtubeId: ytId }, 'Staff');
-    showToast('YouTube link saved');
+    try {
+      await ctx.repo.setYoutube(rec.id, { youtubeUrl: val.startsWith('http') ? val : `https://youtu.be/${ytId}`, youtubeId: ytId }, 'Staff');
+      showToast('YouTube link saved');
+    } catch (err) {
+      showToast(err.message || 'Could not save — try again');
+    }
     await ctx.refresh();
     paint(ctx);
   });
 
   const moveToCreatedBtn = root.querySelector('#d-move-to-created');
   if (moveToCreatedBtn) moveToCreatedBtn.addEventListener('click', async () => {
-    await ctx.repo.setStatus(rec.id, 'created', 'Staff');
-    showToast('Moved to Completed');
+    try {
+      await ctx.repo.setStatus(rec.id, 'created', 'Staff');
+      showToast('Moved to Completed');
+    } catch (err) {
+      showToast(err.message || 'Could not update status — try again');
+    }
     await ctx.refresh();
     paint(ctx);
   });

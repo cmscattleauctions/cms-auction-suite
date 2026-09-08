@@ -849,7 +849,67 @@ the normal push/PR/merge like any other code change.
 
 ## Phase 3 — Reliability
 
+- [x] Concurrent-save protection (lost updates between staff) — see detail below
 - [x] Live-sync refresh could destroy an in-progress, unsaved table edit — see detail below
+
+### Concurrent-save protection (review item 6)
+
+**Finding:** `firestore-data.js`'s `saveVideo()` was a plain `setDoc()`
+full-document overwrite. Every mutation in `repository.js`
+(status change, claim, YouTube link, cattle-field edit, ...) reads a
+record from the in-memory cache, mutates it, and calls this — with two
+staff editing the same record close together, whichever save lands
+second silently discards the first person's change entirely (a lost
+update), with no warning to either of them. The table-edit guard added
+earlier this pass (item 3 in Phase 3 below) stops a *local* re-render
+from destroying an in-progress edit; it does nothing for two different
+people's edits actually colliding server-side.
+
+**Implemented:** `saveVideo()` now runs as a Firestore transaction with
+a `version` field for optimistic concurrency — reads the server's
+current document inside the transaction, compares its `version` to
+what the caller last saw, and throws a `ConflictError` instead of
+writing if they don't match (or if the document was deleted out from
+under an update). On success the doc is written with `version`
+incremented, and the caller's in-memory copy is updated to match.
+Backward-compatible with zero migration needed: an existing record
+with no `version` field reads as `0` on both sides, so its first save
+after this ships just succeeds normally and picks up `version: 1` —
+older documents never conflict with themselves.
+
+Wired a representative (not exhaustive — see below) set of the
+highest-traffic UI save paths to actually surface a conflict (or any
+other save failure) instead of it being a silent unhandled rejection:
+the table's whole delegated row-click handler (`ui-table.js`'s
+`wireRows` — one wrap covers claim/release, copy actions, and more all
+at once), the inline YouTube-link cell edit, and the drawer's status-
+change buttons and YouTube-save button. Each now shows the conflict's
+own message ("This record was changed by someone else since you last
+loaded it.") via the existing toast, then refreshes — the live-sync
+subscription has already delivered the newer version by the time the
+user sees the message, so a retry immediately reflects current state.
+
+**Verified:** all touched files re-checked as valid syntax. Traced the
+transaction logic by hand for both the update-conflict and delete-
+then-update cases. **Not verified against a real concurrent-edit
+scenario** — would need two simultaneous authenticated sessions
+against live Firestore to actually trigger a conflict, which isn't
+possible from this environment.
+
+**Explicitly not done — a real, honest gap, not silently claimed
+complete:** this is NOT a full audit of every save call site in
+`ui-table.js`/`ui-drawer.js`/`ui-modals.js` (there are dozens —
+cattle-field edits, suffix edits, notes, canva link, delete/restore/
+purge, CSV usage import, and more). The ones fixed here are a
+deliberately-chosen high-traffic sample proving the mechanism works
+end to end, not the complete set. If you want every remaining save
+path covered, say so and I'll do a dedicated pass — it's mechanical
+(the same three-line try/catch+toast pattern) rather than uncertain,
+just a lot of individual call sites to touch carefully.
+
+**Remaining/deploy steps:** none beyond the standard rules deploys
+already listed elsewhere — this is a client-code + Firestore-write-
+pattern change, no rules file touched, ships via normal push/PR/merge.
 
 ### Live-sync refresh could destroy an in-progress, unsaved table edit
 

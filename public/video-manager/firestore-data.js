@@ -33,7 +33,7 @@ import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/1
 import {
   getFirestore, collection, doc,
   getDoc, setDoc, deleteDoc, writeBatch,
-  addDoc, onSnapshot, serverTimestamp,
+  addDoc, onSnapshot, serverTimestamp, runTransaction,
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
 import { firebaseConfig, FIREBASE_CONFIGURED } from '../shared/firebase-config.js';
@@ -191,10 +191,54 @@ export async function fetchVideo(id) {
   return snap.exists() ? snap.data() : null;
 }
 
-/** Full overwrite of one record (repository.js always writes the complete record, not a partial patch). */
+/** Thrown by saveVideo() when the document changed server-side since
+ *  the caller's copy was read — see that function's own comment. */
+export class ConflictError extends Error {
+  constructor(message, serverRecord) {
+    super(message);
+    this.name = 'ConflictError';
+    this.serverRecord = serverRecord;
+  }
+}
+
+/**
+ * Full overwrite of one record (repository.js always writes the
+ * complete record, not a partial patch) — but only if nobody else's
+ * write landed since `record.version` was read. Every mutation in
+ * repository.js reads a record from the in-memory cache, mutates it,
+ * and calls this; with two staff editing the same record around the
+ * same time, a plain setDoc() would let whichever save happened
+ * second silently discard the first person's change (a lost update).
+ * runTransaction() re-reads the server's actual current document
+ * inside the transaction and compares its version to what the caller
+ * last saw — a mismatch means someone else wrote in between, so this
+ * throws instead of overwriting; repository.js's persist() surfaces
+ * that as a real, catchable error rather than a silent loss.
+ */
 export async function saveVideo(record) {
   requireDb();
-  await setDoc(doc(db, COLLECTION, record.id), stripFileHandles(record));
+  const ref = doc(db, COLLECTION, record.id);
+  const clean = stripFileHandles(record);
+  const expectedVersion = record.version || 0;
+  await runTransaction(db, async tx => {
+    const snap = await tx.get(ref);
+    if (snap.exists()) {
+      const serverVersion = snap.data().version || 0;
+      if (serverVersion !== expectedVersion) {
+        throw new ConflictError(
+          'This record was changed by someone else since you last loaded it.',
+          snap.data()
+        );
+      }
+    } else if (expectedVersion !== 0) {
+      // Caller thought this was an update to an existing doc (non-zero
+      // expected version) but the doc is gone server-side — e.g.
+      // someone else deleted it in the meantime.
+      throw new ConflictError('This record no longer exists — it may have been deleted.', null);
+    }
+    tx.set(ref, { ...clean, version: expectedVersion + 1 });
+  });
+  record.version = expectedVersion + 1;
 }
 
 export async function deleteVideoDoc(id) {

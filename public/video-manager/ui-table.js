@@ -341,6 +341,7 @@ function wireAddRow(tbody, ctx) {
  * ============================================================= */
 function wireRows(tbody, ctx) {
   tbody.addEventListener('click', async e => {
+   try {
     const compareCheck = e.target.closest('[data-compare]');
     if (compareCheck) {
       e.stopPropagation();
@@ -409,6 +410,16 @@ function wireRows(tbody, ctx) {
     // the drawer directly.
     const tr = e.target.closest('tr[data-id]');
     if (tr) ctx.openDrawer(tr.dataset.id);
+   } catch (err) {
+     // Whole-handler catch rather than one per branch — this delegated
+     // click handler covers a dozen+ different actions (claim/release,
+     // copy link, open drawer, etc.); without this, any of them
+     // failing (a conflict from item 6's optimistic-concurrency check,
+     // a dropped connection, ...) was an unhandled rejection with zero
+     // user-visible feedback.
+     showToast(err.message || 'Something went wrong — try again');
+     ctx.refresh();
+   }
   });
 }
 
@@ -433,7 +444,11 @@ function startEdit(span, ctx) {
     editingActive = false;
     if (!commit) { ctx.refresh(); return; }
     const value = input.value.trim();
-    await applyFieldEdit(id, field, value, ctx);
+    try {
+      await applyFieldEdit(id, field, value, ctx);
+    } catch (err) {
+      showToast(err.message || 'Could not save — try again');
+    }
     ctx.refresh();
   };
 
@@ -542,8 +557,12 @@ function openStaffPopover(anchorEl, rec, ctx) {
   document.body.appendChild(pop);
 
   pop.querySelectorAll('[data-claim-staff]').forEach(btn => btn.addEventListener('click', async () => {
-    await ctx.repo.setWorkingOn(rec.id, btn.dataset.claimStaff, 'Staff');
-    showToast(`${btn.dataset.claimStaff} is building this now`);
+    try {
+      await ctx.repo.setWorkingOn(rec.id, btn.dataset.claimStaff, 'Staff');
+      showToast(`${btn.dataset.claimStaff} is building this now`);
+    } catch (err) {
+      showToast(err.message || 'Could not claim this — try again');
+    }
     closeStaffPopover();
     ctx.refresh();
   }));
