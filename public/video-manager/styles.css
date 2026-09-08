@@ -269,6 +269,12 @@ table.vm-table { width: 100%; min-width: 100%; border-collapse: collapse; font-s
 .vm-exception-dot.is-warn { background: var(--format-legacy-fg); }
 .vm-exception-dot.is-bad { background: var(--format-redo-fg); }
 .vm-table td { padding: 6px 9px; vertical-align: middle; white-space: nowrap; }
+/* Aligned digits for clip counts and dates — spec's "align numeric
+   data consistently" (there's no dedicated price/weight column in
+   this table; cattle attributes are a collapsed text summary,
+   edited in the drawer, not here — see this file's own header
+   comment on renderTable()). */
+.vm-col-clips, .vm-col-added, .vm-col-published { font-variant-numeric: tabular-nums; }
 .vm-table th:nth-child(2), .vm-table td:nth-child(2) { width: 280px; }
 .vm-table th:nth-child(3), .vm-table td:nth-child(3) { min-width: 190px; }
 .vm-col-check { width: 28px; }
