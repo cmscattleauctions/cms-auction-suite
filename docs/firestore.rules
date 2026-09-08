@@ -264,9 +264,32 @@ service cloud.firestore {
           && resource.data.status in ['Staged', 'Active']
           && request.resource.data.status == resource.data.status
           && request.resource.data.rep == resource.data.rep
+          // Buyer identity is admin-only to set (app.js's own
+          // requirePerm(canChangeStatus(), 'Only admins can edit sale
+          // information.') already keeps the real UI from ever
+          // offering this to a rep) — this is the server-side version
+          // of that same boundary, so a direct SDK call can't bypass
+          // it. Presence-safe: buyer isn't set on every lot (only once
+          // sold), so this checks it neither appears nor disappears,
+          // and where it already exists its value can't change,
+          // without assuming the field exists at all.
+          && (('buyer' in request.resource.data) == ('buyer' in resource.data))
+          && (!('buyer' in resource.data) || request.resource.data.buyer == resource.data.buyer)
         )
       );
       allow delete: if isApproved() && cmIsAdmin();
+    }
+    // Buyer identity, split out of cmLots into its own admin-only-
+    // readable collection — Firestore rules are document-granular, not
+    // field-granular, so this is the only way to make canViewBuyer()'s
+    // UI-only boundary (reps never see a lot's buyer) hold up against
+    // direct SDK/API access too. One doc per lot that's ever had a
+    // buyer (id matches the lot's own id); app.js joins this onto
+    // state.lots client-side for admins only after loading lots (see
+    // loadApp()) rather than touching every render call site that
+    // reads lot.buyer, so contract/report generation stays unchanged.
+    match /cmLotBuyers/{lotId} {
+      allow read, write: if isApproved() && cmIsAdmin();
     }
     match /cmActivityLog/{id} { allow read, write: if isApproved(); }
     match /cmConsignors/{id} {

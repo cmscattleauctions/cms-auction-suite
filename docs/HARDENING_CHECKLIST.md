@@ -207,6 +207,78 @@ before I run this):**
    a *newly created* profile document can contain, so no current admin
    loses access.
 
+### 3a. Follow-up: buyer-field protection completed (found in review, fixed)
+
+**Finding:** the earlier pass flagged buyer-field read/write protection
+as a document-granularity limitation and left it there. Called out
+correctly as not actually fixed — implemented now, both halves treated
+as the separate problems they are:
+
+**Write restriction:** `docs/firestore.rules`' `cmLots` update rule
+(rep branch) now requires `buyer`'s presence AND value to be unchanged
+— presence-safe (buyer isn't set on every lot). Admin branch is
+unaffected. The real app UI already gated sale-info editing to admins
+only (`requirePerm(canChangeStatus(), 'Only admins can edit sale
+information.')`), so this is pure server-side hardening against a
+direct SDK bypass — zero behavior change for the legitimate workflow.
+
+**Read separation:** moved buyer out of `cmLots` into its own
+`cmLotBuyers/{lotId}` collection, `allow read, write: if isApproved()
+&& cmIsAdmin()`. `country-market/app.js`: new `joinLotBuyers()` does
+ONE bulk read after lots load (admins only) and merges `buyer` back
+onto the in-memory `state.lots` array by id — every existing render
+call site (contract/recap generation, the sale-info panel, table
+cells) keeps reading `lot.buyer` exactly as before, unchanged, since
+the in-memory shape is preserved; only where the value actually comes
+from changed. `setLotBuyer()`/`clearLotBuyer()` write to the new
+collection from `saveSaleInfo()` (setting a buyer) and
+`doChangeStatus()` (clearing it when a lot moves off Sold). Fixed a
+real bug found along the way: the realtime lot-update handler was
+about to silently wipe out an admin's already-joined buyer on ANY
+unrelated field change to that lot (a fresh `dbToLot()` naturally
+omits `buyer` now) — now carries the existing in-memory value forward
+across a realtime update.
+
+**Also fixed, a related bug found while tracing this:**
+`getDocsForLot()` accepted a `userIsAdmin` parameter that was never
+actually used — every rep who could reach "Generate Documents" for a
+sold lot could already download the Buyer's Contract and Buyer Recap
+through the normal UI, regardless of `canViewBuyer()`'s intent. Those
+two document types are now gated behind `userIsAdmin`.
+
+**Migration:** new `scripts/migrate-country-market-buyers.mjs`
+(dry-run by default) — copies every existing `cmLots.buyer` value into
+`cmLotBuyers/{lotId}`, then (only with `--apply`) removes `buyer` from
+the `cmLots` document. Idempotent (safe to re-run; overwrites, doesn't
+duplicate).
+
+**Verified:** `firestore:rules --dry-run` compiled successfully.
+`app.js` and the migration script re-checked as valid syntax. **Not
+verified live** — no way to exercise a real admin session, realtime
+update, or contract generation against live Firestore from this
+environment; the realtime-update fix in particular should be spot-
+checked after deploy (change an unrelated field on a sold lot as one
+admin, confirm buyer doesn't disappear from another admin's open tab).
+
+**Remaining/deploy steps (needs you):**
+1. `firebase deploy --only firestore:rules` (same deploy as every
+   other rules item this pass).
+2. Run `node scripts/migrate-country-market-buyers.mjs` (dry run
+   first, review the list, then `--apply`).
+3. After both, sign in as an admin and confirm: existing sold lots
+   still show their buyer in the table and in generated contracts;
+   editing sale info still saves the buyer correctly; changing a lot's
+   status away from Sold clears its buyer; a rep account cannot see
+   buyer anywhere (table shows "—", Buyer's Contract/Recap aren't
+   offered in Generate Documents).
+4. **Rollback:** revert the `app.js`/`firestore.rules` commits and
+   redeploy rules. The migration script does not need a "reverse" —
+   until you run it with `--apply`, nothing on `cmLots` has changed;
+   if you do run `--apply` and want to undo it, the values are still
+   sitting in `cmLotBuyers` and could be copied back with a small
+   reverse script if ever needed (not written, since you'd only want
+   this if the whole approach were being abandoned).
+
 ### 3. Firebase authorization (allowedTabs, Country Market data rules)
 
 **Finding:** two related gaps — (a) Country Market's Firestore rules
