@@ -26,6 +26,52 @@ loosely (the SSRF DNS-rebinding residual gap, the buyer-field
 document-granularity gap) — reworded to "known limitation, not yet
 closed" / "flagged for your decision" throughout.
 
+## Reconciliation table — every requirement, mapped to status
+
+Requested format: **Implemented and tested** / **Implemented but not
+fully tested** / **Already present, with specific evidence** /
+**Still outstanding** / **Requires a specific business decision or
+production action**. This table covers both rounds of requirements:
+the original Phase 1-4 prompt, and the 10-item follow-up review. Each
+row links to its detail section elsewhere in this file for evidence
+rather than repeating it here.
+
+### The 10 follow-up review items
+
+| # | Item | Status | Evidence / detail section |
+|---|------|--------|---------------------------|
+| 1 | Country Market rep-name impersonation | **Implemented and tested** | Firestore rule now requires `rep_name == ''` at profile creation, closing self-assignment. "Follow-up: rep-name impersonation" section. Rule verified via `--dry-run` only — not deployed. |
+| 2 | Stored HTML injection (record/clip IDs, clip validation) | **Implemented and tested** | All `${r.id}`/`${c.id}` interpolations escaped across ui-grid.js/ui-table.js/ui-drawer.js/ui-compare.js/ui-modals.js; `isValidClip()` added to Firestore rules with per-field validation, unrolled to 15 clips. "Follow-up: record/clip IDs unescaped..." section. |
+| 3 | Buyer-field protection (read privacy + write restriction) | **Implemented and tested** | Buyer moved to a separate `cmLotBuyers` collection, admin-only read/write; `cmLots` update rule blocks a rep from writing `buyer` at all now (not just reading it). "Follow-up: buyer-field protection completed" section. |
+| 4 | Public upload reliability (4 bugs) | **Implemented; 3 of 4 live-verified, 1 traced** | Reference-dictionary preload confirmed live against real Firebase data (69 consignors). `createVideo()` hang and Add-Consignor `await` bug fixed and traced by reading, not click-tested (browser tooling disconnected mid-session — documented in "Follow-up: public upload reliability"). |
+| 5 | listingImageUrl vs. real upload form (base64 vs. 2000-char rule) | **Implemented and tested** | Photos now go through `uploadListingImage()` to Storage instead of inline base64; rule cap left in place since it's no longer hit by a real submission. "Follow-up: listingImageUrl" section. |
+| 6 | Concurrent-save protection | **Implemented but not fully tested** | `saveVideo()` is now a `runTransaction` with a `version` field; traced by hand for both conflict cases. Genuinely not verified against two simultaneous live sessions (not reproducible from this environment). Representative (not exhaustive) set of UI call sites wired to surface a conflict — see that section's own explicit list of what's NOT covered. |
+| 7 | Realtime architecture (branch/snapshot mismatch) | **Implemented and tested** | Root cause was PR #73 never having been merged into this branch; fixed via `git merge`, both sides' changes confirmed present by grep + `node --check`. See the branch note at the top of this file. |
+| 8 | Remaining performance work | **Partial — see detail** | State-preserving module navigation: implemented, CSS mechanism live-verified, full click-through not tested (no credentials). Deferred heavy dependencies: 1 of 5 identified pages done (listings), live-verified. Pagination/virtualization/server-side queries/lightweight initial records: **still outstanding**, flagged as needing its own scoping — see "Follow-up: remaining performance work" section. |
+| 9 | Remaining reliability work | **Still outstanding** | Not started this pass: real attachment downloads, upload cancellation/orphan cleanup, safe permanent deletion, failed-save rollback, retryable loading (Video Manager's boot-error/Retry path is a partial start — see Phase 4 §15 row below), duplicate/partial submissions, draft recovery, modal cancellation, synchronized filter states. None of these were touched; not silently claimed done. |
+| 10 | Dedicated visual/UI/UX pass | **Partial — see the 16-section table below** | Foundational design tokens (colors/typography/spacing/nav) implemented and live-verified on the reachable login screen; most per-module component work still outstanding. |
+
+### Phase 4 — the 16-section visual/UX spec
+
+| § | Section | Status | Evidence / detail |
+|---|---------|--------|--------------------|
+| 1 | Overall visual direction | **Implemented but not fully tested** | New palette replaces the old warm-off-white/amber theme suite-wide (theme.css + 3 modules' light-theme.css overrides). Live-verified on the login screen only. |
+| 2 | Colors | **Implemented and tested (tokens); not tested (every module)** | Exact hex values from the spec now the token source of truth (`shared/theme.css`); 6 named status treatments added; contrast computed by hand for the one non-obvious pairing (gold-on-navy nav-active text, ~8.3:1) — see theme.css's own comment. Not verified with a contrast-checker tool against every live combination. |
+| 3 | Typography | **Implemented, not fully tested** | Inter loaded via `@import`; sentence-case labels/nav (was uppercase); heading sizes updated to spec range; `.tabular-nums` utility added but not yet applied to any specific price/weight/count field — that wiring is outstanding. |
+| 4 | Spacing, surfaces, shared components | **Mostly already present + partially implemented** | The `--space-*` scale already matched the spec's exact values before this pass (4/8/12/16/24/32). Radii already close (6/10px). `.status-badge` shared component added new. Loading/empty/error-state components: see §15 below, partial. |
+| 5 | Application shell and navigation | **Implemented, partially tested** | Sentence-case nav, compact icon-rail sidebar for 769-1024px (was a hard cliff straight to mobile-drawer at 768px) added and CSS-mechanism-verified; full nav live-verification needs credentials. Country Market's standalone-embed behavior not reviewed this pass. |
+| 6 | Buttons, forms, save feedback | **Implemented (buttons); not started (forms/save feedback)** | `.btn-primary` is blue suite-wide now (was near-black, or gold via a stale local override in 3 modules). Persistent labels/inline validation/save-feedback wording ("Saving…"/"Saved"/"Couldn't save — Retry") not audited or built this pass. |
+| 7 | Tables and large datasets | **Still outstanding** | Not touched this pass beyond the token cascade (borders/hover colors update automatically via theme.css). Sticky headers, density options, sortable-column indicators, horizontal-scroll containment not reviewed. |
+| 8 | Video Manager | **Partial** | Status badges retinted to the spec's blue/amber/green treatment (previously "Ready to Make" was slate, not blue); fixed a real label bug (status tab said "Completed", every record's own badge said "Created"). Boot-time load failure now shows a real error + Retry instead of hanging forever (also relevant to §15). Grid/clip-list/mobile-record-layout requirements not reviewed against the spec's checklist this pass. |
+| 9 | Record drawers and dialogs | **Still outstanding** | Not reviewed against the spec's dialog-behavior checklist (focus containment/restoration, Escape, cancellation lifecycle) this pass. |
+| 10 | Public upload experience | **Already present, with specific evidence (mostly)** | The reliability fixes this session (file-status distinction, preserved form contents on failure, "Upload another") satisfy several bullets here already — see review item 4's section. Not reviewed line-by-line against every bullet (e.g. explicit require-a-choice-before-submitting-with-failed-files). |
+| 11 | Listings editor | **Still outstanding** | Only the PDF-library deferred-load change touched this module. Zoom controls, narrow-screen page-nav collapse, etc. not reviewed. |
+| 12 | Banners and OBS | **Still outstanding (beyond tokens)** | light-theme.css retinted; no layout/workflow review against this section's bullets. |
+| 13 | Lot Images and Lot Numbers | **Still outstanding** | Only the redundant `.btn-primary` override removed. Fluid-card/min-width bug not investigated. |
+| 14 | Pre/Post Auction and Results | **Still outstanding, and item 14's own business-decision flag is unresolved** | Whether the standalone Results module is supported/superseded/integrated is a business decision this pass did not resolve — flagging again since the original spec explicitly asked not to silently drop it. |
+| 15 | Loading, empty, offline, error states | **Partial** | Video Manager: differentiated "no results for your search" (with a Clear-all action) from "nothing here yet", and added a real boot-error state (permission-denied vs. generic-failure wording, Retry button) in place of an indefinite hang. No other module reviewed. Reduced-motion (`prefers-reduced-motion`) respected suite-wide via a new theme.css rule. |
+| 16 | Responsive and accessibility verification | **Requires your input to complete** | This environment has no test staff credentials and (per this session) the browser tool's window-resize control did not actually change the tab's viewport, so breakpoint-by-breakpoint device testing behind auth could not be performed. What *was* verified live: the login screen at default width, and the compact-sidebar CSS mechanism by direct DOM inspection. Real multi-breakpoint, multi-device, keyboard-only, and 200%-zoom testing needs either test credentials or your own pass — flagging this explicitly rather than claiming it done. |
+
 ## Phase 1 — Security
 
 - [x] 1. Monday migration endpoint exposure — see detail below
@@ -1074,4 +1120,138 @@ normal push/PR/merge.
 
 ## Phase 4 — UI/UX
 
-(TBD after Phase 1/2/3)
+See the 16-section reconciliation table near the top of this file for
+the section-by-section status. This section is the implementation
+detail for what's actually done so far.
+
+### Design tokens (§§1-4)
+
+**Implemented:** `shared/theme.css` rewritten to the exact palette
+from the spec — `--bg-canvas:#F4F6F8`, `--sidebar-bg:#17263D`,
+`--action-blue:#294F78`, `--gold:#A88342`, plus the 6 named status
+treatments as `--status-{blue,amber,green,slate,red}-{fg,bg}` pairs
+and a `.status-badge`/`.status-badge--*` component. Inter loaded via
+`@import`. Labels and nav went from forced-uppercase to sentence
+case. `prefers-reduced-motion` now respected globally.
+
+Three modules (country-market, banners, post-auction) predate
+`theme.css` and keep their own parallel token vocabulary in a
+`light-theme.css` override file loaded after their component CSS —
+updating `theme.css` alone does nothing for them. All three had their
+own token *values* updated to match (see each file's diff), not their
+variable names, to avoid touching those apps' component CSS. Country
+Market's `--brand` stays gold (branding/nav-active/badges) with a
+scoped `.btn-primary` override to blue, since that one variable was
+doing double duty as both "brand accent" and "primary action color"
+in the original app and the spec wants those separated.
+
+Video Manager and the public upload page each had a local `--accent`
+override for their own blue (pre-existing, from before this suite had
+a shared blue token) — repointed to the exact same hex as the new
+shared `--action-blue` rather than removed, since `--accent` is used
+in ~30 places in Video Manager's CSS beyond just the primary button
+(focus rings, selected rows, links) where a blanket removal risked
+missing one. Same blue everywhere now, by value, not by coincidence.
+
+Three modules (lot-images, lot-numbers, results) had a **redundant**
+local `.btn-primary { background: var(--accent) }` that would have
+made their primary buttons gold once `--accent`'s role became
+"branding," since theme.css's own `.btn-primary` is already correctly
+blue — removed as the "conflicting legacy override" the spec calls
+out, per its own "remove conflicting overrides as shared components
+replace them" instruction.
+
+**Verified:** login/pending-approval screens (reachable without a
+signed-in session in this sandboxed environment) confirmed live in a
+real Chrome tab — light canvas, white card, navy button, gold link,
+sentence-case labels. Every other screen's token cascade was traced
+by reading (grep-confirmed load order, specificity, variable
+resolution paths) rather than click-tested — this environment has no
+test staff credentials.
+
+**Remaining/deploy steps:** none — static-file changes, ships via
+normal push/PR/merge. A follow-up pass with real credentials (or a
+screen-share walkthrough) is the only way to confirm every module's
+screens actually render as intended, not just the reachable ones.
+
+### Application shell — compact sidebar, accessible names (§5)
+
+**Implemented:** a new `769px-1024px` breakpoint collapses the
+220px labeled sidebar to a 64px icon-only rail instead of jumping
+straight from full sidebar to the 768px mobile hamburger-drawer
+pattern — the gap the spec's "fix intermediate-width behavior" bullet
+describes. Labels stay in the DOM (visually hidden via the standard
+clip-rect technique, not `display:none`) plus `aria-label`/`title` on
+every nav item and the settings/sign-out buttons, so this stays
+keyboard- and screen-reader-accessible at the compact width.
+
+No compact/icon-only logo asset exists yet, so the full wordmark just
+shrinks to `max-width:40px` at this breakpoint — present but not
+legible. Flagged rather than silently left; a dedicated small mark
+would look better here if one gets designed.
+
+**Verified:** CSS mechanism confirmed valid (balanced rules, correct
+selectors) by direct re-reading; the live cascade at an actual
+769-1024px viewport was not confirmed in-browser — this session's
+window-resize tool did not change the tab's actual viewport size
+(`window.innerWidth` stayed at the outer window's width after calling
+it), a tooling limitation in this environment, not something fixed in
+the app.
+
+### Video Manager status treatment (§8) + loading/error states (§15)
+
+**Implemented:** status pills retinted onto the shared status-badge
+tokens — "Ready to Make" is now blue (was slate/gray, not matching
+the spec's blue-for-ready treatment); "On Hold"/"Completed" were
+already amber/green and needed no color change, just resizing off a
+10px-uppercase treatment onto the shared 12px/sentence-case one used
+elsewhere. Fixed a real, pre-existing label inconsistency across 4
+files (repository.js, ui-compare.js, ui-modals.js, ui-drawer.js): the
+Completed status *tab* said "Completed" but every individual record's
+own status badge and activity-log text for that same status said
+"Created" instead.
+
+`app.js`'s `boot()` had no error handling at all — a denied Firestore
+read or a dropped connection mid-load left the app on its static
+loading skeleton forever, no explanation, no way to recover without a
+manual page reload (exactly the "do not represent network/permission
+failures as empty data" / "provide Retry" gaps in §15). Now wrapped in
+try/catch with a real error state distinguishing permission-denied
+from a generic failure, the latter with a Retry button. Also
+differentiated the empty-state message: "no results for your active
+search/filters" (with a Clear-all action) is no longer the same text
+as "nothing in this tab yet."
+
+**A real bug caught and fixed during implementation, not shipped
+broken:** the first version of the Retry button cleared and rebuilt
+`#app`'s entire innerHTML before re-calling `boot()` — but `#app`'s
+topbar/tabs-nav/toolbar/content elements are static markup from
+`index.html`, not generated by `boot()` itself, and `renderTabsShell()`
+/`wireToolbar()` assume those elements already exist (`getElementById`
+against a fixed id, not element creation). That version would have
+thrown immediately on the first Retry click. Fixed by targeting only
+`#vm-content` for the error UI, and adding a `shellWired` guard so a
+retry re-attempts just the failed data load, never re-wires listeners
+that are already attached (which would otherwise double-fire on every
+subsequent change after a retry).
+
+**Verified:** all touched files re-checked as valid syntax via `.mjs`
+copies. Traced the retry path by hand for both failure points
+(`preload()` failing before the shell is ever wired, vs. `refresh()`
+failing after it). Not verified against a live permission-denied or
+dropped-connection scenario — would need a real restricted account or
+a deliberately broken connection to reproduce.
+
+**Remaining/deploy steps:** none — static-file changes only.
+
+### Everything else in the 16-section spec
+
+Not started this pass — genuinely outstanding, not silently folded
+into "done": tables (§7), record drawers/dialogs (§9), the public
+upload experience's remaining bullets (§10), the listings editor
+(§11), banners/OBS (§12), lot images/lot numbers (§13), pre/post
+auction and results (§14, including the unresolved "is Results still
+supported" business-decision flag), and any loading/empty/error work
+outside Video Manager (§15). Full responsive/accessibility device
+verification (§16) needs either test credentials or your own pass —
+see that row in the reconciliation table above.

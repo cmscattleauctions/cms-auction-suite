@@ -88,6 +88,16 @@ function paintSelectedRow() {
 /* =============================================================
  * Boot
  * ============================================================= */
+// Wiring the static shell (tab nav, filters panel, toolbar listeners,
+// the one Firestore subscription) must happen exactly once — index.html
+// provides #vm-tabs/#vm-content/etc. as fixed static elements, and
+// re-running renderTabsShell()/wireToolbar() a second time on a Retry
+// would attach duplicate listeners to those same still-live DOM nodes
+// (and VideoRepository.subscribe() would double-fire refresh() on every
+// change). A Retry after a failed boot only needs to redo whichever
+// data load actually failed, never the one-time wiring around it.
+let shellWired = false;
+
 async function boot() {
   // Restore whichever status tab the shell was asked to reopen us on
   // (see shared/subapp-url.js) — otherwise a reload always drops back
@@ -101,15 +111,54 @@ async function boot() {
   // synchronously everywhere below (renderFiltersPanel, the Video ID
   // Manager, the upload modal) — load them once before anything renders,
   // same as ReferenceDataRepository's own doc comments assume.
-  await ReferenceDataRepository.preload();
-  renderTabsShell();
-  renderFiltersPanel();
-  wireToolbar();
-  VideoRepository.subscribe(evt => {
-    if (evt && evt.type === 'reference-changed') refreshConsignorFilterOptions();
-    refresh();
-  });
-  await refresh();
+  //
+  // Both this and the first refresh() below can throw — a denied
+  // Firestore read, a dropped connection mid-load, or (per
+  // repository.js's ensureLoaded()) a subscription that errors before
+  // its first snapshot ever arrives. Unhandled, that left the whole
+  // app on its static loading skeleton forever with no explanation
+  // and no way to recover without a manual page reload. Represent it
+  // as an actual error, not empty data — and let staff retry in place.
+  try {
+    await ReferenceDataRepository.preload();
+    if (!shellWired) {
+      shellWired = true;
+      renderTabsShell();
+      renderFiltersPanel();
+      wireToolbar();
+      VideoRepository.subscribe(evt => {
+        if (evt && evt.type === 'reference-changed') refreshConsignorFilterOptions();
+        refresh();
+      });
+    }
+    await refresh();
+  } catch (err) {
+    console.error('[video-manager] boot() failed:', err);
+    renderBootError(err);
+  }
+}
+
+function renderBootError(err) {
+  const isPermission = /permission|insufficient/i.test(err?.code || err?.message || '');
+  // Targets #vm-content specifically (not #app) — the topbar/tabs-nav/
+  // toolbar around it are static markup from index.html that boot()
+  // may not have wired up yet (if preload() is what failed); replacing
+  // #app wholesale would blank those out and, on Retry, renderTabsShell/
+  // wireToolbar would find their target elements already gone.
+  const content = document.getElementById('vm-content');
+  const meta = document.getElementById('vm-meta');
+  if (meta) meta.textContent = '';
+  content.innerHTML = `
+    <div class="vm-boot-error">
+      <div>
+        <h3>${isPermission ? "Couldn't load — access denied" : "Couldn't load Video Manager"}</h3>
+        <p>${isPermission
+          ? "Your account doesn't have permission to view this data. Contact an admin if this seems wrong."
+          : "Check your connection and try again."}</p>
+        ${isPermission ? '' : '<button class="btn btn-primary" id="vm-boot-retry" type="button">Retry</button>'}
+      </div>
+    </div>`;
+  document.getElementById('vm-boot-retry')?.addEventListener('click', () => boot());
 }
 
 /* =============================================================
@@ -153,13 +202,26 @@ async function refresh() {
 
   const content = document.getElementById('vm-content');
   if (!list.length) {
-    content.innerHTML = `
+    // Distinguish "nothing here yet" from "your search/filters matched
+    // nothing" — an active query gets a reset action and keeps the
+    // filters visible instead of implying the tab itself is empty.
+    content.innerHTML = hasActiveQuery
+      ? `
       <div class="vm-empty">
         <div>
-          <h3>No videos match</h3>
-          <p>Try clearing search or filters, or add a new video.</p>
+          <h3>No results for your search or filters</h3>
+          <p>Nothing in this tab matches. Try adjusting or clearing them.</p>
+          <button class="btn btn-primary" id="vm-empty-clear" type="button">Clear all filters</button>
+        </div>
+      </div>`
+      : `
+      <div class="vm-empty">
+        <div>
+          <h3>No videos in ${STATUS_TABS.find(t => t.id === state.statusTab)?.label || 'this tab'} yet</h3>
+          <p>Add a new video to get started.</p>
         </div>
       </div>`;
+    document.getElementById('vm-empty-clear')?.addEventListener('click', resetAllFilters);
     return;
   }
 

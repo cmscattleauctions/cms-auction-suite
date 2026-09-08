@@ -224,6 +224,14 @@ label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spa
 .vm-content { flex: 1; padding: 4px 24px 32px; }
 .vm-empty { display: grid; place-items: center; padding: 80px 20px; color: var(--text-muted); text-align: center; }
 .vm-empty h3 { color: var(--text-secondary); margin-bottom: 6px; font-size: 14px; }
+.vm-empty p { margin-bottom: var(--space-4); }
+
+/* Whole-app boot failure — replaces #app entirely (no shell/tabs to
+   show yet), distinct from .vm-empty which replaces just the record
+   list within an already-working shell. */
+.vm-boot-error { display: grid; place-items: center; min-height: 60vh; padding: var(--space-6); text-align: center; }
+.vm-boot-error h3 { color: var(--status-red-fg); font-size: 18px; margin-bottom: var(--space-2); }
+.vm-boot-error p { color: var(--text-secondary); margin-bottom: var(--space-4); max-width: 360px; }
 
 /* =============================================================
  * Sex tags — plain and understated (STR / HFR / S&H)
