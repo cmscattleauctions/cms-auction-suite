@@ -330,10 +330,15 @@ function svg(strings) {
  * ============================================================= */
 
 function selectTab(tabId, route = null) {
-  // Defense in depth beyond renderNav()'s filtering — catches a disallowed
-  // tab reached via a typed/bookmarked #hash, not just a click. Falls back
-  // to this user's first allowed tab (own security rules inside each
-  // sub-app remain the real data boundary; this is a workflow guard).
+  // Catches a disallowed tab reached via a typed/bookmarked #hash, not
+  // just a click — falls back to this user's first allowed tab. This
+  // (and allowedTabs generally) is navigation-only: most of the
+  // suite's Firestore collections are gated by isApproved() alone, not
+  // per-account, so hiding a tab here does not stop its data from
+  // being reachable directly via the SDK by any other approved user.
+  // Treat this as decluttering someone's sidebar, not as a security
+  // boundary — see docs/HARDENING_CHECKLIST.md's Firebase-authorization
+  // item for which collections this is and isn't true for.
   if (!isTabAllowed(tabId)) {
     const fallback = TABS.find(t => isTabAllowed(t.id));
     if (!fallback || fallback.id === tabId) return;

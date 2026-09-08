@@ -119,7 +119,39 @@ service cloud.firestore {
     }
 
     // ── Country Market ─────────────────────────────────────────
-    match /cmLots/{id}        { allow read, write: if isApproved(); }
+    // app.js's own permission model (canEditLot/canDeleteLot/
+    // canChangeStatus/canViewBuyer) already draws these exact lines —
+    // this just makes the rules actually enforce them, since the old
+    // blanket `write: if isApproved()` let any approved suite user
+    // edit/delete/change-status on ANY lot (not just their own) via a
+    // direct SDK call, bypassing the app's UI-only restriction
+    // entirely. Buyer-field visibility (read) and tamper-resistance
+    // (write) can't be fully enforced here — Firestore rules are
+    // document-granular, not field-granular, and `buyer` isn't present
+    // on every lot (only once sold, so a presence-safe equality check
+    // on it adds real complexity for a partial guarantee). An approved
+    // rep with direct SDK access can therefore still read, or write
+    // over, a lot's buyer field even though the UI hides/blocks that.
+    // Closing this fully needs moving `buyer` into a separate, admin-
+    // only-readable document — a real schema change, out of scope for
+    // this pass (flagged in docs/HARDENING_CHECKLIST.md).
+    function cmRepName() {
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.rep_name;
+    }
+    match /cmLots/{id} {
+      allow read:   if isApproved();
+      allow create: if isApproved();
+      allow update: if isApproved() && (
+        cmIsAdmin() ||
+        (
+          resource.data.rep == cmRepName()
+          && resource.data.status in ['Staged', 'Active']
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.rep == resource.data.rep
+        )
+      );
+      allow delete: if isApproved() && cmIsAdmin();
+    }
     match /cmActivityLog/{id} { allow read, write: if isApproved(); }
     match /cmConsignors/{id} {
       allow read:  if isApproved();
@@ -130,11 +162,21 @@ service cloud.firestore {
       allow write: if isApproved() && cmIsAdmin();
     }
     match /profiles/{uid} {
-      // Approved users can read all profiles; you can create your own
-      // (first-login bootstrap); only admins can change roles.
+      // Approved users can read all profiles, and can create their own
+      // on first login — but never as admin. A role escalation is a
+      // trusted-process action (an existing Country Market admin, or
+      // the suite admin as a bootstrap/recovery path if Country Market
+      // ever has zero admins, promotes someone via the Admin page
+      // afterwards) — never something a new profile can grant itself.
+      // Previously this had no role restriction on create at all: any
+      // approved suite user (rep, video staff, anyone) could create
+      // their own profile with role:'admin' directly via the SDK,
+      // bypassing the app's client-side "first user becomes admin"
+      // check entirely, since that check was never enforced here.
       allow read:   if isApproved();
-      allow create: if isApproved() && request.auth.uid == uid;
-      allow update: if isApproved() && cmIsAdmin();
+      allow create: if isApproved() && request.auth.uid == uid
+                    && request.resource.data.role == 'rep';
+      allow update: if isApproved() && (cmIsAdmin() || isSuiteAdmin());
       allow delete: if false;
     }
   }

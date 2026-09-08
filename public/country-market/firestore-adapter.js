@@ -14,10 +14,11 @@
  *   profiles/{uid}         user profile: role ('admin'|'rep'),
  *                          rep_name, full_name, email
  *
- * First sign-in bootstrap: if a user has no profile document,
- * one is created automatically — role 'admin' if the profiles
- * collection is empty (first user), otherwise 'rep'. Admins can
- * change roles from the app's Admin page afterwards.
+ * First sign-in bootstrap: if a user has no profile document, one is
+ * created automatically as role 'rep' — always, no exceptions (see
+ * docs/firestore.rules' create rule for profiles/{uid}, which enforces
+ * this server-side). Admins promote someone from the app's Admin page
+ * afterwards.
  * ============================================================= */
 
 import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
@@ -65,15 +66,20 @@ async function ensureProfile(user) {
   const ref = doc(db, COLL.profiles, user.uid);
   const snap = await getDoc(ref);
   if (snap.exists()) return;
-  // First user in the system becomes admin; everyone after is a rep
-  const all = await getDocs(collection(db, COLL.profiles));
-  const role = all.empty ? "admin" : "rep";
+  // Always created as 'rep' — docs/firestore.rules' create rule for
+  // profiles/{uid} enforces this server-side too (a client can't self-
+  // assign 'admin' by editing this file or calling the SDK directly).
+  // Promoting someone to admin is a trusted-process action from the
+  // app's own Admin page (canEditProfiles()/cmIsAdmin()), done by an
+  // existing admin — or, if Country Market ever somehow has zero
+  // admins, by the suite admin as a bootstrap/recovery path (see the
+  // rules file's isSuiteAdmin() branch on the update rule).
   await setDoc(ref, {
     id: user.uid,
     email: user.email || "",
     full_name: (user.email || "").split("@")[0],
     rep_name: "",
-    role,
+    role: "rep",
     created_at: nowIso(),
   });
 }
