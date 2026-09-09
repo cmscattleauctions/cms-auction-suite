@@ -4238,21 +4238,29 @@ function init(){
 
   wireSectionSelectors();
   
-  // Wire date picker auto-fill
-  auctionDatePicker.addEventListener("change", () => {
+  // Wire date picker auto-fill. Pulled out to a named function, not
+  // left inline in the "change" listener below, because setting
+  // auctionDatePicker.value with plain JS (as the default-date-on-load
+  // code further down does) never fires a real "change" event on its
+  // own — that's a DOM quirk, not a bug in this listener. Without this
+  // split, the auto-fill only ever ran after a manual pick, never for
+  // the default date silently sitting in the picker on a fresh page
+  // load. Called both from the listener (manual picks) and right after
+  // the default is set below (so the same fill happens either way).
+  function applyAuctionDateFill() {
     const selectedDate = auctionDatePicker.value;
     if(!selectedDate) return;
-    
+
     // Parse the datetime-local value (format: YYYY-MM-DDTHH:mm)
     const dateObj = new Date(selectedDate);
-    
+
     // Format date: "February 12th, 2026 @ 1:00PM"
-    const months = ["January", "February", "March", "April", "May", "June", 
+    const months = ["January", "February", "March", "April", "May", "June",
                     "July", "August", "September", "October", "November", "December"];
     const month = months[dateObj.getMonth()];
     const day = dateObj.getDate();
     const year = dateObj.getFullYear();
-    
+
     // Add ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
     const ordinal = (d) => {
       if (d > 3 && d < 21) return 'th';
@@ -4263,27 +4271,28 @@ function init(){
         default: return "th";
       }
     };
-    
+
     // Format time: "1:00PM"
     let hours = dateObj.getHours();
     const minutes = dateObj.getMinutes();
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12 || 12;
     const timeStr = `${hours}:${minutes.toString().padStart(2, '0')}${ampm}`;
-    
+
     // Set the formatted date
     auctionDate.value = `${month} ${day}${ordinal(day)}, ${year} @ ${timeStr}`;
 
     // Auto-select the Contract Details banner color that matches this month
     const monthColorRadio = document.querySelector(`input[name="lotByLotColor"][data-month="${dateObj.getMonth()}"]`);
     if(monthColorRadio) monthColorRadio.checked = true;
-    
+
     // Auto-fill auction title ONLY if empty
     if(!auctionName.value || auctionName.value.trim() === ""){
       auctionName.value = `${month} DairyX, Holstein and Native Auction`;
     }
-  });
-  
+  }
+  auctionDatePicker.addEventListener("change", applyAuctionDateFill);
+
   wireBuild();
   wireExit();
   wireResultsDropdowns();
@@ -4295,6 +4304,7 @@ function init(){
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   auctionDatePicker.value = `${year}-${month}-${day}T13:00`;
+  applyAuctionDateFill();
 
   // Pre-select the Contract Details banner color for the default (current) month
   const defaultMonthColorRadio = document.querySelector(`input[name="lotByLotColor"][data-month="${now.getMonth()}"]`);

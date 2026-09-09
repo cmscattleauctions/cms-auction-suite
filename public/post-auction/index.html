@@ -1461,7 +1461,17 @@
       };
       
       if (!presetButtons.presetFullPostAuction) return;
-      
+
+      // Shared active-state highlight for whichever preset button was
+      // actually clicked — runs on every preset button via one
+      // delegated listener, so each button's own handler above/below
+      // only needs to worry about what it selects, not this bookkeeping.
+      document.querySelectorAll('.btnPreset').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.btnPreset').forEach(b => b.classList.toggle('active', b === btn));
+        });
+      });
+
       presetButtons.presetFullPostAuction.addEventListener('click', () => {
         clearAllSelections();
         if (typeof chkBuyer !== 'undefined') {
@@ -1751,6 +1761,21 @@
       setupCollapsibleSections();
       setupCsvUploadUI();
       setupLiveUpdates();
+
+      // Auto-select the workflow preset matching this page's mode
+      // (?mode=pre/post — set by the shell's Pre Auction / Post Auction
+      // nav tabs, see shell.js's TABS array) instead of requiring a
+      // manual preset click every time the page loads. A real .click()
+      // on the actual button, not a reimplementation of what it does —
+      // stays correct if that handler ever changes, and picks up the
+      // active-state highlight for free via the delegated listener
+      // above (nothing previously ever set that class — the .active
+      // CSS existed but was dead code until this).
+      const autoPresetMode = new URLSearchParams(location.search).get('mode');
+      const autoPresetBtn = autoPresetMode === 'pre' ? document.getElementById('presetPreAuction')
+        : autoPresetMode === 'post' ? document.getElementById('presetFullPostAuction')
+        : null;
+      if (autoPresetBtn) autoPresetBtn.click();
     }
   </script>
 </body>
