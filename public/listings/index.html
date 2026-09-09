@@ -46,7 +46,7 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
 .topbar .spacer{flex:1}
 .topbar .crumbs{display:flex;gap:6px;font-size:12px}
 .crumb{padding:5px 12px;border-radius:20px;background:var(--bg2);color:var(--dim);
-  letter-spacing:.6px;text-transform:uppercase}
+  letter-spacing:.6px;text-transform:uppercase;white-space:nowrap;flex-shrink:0}
 .crumb.on{background:var(--blue);color:#fff}
 .btn{background:var(--blue);color:#fff;padding:11px 22px;border-radius:8px;
   font-weight:600;font-size:14px;letter-spacing:.3px;transition:.15s}
@@ -832,9 +832,19 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
    this breakpoint changes. */
 #railToggle{display:none}
 @media (max-width: 640px){
+  /* .topbar's own breadcrumbs wrap to a second line below 760px
+     (see that rule above), making its real height variable — 100px
+     when wrapped vs ~56px on one line, confirmed live (375px: 100px;
+     430px: 85px). #railToggle used to be position:fixed with a
+     hardcoded top:66px assuming a single-line topbar, which put its
+     bottom ~34px underneath/inside the wrapped topbar instead of
+     below it. Anchoring to .ed-wrap instead — which always starts
+     exactly at the topbar's real bottom edge, whatever that is —
+     fixes this without needing to know that height at all. */
+  .ed-wrap{position:relative}
   #railToggle{
     display:inline-flex;align-items:center;gap:6px;
-    position:fixed;top:66px;left:12px;z-index:61;
+    position:absolute;top:12px;left:12px;z-index:61;
     background:var(--navy);color:#fff;border:1px solid rgba(255,255,255,.18);
     border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:600;
     box-shadow:0 4px 10px rgba(0,0,0,.25);
@@ -849,6 +859,11 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
     display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:59;
   }
   .ed-rail-backdrop.open{display:block}
+  /* .ed-rail is out of flow at this width (fixed, above), so .ed-main
+     is .ed-wrap's only in-flow child and its first row (the mode tabs)
+     would otherwise start right under the toggle button above instead
+     of below it. Reserve exactly the toggle's own footprint. */
+  .mode-tabs{margin-top:46px}
 }
 
 .sheet .s-thead .cell{line-height:1.05;}
