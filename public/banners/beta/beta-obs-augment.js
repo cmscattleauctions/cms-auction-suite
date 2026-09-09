@@ -173,8 +173,16 @@ function makeImageSource(localFilePath, sourceName) {
  * time the scene reactivates, rather than a lighter-weight seek-to-0 on
  * an already-open file.
  *
- * `clear_on_media_end: false` — the cattle video freezes on its last
- * frame if it's shorter than the time spent on that lot, it never vanishes.
+ * `looping: true` — the cattle video repeats from the start for as
+ * long as its lot's scene stays active, instead of playing once and
+ * either freezing on its last frame or clearing to black if it's
+ * shorter than the time actually spent on that lot.
+ *
+ * `clear_on_media_end: false` is now moot rather than wrong: OBS only
+ * consults it once playback reaches a real, non-looping end, which a
+ * looping source never does — left as `false` (its prior intent, and
+ * still the correct fallback if `looping` is ever turned off again)
+ * rather than removed, since the field is otherwise ignored either way.
  */
 function makeMediaSource(localFilePath, sourceName) {
   return {
@@ -186,7 +194,7 @@ function makeMediaSource(localFilePath, sourceName) {
     settings: {
       local_file: localFilePath,
       is_local_file: true,
-      looping: false,
+      looping: true,
       restart_on_activate: true,
       close_when_inactive: true,
       clear_on_media_end: false,
