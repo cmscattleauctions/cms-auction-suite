@@ -1,0 +1,148 @@
+/* =============================================================
+ * CMS Auction Suite — Startup loading screen
+ * -------------------------------------------------------------
+ * Full-screen branded overlay shown only while shell.js's boot()
+ * is resolving auth state (and, for an approved session, the
+ * profile fetch renderShell() needs before it can paint). Scoped
+ * entirely under .startup-loader so nothing here can leak into or
+ * be affected by the rest of the app's styling.
+ *
+ * Colors are this screen's own — approximate values from the
+ * design reference, not shared/theme.css's suite tokens (which are
+ * a slightly different navy/gold pairing tuned for the workspace
+ * chrome, not a full-bleed brand moment like this one).
+ * ============================================================= */
+
+.startup-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #101C2D;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 250ms ease;
+}
+.startup-loader.startup-loader-hide {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Subtle oversized angular shapes along the edges — a few flat
+   polygons in barely-lighter navy tones, not an image. Purely
+   decorative: hidden from assistive tech, never intercepts clicks. */
+.startup-loader-shape {
+  position: absolute;
+  pointer-events: none;
+}
+.startup-loader-shape--tl {
+  top: -12%; left: -10%; width: 46%; height: 60%;
+  background: rgba(255, 255, 255, 0.035);
+  clip-path: polygon(0 0, 100% 0, 55% 100%, 0 70%);
+}
+.startup-loader-shape--tr {
+  top: -14%; right: -12%; width: 40%; height: 55%;
+  background: rgba(255, 255, 255, 0.03);
+  clip-path: polygon(100% 0, 100% 100%, 40% 100%, 60% 0);
+}
+.startup-loader-shape--bl {
+  bottom: -16%; left: -10%; width: 42%; height: 55%;
+  background: rgba(255, 255, 255, 0.03);
+  clip-path: polygon(0 100%, 0 0, 60% 40%, 45% 100%);
+}
+.startup-loader-shape--br {
+  bottom: -14%; right: -10%; width: 44%; height: 58%;
+  background: rgba(255, 255, 255, 0.035);
+  clip-path: polygon(100% 100%, 100% 0, 35% 60%, 55% 100%);
+}
+
+.startup-loader-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding: 24px;
+  text-align: center;
+}
+
+.startup-loader-logo {
+  display: block;
+  width: min(240px, 60vw);
+  height: auto;
+}
+
+.startup-loader-track {
+  width: min(280px, 70vw);
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.startup-loader-track-fill {
+  width: 40%;
+  height: 100%;
+  border-radius: 999px;
+  background: #B99A60;
+  animation: startup-loader-sweep 1.4s ease-in-out infinite;
+}
+
+.startup-loader-status {
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.02em;
+}
+
+/* Error/retry state — a startup auth failure otherwise leaves this
+   screen showing forever with no way out. */
+.startup-loader-error {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.startup-loader.startup-loader-error-state .startup-loader-track,
+.startup-loader.startup-loader-error-state .startup-loader-status {
+  display: none;
+}
+.startup-loader.startup-loader-error-state .startup-loader-error {
+  display: flex;
+}
+.startup-loader-error-message {
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 320px;
+}
+.startup-loader-retry-btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #101C2D;
+  background: #B99A60;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 20px;
+  cursor: pointer;
+}
+.startup-loader-retry-btn:hover { background: #c9ab74; }
+.startup-loader-retry-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+@keyframes startup-loader-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startup-loader { transition: none; }
+  .startup-loader-track-fill { animation: none; width: 55%; transform: none; }
+}
+
+@media (max-width: 480px) {
+  .startup-loader-content { gap: 20px; }
+  .startup-loader-logo { width: min(190px, 66vw); }
+}

@@ -4596,10 +4596,14 @@ function toast(msg, isError = false) {
 }
 
 function showLoadingScreen() {
+  // #app has no static shell of its own — loadApp() below builds the
+  // real nav/topbar/lot-list only once it actually has data, so this
+  // is genuinely the only thing on screen until then. A "table" shape
+  // (see shared/skeleton.js) roughly matches the lot list that
+  // usually replaces it.
   document.getElementById('app').innerHTML = `
-    <div class="loading-screen">
-      <div class="loading-logo">★</div>
-      <div class="loading-text">Loading CMS…</div>
+    <div class="loading-screen" role="status" aria-busy="true" aria-label="Loading Country Market">
+      ${skeletonHtml('table', { rows: 8, columns: 5 })}
     </div>`;
 }
 

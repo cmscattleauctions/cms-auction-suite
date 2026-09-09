@@ -12,11 +12,22 @@
   <!-- Styles -->
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="light-theme.css">
+  <link rel="stylesheet" href="../shared/skeleton.css">
 
   <!-- Firestore data layer, backed by the suite's shared Firebase project
        (module scripts run before DOMContentLoaded, so it's installed
        before the app boots) -->
   <script type="module" src="./firestore-adapter.js"></script>
+  <!-- app.js below is a classic (non-module) script, so it can't
+       `import` shared/skeleton.js directly — bridge just the one
+       function it needs onto window, same pattern as
+       firestore-adapter.js/shared/cms-data.js already use for this
+       exact classic-script/ES-module boundary. Runs before app.js's
+       own showLoadingScreen() is ever called (see that comment). -->
+  <script type="module">
+    import { skeletonHtml } from '../shared/skeleton.js';
+    window.skeletonHtml = skeletonHtml;
+  </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
