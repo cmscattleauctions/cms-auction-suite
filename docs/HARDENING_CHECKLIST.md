@@ -74,7 +74,7 @@ rather than repeating it here.
 | 6 | Buttons, forms, save feedback | **Implemented (buttons); not started (forms/save feedback)** | `.btn-primary` is blue suite-wide now (was near-black, or gold via a stale local override in 3 modules). Persistent labels/inline validation/save-feedback wording ("Saving…"/"Saved"/"Couldn't save — Retry") not audited or built this pass. |
 | 7 | Tables and large datasets | **Mostly already present, with specific evidence; some still outstanding** | Video Manager's table already had, before this pass: sticky header (`position:sticky`), subtle header background, light row separators, distinct hover/selected states, horizontal scroll contained to the table wrapper (`overflow-x:auto`), larger touch targets on mobile. Added `.tabular-nums` to clip-count/date columns for digit alignment. Sort is a dedicated toolbar dropdown showing the active sort, not per-column-header click-to-sort with arrow indicators — the spec's "clearly indicate sortable columns and active sort" reads as satisfied by that dropdown, not as a literal requirement for clickable `<th>`s; flagging the interpretation rather than assuming it. Still outstanding: a compact-density option, and pagination/virtualization (tracked under item 8 in the review list, not duplicated here). |
 | 8 | Video Manager | **Partial** | Status badges retinted to the spec's blue/amber/green treatment (previously "Ready to Make" was slate, not blue); fixed a real label bug (status tab said "Completed", every record's own badge said "Created"). Boot-time load failure now shows a real error + Retry instead of hanging forever (also relevant to §15). **Grid view removed entirely at your request** (see "Grid view removed" detail section) — its bullets are now not applicable, not outstanding. Clip-list/mobile-record-layout requirements not reviewed against the spec's checklist this pass. |
-| 9 | Record drawers and dialogs | **Mostly already present, with specific evidence; one gap fixed** | Dialogs: shared modal shell has focus containment, initial focus, Escape dismissal, and focus restoration (all its modals go through one function, fixed once). Drawer: audited its content organization against the spec's exact list — already split into "Cattle & Video Details" / "Clips" tabs, with Cattle Information → Publishing → Usage → Notes → Activity as ordered sections within the first tab; Usage and Activity are both already collapsed-by-default with a "View all"/"View Activity" expand control, matching "collapse long histories" directly. Already full-width with a close action below 900px, matching "full-width detail view on narrow screens." Found and fixed one real gap: the sticky footer (Save/overflow menu) had no `env(safe-area-inset-bottom)` padding, so on a full-width mobile drawer on a notched iOS device its buttons would sit flush against the home-indicator area — added the same safe-area pattern shell.css already uses for its mobile topbar, plus the `viewport-fit=cover` meta tag this page was missing (without it, `env()` insets are always 0 — confirmed live: a test element resolved the padding calc to exactly `12px` on a non-notched browser, proving the CSS itself is valid). Not reviewed: dialog-cancellation-lifecycle bullets specifically for the drawer's own inline edit flows (separate from the shared-modal fix above), and whether every field's edit-vs-display state genuinely follows "avoid making every field permanently editable" everywhere. |
+| 9 | Record drawers and dialogs | **Mostly already present, with specific evidence; several gaps fixed** | **Video Manager** — dialogs: shared modal shell has focus containment, initial focus, Escape dismissal, and focus restoration (all its modals go through one function, fixed once). Drawer: content organization already matched the spec's exact list; fixed one real gap, missing `env(safe-area-inset-bottom)` on the mobile sticky footer (plus the `viewport-fit=cover` meta tag needed to make that non-zero). **Country Market** — found and fixed a real bug while auditing its own modals: 3 event listeners were each registered 2-3x (accidental duplication already in the codebase), including one that made Enter on the delete-lot confirmation call `doDeleteLot()` twice per keypress; also generalized Escape-to-close from "only the delete-lot modal" to every modal-overlay. Did not add focus-trap/initial-focus/restoration to Country Market's modals — its per-modal open call sites are scattered and unfamiliar (no single shared function like Video Manager's `mountModal()`), so retrofitting those specifically was judged higher regression risk than the fixes actually made; flagged rather than guessed. Not reviewed: dialog-cancellation-lifecycle for the drawer's own inline edit flows, and whether every field's edit-vs-display state follows "avoid making every field permanently editable" everywhere. |
 | 10 | Public upload experience | **Already present, with specific evidence (mostly)** | The reliability fixes this session (file-status distinction, preserved form contents on failure, "Upload another") satisfy several bullets here already — see review item 4's section. Not reviewed line-by-line against every bullet (e.g. explicit require-a-choice-before-submitting-with-failed-files). |
 | 11 | Listings editor | **Partial** | Added a "Fit" button next to the existing +/- zoom controls (computes zoom from the canvas's actual available width against the fixed 1056px print sheet — live-verified, produced 120% in a wide browser window). Added a collapsible off-canvas "Pages" drawer below 640px (toggle button, backdrop, Escape, and picking a page all close it — all 4 verified live via direct DOM/class-state checks) in place of a persistent 132-178px-wide sidebar that competed with the canvas for space on phone widths. Not reviewed: readable selected-lot form, distinguishing local-unsaved vs. saved-project state, complex-formatting-control grouping. |
 | 12 | Banners and OBS | **Still outstanding (beyond tokens)** | light-theme.css retinted; the two bug fixes this session (auto-generating interludes, video-fit) are separate PRs, not this Phase 4 pass. Checked for a specific previously-flagged issue (hardcoded `max-width:640px` wrappers stranding the Stinger/OBS Settings pages in blank space on a wide layout) — not present in the current code, that finding was stale. No further layout/workflow review against this section's bullets (preview workspace sizing, settings grouping, frequent-vs-advanced separation) — this module's canvas-preview/OBS-export code is exactly what the two bug fixes already touched twice this session, and speculative layout changes here without a clear, verified bug carry more regression risk than the other sections' fixes did. Would rather scope this deliberately than guess. |
@@ -1334,6 +1334,51 @@ there's no Grid view left to satisfy or fail them.
 
 **Remaining/deploy steps:** none — static-file change, ships via
 normal push/PR/merge.
+
+### Country Market: duplicate event listeners (real bug, found while auditing §9 for this module)
+
+**Finding:** while checking Country Market's own modals against the
+same focus/Escape work already done for Video Manager, found that
+`attachAppEvents()` registered three separate listeners doing
+identical things: the delete-lot confirmation's Enter/Escape keydown
+handler (2x), the search input's Escape handler (3x), and the
+click-outside-search handler (3x) — all in the same function, clearly
+an accidental copy-paste duplication already in the codebase, not
+something introduced this session. The delete-lot one is a genuine,
+user-visible bug: pressing Enter on the "type the lot number to
+confirm" field called `doDeleteLot()` twice per keypress.
+
+**Implemented:** removed the duplicate registrations, keeping one of
+each. Also generalized Escape-to-close: it previously only worked for
+the delete-lot confirmation modal specifically — every other modal
+(`m-sell`, `m-arch`, `m-ship`, `m-consignor`) had no Escape handling
+at all. Replaced the narrow, single-modal Escape check with one
+delegated handler that closes whichever `.modal-overlay` is currently
+visible, covering all of them at once.
+
+**Not done — full modal parity with Video Manager's fix:** initial
+focus, focus containment (Tab trapping), and focus restoration on
+close were NOT added here. Unlike Video Manager's single shared
+`mountModal()` function, Country Market's modals are static markup
+toggled by several different, unfamiliar per-modal "open" call sites
+scattered through a 3500+-line file — retrofitting those three
+behaviors correctly means touching each one individually, which
+carries meaningfully more regression risk in code this dense and
+unfamiliar than the single-function fix Video Manager's architecture
+allowed. Escape-dismissal and the duplicate-listener bug were safe,
+high-confidence wins reachable without touching those call sites;
+stopping there rather than guessing at the rest.
+
+**Verified:** re-checked as valid syntax. Live in Chrome (unauthenticated,
+so `attachAppEvents()` was called directly rather than through a real
+login): confirmed a synthetic `.modal-overlay` set to visible is
+correctly hidden by a dispatched Escape keydown event, and confirmed
+via monkey-patching `doDeleteLot()` that a simulated Enter keypress on
+the confirm field now calls it exactly once (was two, by definition,
+before this fix — traced from the duplicate registration itself, not
+independently reproduced pre-fix in this pass).
+
+**Remaining/deploy steps:** none — static-file change.
 
 ### Everything else in the 16-section spec
 

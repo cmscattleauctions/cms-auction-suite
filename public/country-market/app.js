@@ -3461,30 +3461,11 @@ function attachAppEvents() {
       if (sr) sr.style.display = 'none';
     }
   });
-  // Delete lot confirm — Enter key submits, Escape cancels
+  // Delete lot confirm — Enter key submits (Escape is handled below,
+  // generically, for every modal).
   document.addEventListener('keydown', e => {
-    if (document.activeElement?.id === 'delete-lot-confirm') {
-      if (e.key === 'Enter')  { e.preventDefault(); doDeleteLot(); }
-      if (e.key === 'Escape') { document.getElementById('m-delete-lot').style.display = 'none'; }
-    }
-  });
-  document.addEventListener('click', e => {
-    if (!e.target.closest('.header-search')) {
-      const sr = document.getElementById('search-results');
-      if (sr) sr.style.display = 'none';
-    }
-  }, { passive: true });  searchInput?.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-      searchInput.value = '';
-      const sr = document.getElementById('search-results');
-      if (sr) sr.style.display = 'none';
-    }
-  });
-  // Delete lot confirm — Enter key submits, Escape cancels
-  document.addEventListener('keydown', e => {
-    if (document.activeElement?.id === 'delete-lot-confirm') {
-      if (e.key === 'Enter')  { e.preventDefault(); doDeleteLot(); }
-      if (e.key === 'Escape') { document.getElementById('m-delete-lot').style.display = 'none'; }
+    if (document.activeElement?.id === 'delete-lot-confirm' && e.key === 'Enter') {
+      e.preventDefault(); doDeleteLot();
     }
   });
   document.addEventListener('click', e => {
@@ -3493,19 +3474,15 @@ function attachAppEvents() {
       if (sr) sr.style.display = 'none';
     }
   }, { passive: true });
-  searchInput?.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-      searchInput.value = '';
-      const r = document.getElementById('search-results');
-      if (r) r.style.display = 'none';
-    }
+  // Escape closes whichever modal-overlay is currently open, not just
+  // the delete-lot confirmation above — those other modals (m-sell,
+  // m-arch, m-ship, m-consignor, etc.) had no Escape handling at all.
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const open = Array.from(document.querySelectorAll('.modal-overlay'))
+      .find(el => getComputedStyle(el).display !== 'none');
+    if (open) open.style.display = 'none';
   });
-  document.addEventListener('click', e => {
-    if (!e.target.closest('.header-search')) {
-      const r = document.getElementById('search-results');
-      if (r) r.style.display = 'none';
-    }
-  }, { passive: true });
 
   // LDP close
   document.getElementById('ldp-overlay')?.addEventListener('click', closeLDPPanel);
