@@ -414,7 +414,11 @@
   .profile-dropdown {
     position: absolute;
     top: calc(100% + 8px);
-    right: 0;
+    /* left, not right: the profile button now sits at the top-LEFT of
+       the mobile topbar (see renderShell()'s markup order) — anchoring
+       the dropdown's right edge here would extend it off the left
+       edge of the viewport instead of staying on-screen. */
+    left: 0;
     min-width: 200px;
     background: var(--bg-surface);
     color: var(--text-primary);
