@@ -917,9 +917,23 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
   .vm-tabs { overflow-x: auto; padding: 0 14px; -webkit-overflow-scrolling: touch; }
   .vm-tab { padding: 12px 10px; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
 
-  .vm-toolbar { flex-wrap: wrap; padding: 10px 14px; }
+  .vm-toolbar { flex-wrap: wrap; padding: 10px 14px; position: relative; }
   .vm-search { flex: 1 1 100%; max-width: none; order: 1; }
   .vm-filters-wrap, .vm-sort-wrap { order: 2; }
+  /* .vm-filters-panel is position:absolute;right:0 relative to
+     .vm-filters-wrap (the desktop behavior — a dropdown right under a
+     Filters button that sits at the right end of a single-row
+     toolbar). On mobile the toolbar wraps, and Filters ends up on the
+     LEFT side of its own row instead — right:0 relative to that narrow
+     button confirmed live puts the panel's left edge at roughly
+     x:-234px, almost entirely off the left edge of the screen. Making
+     .vm-toolbar (full width) the positioning context instead of
+     .vm-filters-wrap (button-width only), and switching the panel to
+     an explicit left+right inset instead of a fixed 320px width,
+     keeps it fully on-screen regardless of where the button itself
+     lands in the wrapped layout. */
+  .vm-filters-wrap { position: static; }
+  .vm-filters-panel { left: 14px; right: 14px; width: auto; max-width: none; }
 
   .vm-active-filters, .vm-meta, .vm-content { padding-left: 14px; padding-right: 14px; }
 
