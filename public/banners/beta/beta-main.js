@@ -141,6 +141,7 @@ export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}, onP
       lotPlans.set(row.lot, {
         lot: row.lot, status: 'matched', cmsVideoId: result.cmsVideoId, source: result.source,
         youtubeId: result.youtubeId, tagIds,
+        videoScale: settings.assumedVideoWidth ? (settings.assumedVideoWidth < 3840 ? 3840 / settings.assumedVideoWidth : 1) : 1,
       });
     } else {
       lotPlans.set(row.lot, { lot: row.lot, status: 'unmatched', cmsVideoId: null, youtubeId: result.youtubeId, tagIds, reason: result.reason });
@@ -350,6 +351,7 @@ export async function buildAndExportBeta(ctx, classicObsJson, canvasW, canvasH) 
   for (const [lot, plan] of ctx.lotPlans.entries()) {
     lotPlansForAugment.set(lot, {
       cmsVideoId: plan.status === 'matched' ? plan.cmsVideoId : null,
+      videoScale: plan.videoScale,
       tagIds: plan.tagIds,
     });
   }

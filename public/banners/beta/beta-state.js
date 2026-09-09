@@ -59,6 +59,8 @@ export const DEFAULT_SETTINGS = {
   // read too.
   lotBannersFolder: '/Users/brysonmurray/Library/CloudStorage/Dropbox/Auction OBS/Lot Banners/',
   videoExt: 'mp4',
+  assumedVideoWidth: 1920,          // used only to compute a sane default on-canvas scale
+  assumedVideoHeight: 1080,
   tagLayout: {
     rightMargin: 80,
     bottomMargin: 80,
