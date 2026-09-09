@@ -75,7 +75,7 @@ rather than repeating it here.
 | 7 | Tables and large datasets | **Mostly already present, with specific evidence; some still outstanding** | Video Manager's table already had, before this pass: sticky header (`position:sticky`), subtle header background, light row separators, distinct hover/selected states, horizontal scroll contained to the table wrapper (`overflow-x:auto`), larger touch targets on mobile. Added `.tabular-nums` to clip-count/date columns for digit alignment. Sort is a dedicated toolbar dropdown showing the active sort, not per-column-header click-to-sort with arrow indicators — the spec's "clearly indicate sortable columns and active sort" reads as satisfied by that dropdown, not as a literal requirement for clickable `<th>`s; flagging the interpretation rather than assuming it. Still outstanding: a compact-density option, and pagination/virtualization (tracked under item 8 in the review list, not duplicated here). |
 | 8 | Video Manager | **Partial** | Status badges retinted to the spec's blue/amber/green treatment (previously "Ready to Make" was slate, not blue); fixed a real label bug (status tab said "Completed", every record's own badge said "Created"). Boot-time load failure now shows a real error + Retry instead of hanging forever (also relevant to §15). **Grid view removed entirely at your request** (see "Grid view removed" detail section) — its bullets are now not applicable, not outstanding. Clip-list/mobile-record-layout requirements not reviewed against the spec's checklist this pass. |
 | 9 | Record drawers and dialogs | **Mostly already present, with specific evidence; several gaps fixed** | **Video Manager** — dialogs: shared modal shell has focus containment, initial focus, Escape dismissal, and focus restoration (all its modals go through one function, fixed once). Drawer: content organization already matched the spec's exact list; fixed one real gap, missing `env(safe-area-inset-bottom)` on the mobile sticky footer (plus the `viewport-fit=cover` meta tag needed to make that non-zero). **Country Market** — found and fixed a real bug while auditing its own modals: 3 event listeners were each registered 2-3x (accidental duplication already in the codebase), including one that made Enter on the delete-lot confirmation call `doDeleteLot()` twice per keypress; also generalized Escape-to-close from "only the delete-lot modal" to every modal-overlay. Did not add focus-trap/initial-focus/restoration to Country Market's modals — its per-modal open call sites are scattered and unfamiliar (no single shared function like Video Manager's `mountModal()`), so retrofitting those specifically was judged higher regression risk than the fixes actually made; flagged rather than guessed. Not reviewed: dialog-cancellation-lifecycle for the drawer's own inline edit flows, and whether every field's edit-vs-display state follows "avoid making every field permanently editable" everywhere. |
-| 10 | Public upload experience | **Already present, with specific evidence (mostly)** | The reliability fixes this session (file-status distinction, preserved form contents on failure, "Upload another") satisfy several bullets here already — see review item 4's section. Not reviewed line-by-line against every bullet (e.g. explicit require-a-choice-before-submitting-with-failed-files). |
+| 10 | Public upload experience | **Implemented and tested (the one named gap); rest already present** | Reviewed line-by-line this time: per-file filename+size+progress+status+retry/remove already all present. Found and fixed the specific named gap — "require an explicit choice before submitting without failed files" — `onSubmit()` silently dropped failed files from the submission with no acknowledgment at all; a rep could ship a lot missing a video without realizing. Now requires a second Submit tap (with a toast naming the count and pointing at Retry) before proceeding with a failure still present; retrying or removing that file resets the requirement so an old confirmation can't silently cover a new failure. The reliability fixes from earlier this session (file-status distinction, preserved form contents on failure, "Upload another") cover the rest. |
 | 11 | Listings editor | **Partial** | Added a "Fit" button next to the existing +/- zoom controls (computes zoom from the canvas's actual available width against the fixed 1056px print sheet — live-verified, produced 120% in a wide browser window). Added a collapsible off-canvas "Pages" drawer below 640px (toggle button, backdrop, Escape, and picking a page all close it — all 4 verified live via direct DOM/class-state checks) in place of a persistent 132-178px-wide sidebar that competed with the canvas for space on phone widths. Not reviewed: readable selected-lot form, distinguishing local-unsaved vs. saved-project state, complex-formatting-control grouping. |
 | 12 | Banners and OBS | **Still outstanding (beyond tokens)** | light-theme.css retinted; the two bug fixes this session (auto-generating interludes, video-fit) are separate PRs, not this Phase 4 pass. Checked for a specific previously-flagged issue (hardcoded `max-width:640px` wrappers stranding the Stinger/OBS Settings pages in blank space on a wide layout) — not present in the current code, that finding was stale. No further layout/workflow review against this section's bullets (preview workspace sizing, settings grouping, frequent-vs-advanced separation) — this module's canvas-preview/OBS-export code is exactly what the two bug fixes already touched twice this session, and speculative layout changes here without a clear, verified bug carry more regression risk than the other sections' fixes did. Would rather scope this deliberately than guess. |
 | 13 | Lot Images and Lot Numbers | **Implemented and tested (the named min-width bug); rest not reviewed** | Found and fixed the exact bug the spec names ("fix minimum-width rules that force a card wider than its available container"): both modules' card grid used `grid-template-columns: repeat(auto-fill, minmax(300px, 1fr))` — on a viewport narrower than 300px + page padding, that minimum still refuses to shrink, forcing the grid (and the page) wider than the actual container. Changed to `minmax(min(300px, 100%), 1fr)` so it gracefully drops to one full-width column instead. Found the identical pattern in 8 more places across the suite (country-market, results, post-auction ×2, video-manager ×2, banners ×2, listings' color-picker modal) and fixed all of them the same way, since it's the same bug wherever it appears — not scoped to just these two modules. Wrap-groups/selection-state/export-progress bullets not reviewed. |
@@ -1377,6 +1377,44 @@ via monkey-patching `doDeleteLot()` that a simulated Enter keypress on
 the confirm field now calls it exactly once (was two, by definition,
 before this fix — traced from the duplicate registration itself, not
 independently reproduced pre-fix in this pass).
+
+**Remaining/deploy steps:** none — static-file change.
+
+### Public upload: require explicit choice before submitting with a failed video (§10)
+
+**Finding:** re-reviewed the public upload page line-by-line against
+every §10 bullet rather than assuming the earlier reliability pass
+covered it. `onSubmit()` builds its `clips` array from
+`files.filter(f => f.status === 'complete')` — a failed file is just
+silently excluded, with no message and no choice offered. The spec
+names this exact case: "require an explicit choice before submitting
+without failed files." Given the design premise of this whole page is
+"a rep on a phone with an unreliable connection," a failed upload
+being silently dropped is a real, likely-to-happen scenario, not an
+edge case.
+
+**Implemented:** a `failedAcknowledged` flag, false by default and
+reset whenever the set of failed files could change (starting any
+upload/retry, removing a file). `onSubmit()` now checks for any
+`failed` file: the first Submit tap with one present shows a toast
+naming the count and pointing at Retry, and returns without
+submitting; a second tap (with the same failure still there) proceeds
+with the ack flag now set. This preserves the successful clips'
+progress (nothing is lost) while making the "some videos won't be
+included" choice explicit instead of silent.
+
+**Verified:** re-checked as valid syntax. Traced the flag's reset
+points by hand (new upload, retry, remove) to confirm an old
+confirmation can never silently cover a different, later failure.
+Live in Chrome: confirmed the page loads with zero console errors
+after this change. **Not click-tested against a real failure** — this
+file uses ES module scope (top-level functions/state aren't
+`window`-accessible for console-poking the way this session verified
+similar logic in the classic, non-module scripts), and reliably
+forcing a real upload failure needs either a deliberately broken
+network condition or mocking `storage-data.js`'s upload function,
+neither done here. The logic itself was verified by reading, not
+guessed.
 
 **Remaining/deploy steps:** none — static-file change.
 

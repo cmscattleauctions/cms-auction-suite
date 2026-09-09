@@ -40,6 +40,11 @@ const formState = {
   pendingNewConsignorName: '',
 };
 const files = []; // { file, progress, status }
+// Set once the rep explicitly confirms "submit anyway" with a failed
+// video still in the list (see onSubmit()) — reset any time the set
+// of failed files could have changed, so an old confirmation never
+// silently covers a NEW failure.
+let failedAcknowledged = false;
 
 function showToast(msg) {
   const root = document.getElementById('ru-toast-root');
@@ -303,6 +308,7 @@ function addVideoFile(file) {
 }
 
 async function startUpload(entry) {
+  failedAcknowledged = false;
   entry.status = 'uploading';
   entry.progress = 0;
   entry.error = null;
@@ -341,6 +347,7 @@ function renderVideoList() {
   }));
   list.querySelectorAll('[data-remove]').forEach(b => b.addEventListener('click', () => {
     files.splice(Number(b.dataset.remove), 1);
+    failedAcknowledged = false;
     renderVideoList();
   }));
 
@@ -377,6 +384,20 @@ async function onSubmit() {
   }
   if (!files.some(f => f.status === 'complete') && files.length) {
     showToast('Wait for at least one video to finish uploading');
+    return;
+  }
+  // A failed video is silently dropped from the submission below
+  // (only 'complete' clips get included) — require an explicit
+  // second tap before doing that, so a rep on a bad connection can't
+  // accidentally ship a lot with a video missing without realizing
+  // it. Tapping Submit again with the same failure still in the list
+  // is the confirmation; retrying or removing that file (see
+  // startUpload()/the remove handler) resets this, so an old
+  // confirmation never silently covers a different, new failure.
+  const failedCount = files.filter(f => f.status === 'failed').length;
+  if (failedCount > 0 && !failedAcknowledged) {
+    failedAcknowledged = true;
+    showToast(`${failedCount} video${failedCount === 1 ? '' : 's'} failed to upload and won't be included. Tap Submit again to continue anyway, or Retry ${failedCount === 1 ? 'it' : 'them'} above.`);
     return;
   }
   if (formState.listingImageStatus === 'uploading') {
