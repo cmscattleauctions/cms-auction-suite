@@ -1,0 +1,96 @@
+/* =============================================================
+ * CMS Auction Suite — Skeleton loading primitives
+ * -------------------------------------------------------------
+ * Reusable building blocks for in-app loading states — both the
+ * shell's own "switching tabs" skeleton (shared/skeleton.js's
+ * layout compositions, shown in #content while a tab's iframe is
+ * still loading) and, where a module builds its own, its internal
+ * "still fetching data" state (e.g. Video Manager's table).
+ *
+ * Scoped under .skel-* class names only — nothing here touches any
+ * existing component's styles.
+ * ============================================================= */
+
+.skel-shimmer {
+  background: linear-gradient(
+    100deg,
+    var(--skel-base, #E9ECEF) 30%,
+    var(--skel-highlight, #F3F5F7) 50%,
+    var(--skel-base, #E9ECEF) 70%
+  );
+  background-size: 200% 100%;
+  animation: skel-shimmer-sweep 1.6s ease-in-out infinite;
+}
+
+.skel-line, .skel-block, .skel-circle {
+  border-radius: var(--radius-sm, 4px);
+  background: var(--skel-base, #E9ECEF);
+}
+.skel-circle { border-radius: 50%; }
+
+.skel-line { height: 12px; }
+.skel-line--lg { height: 16px; }
+.skel-line--sm { height: 9px; }
+
+/* Decorative only — screen readers get the container's own
+   aria-busy/status text instead, not each individual shape. */
+.skel-line, .skel-block, .skel-circle, .skel-row {
+  pointer-events: none;
+}
+
+.skel-wrap {
+  padding: var(--space-5, 24px);
+}
+.skel-wrap[hidden] { display: none; }
+
+@keyframes skel-shimmer-sweep {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skel-shimmer {
+    animation: none;
+    background: var(--skel-base, #E9ECEF);
+  }
+}
+
+/* =============================================================
+ * Compositions — table / grid / dashboard / detail / form.
+ * Each composed from the primitives above by shared/skeleton.js.
+ * ============================================================= */
+
+.skel-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: var(--space-5, 24px); }
+.skel-toolbar .skel-block { height: 34px; }
+.skel-toolbar .skel-block:first-child { flex: 1; max-width: 340px; }
+.skel-toolbar .skel-block:not(:first-child) { width: 84px; }
+
+.skel-table { border: 1px solid var(--border-subtle, #DCE2E8); border-radius: var(--radius-md, 6px); overflow: hidden; }
+.skel-table-head { display: flex; gap: 16px; padding: 10px 14px; background: var(--bg-muted, #EEF1F4); }
+.skel-table-head .skel-line { width: 70px; }
+.skel-row { display: flex; align-items: center; gap: 16px; padding: 12px 14px; border-top: 1px solid var(--border-subtle, #DCE2E8); }
+.skel-row .skel-circle { width: 32px; height: 32px; flex-shrink: 0; }
+.skel-row-col { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.skel-row-col .skel-line:first-child { width: 60%; }
+.skel-row-col .skel-line:last-child { width: 35%; }
+.skel-row .skel-line--pill { width: 64px; height: 20px; border-radius: 999px; flex-shrink: 0; }
+
+.skel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 16px; }
+.skel-card { border: 1px solid var(--border-subtle, #DCE2E8); border-radius: var(--radius-md, 6px); overflow: hidden; background: var(--bg-surface, #fff); }
+.skel-card-thumb { aspect-ratio: 16 / 9; }
+.skel-card-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+
+.skel-summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: var(--space-6, 32px); }
+.skel-summary-card { border: 1px solid var(--border-subtle, #DCE2E8); border-radius: var(--radius-lg, 10px); padding: var(--space-4, 16px); display: flex; flex-direction: column; gap: 10px; background: var(--bg-surface, #fff); }
+.skel-summary-card .skel-line:first-child { width: 50%; }
+.skel-summary-card .skel-line:last-child { width: 70%; height: 22px; }
+
+.skel-detail-heading { display: flex; align-items: center; gap: 14px; margin-bottom: var(--space-5, 24px); }
+.skel-detail-heading .skel-circle { width: 48px; height: 48px; flex-shrink: 0; }
+.skel-detail-section { margin-bottom: var(--space-5, 24px); }
+.skel-detail-section .skel-line--lg { width: 140px; margin-bottom: 12px; }
+.skel-detail-section .skel-line { margin-bottom: 8px; }
+
+.skel-form-field { margin-bottom: var(--space-4, 16px); }
+.skel-form-field .skel-line--sm { width: 90px; margin-bottom: 6px; }
+.skel-form-field .skel-block { height: 38px; }

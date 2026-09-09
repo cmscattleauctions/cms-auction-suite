@@ -12,6 +12,7 @@ import { openDrawer, closeDrawer } from './ui-drawer.js';
 import { openUploadModal, openCsvImportModal, openVideoIdManagerModal, openStaffManagerModal, openTrashModal } from './ui-modals.js';
 import { readInitialRoute, reportRoute } from '../shared/subapp-url.js';
 import { escapeHtml } from './format.js';
+import { showSkeletonAfterDelay } from '../shared/skeleton.js';
 
 const state = {
   statusTab: 'created', // "Completed" — the default view staff actually want first; boot() below overrides this from the URL when a reload is restoring a specific tab
@@ -117,6 +118,18 @@ async function boot() {
   // app on its static loading skeleton forever with no explanation
   // and no way to recover without a manual page reload. Represent it
   // as an actual error, not empty data — and let staff retry in place.
+  // Covers this module's own data-loading window (distinct from the
+  // shell's "still loading this tab's iframe at all" skeleton, which
+  // has already finished by the time this runs — see shared/skeleton.js's
+  // header comment on the split). Only shown after a short delay, and
+  // only if still relevant by then — cancel() is always called below,
+  // on both the success and failure paths, since refresh()/
+  // renderBootError() each replace #vm-content's own contents directly
+  // and would otherwise race a still-pending skeleton insertion.
+  const skeleton = showSkeletonAfterDelay(document.getElementById('vm-content'), 'table', {
+    label: 'Loading Video Manager',
+  });
+
   try {
     await ReferenceDataRepository.preload();
     if (!shellWired) {
@@ -130,8 +143,10 @@ async function boot() {
       });
     }
     await refresh();
+    skeleton.cancel();
   } catch (err) {
     console.error('[video-manager] boot() failed:', err);
+    skeleton.cancel();
     renderBootError(err);
   }
 }

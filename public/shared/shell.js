@@ -22,6 +22,8 @@ import * as AuthUI from './auth-ui.js';
 import { FIREBASE_CONFIGURED } from './firebase-config.js';
 import { openAdminPanel } from './admin-panel.js';
 import { SUITE_ADMIN_EMAIL } from './admin-data.js';
+import { showStartupLoader, dismissStartupLoader, showStartupLoaderError } from './startup-loader.js';
+import * as SkeletonModule from './skeleton.js';
 
 const TABS = [
   { id: 'listings',     label: 'Listings',     src: './listings/index.html',                ready: true, section: 'Auction Management' },
@@ -33,6 +35,22 @@ const TABS = [
   { id: 'country-market', label: 'Country Market', src: './country-market/index.html',        ready: true, section: 'Country Market' },
   { id: 'video-manager', label: 'Video Manager', src: './video-manager/index.html',          ready: true, section: 'Video Management' },
 ];
+
+// Which shared/skeleton.js composition roughly matches each tab's own
+// layout, for the "still loading this tab's iframe for the first time
+// this session" skeleton in selectTab() below — not the tab's own
+// internal data-loading skeleton (that's each module's own concern,
+// since the shell can't see inside another document's fetch state).
+const SKELETON_TYPE_BY_TAB = {
+  listings: 'table',
+  'lot-numbers': 'table',
+  'lot-images': 'grid',
+  banners: 'grid',
+  'pre-auction': 'dashboard',
+  'post-auction': 'dashboard',
+  'country-market': 'table',
+  'video-manager': 'table',
+};
 
 const DEFAULT_TAB = 'listings';
 
@@ -75,20 +93,43 @@ function isTabAllowed(tabId) {
 
 async function boot() {
   const root = document.getElementById('root');
-  root.innerHTML = `<div class="auth-loading">Loading…</div>`;
+  root.innerHTML = '';
 
-  const result = await Auth.resolveAuthState();
+  // Full-screen branded overlay, independent of #root (it's appended
+  // to <body> directly) so showLogin()/renderPending()/renderShell()
+  // below can go on replacing #root's own innerHTML as they always
+  // have — the overlay stays on top, covering that construction,
+  // until whichever destination is actually ready to be seen.
+  const loader = showStartupLoader();
 
-  if (result.state === 'signed-out') {
-    showLogin(root);
-  } else if (result.state === 'pending') {
-    AuthUI.renderPending(root, {
-      user: result.user,
-      onSignOut: () => showLogin(root),
-    });
-  } else {
-    // 'approved' or 'demo'
-    await renderShell(root, result.user);
+  try {
+    // "Essential initialization" for every outcome: auth state itself,
+    // plus — only on the path that needs it — the profile fetch
+    // renderShell() awaits before it can render anything (allowedTabs
+    // for nav, admin flag). Not waiting for anything else: no other
+    // module's data load blocks this screen (see skeleton.js for
+    // in-app loading instead).
+    const result = await Auth.resolveAuthState();
+
+    if (result.state === 'signed-out') {
+      showLogin(root);
+    } else if (result.state === 'pending') {
+      AuthUI.renderPending(root, {
+        user: result.user,
+        onSignOut: () => showLogin(root),
+      });
+    } else {
+      // 'approved' or 'demo'
+      await renderShell(root, result.user);
+    }
+
+    dismissStartupLoader(loader);
+  } catch (err) {
+    // Previously unhandled — an auth-resolution failure left whatever
+    // was on screen (a bare "Loading…") stuck forever. Give the
+    // startup screen a real error + retry state instead.
+    console.error('[shell] boot() failed:', err);
+    showStartupLoaderError(loader, err?.message, () => boot());
   }
 }
 
@@ -416,11 +457,35 @@ function selectTab(tabId, route = null) {
     const src = route ? `${tab.src}${sep}route=${encodeURIComponent(route)}` : tab.src;
     iframe = document.createElement('iframe');
     iframe.className = 'app-frame';
-    iframe.src = src;
     iframe.title = tab.label;
     iframe.referrerPolicy = 'no-referrer';
+    // Stays hidden (and its src unset) until the skeleton-vs-instant
+    // decision below is wired up — setting src first would let the
+    // iframe start (and possibly finish) loading before the 'load'
+    // listener that's supposed to catch that moment even exists.
+    iframe.hidden = true;
     contentEl.appendChild(iframe);
     iframes.set(tabId, iframe);
+
+    // A brand-new tab's iframe hasn't loaded its own HTML/JS yet, let
+    // alone whatever data it fetches once it has — show a skeleton
+    // matching this tab's general shape (see SKELETON_TYPE_BY_TAB)
+    // while it does, but only after a short delay so a fast load never
+    // flashes one. Only this first-visit path needs this at all — an
+    // already-mounted iframe (the branch below) is just a hidden/shown
+    // toggle, its content is already sitting there ready.
+    const skeleton = SkeletonModule.showSkeletonAfterDelay(contentEl, SKELETON_TYPE_BY_TAB[tabId] || 'table', {
+      label: `Loading ${tab.label}`,
+    });
+    iframe.addEventListener('load', () => {
+      skeleton.cancel();
+      contentEl.querySelectorAll(':scope > iframe.app-frame').forEach(f => {
+        f.hidden = f !== iframe;
+      });
+    }, { once: true });
+
+    iframe.src = src;
+    return;
   }
   contentEl.querySelectorAll(':scope > iframe.app-frame').forEach(f => {
     f.hidden = f !== iframe;
