@@ -887,6 +887,16 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
  * ============================================================= */
 @media (max-width: 900px) {
   .vm-col-added, .vm-col-usage, .vm-col-published { display: none; }
+  /* table-layout:auto (the desktop default) sizes each column by its
+     own content/explicit width and does NOT redistribute the space
+     freed up by hiding columns above to the columns that remain —
+     confirmed live: hiding 3 of 6-7 columns left the header/table
+     stopping partway across its container instead of reaching the
+     right edge. Fixed layout instead divides 100% of the table's
+     width among the columns present in the first row, honoring
+     .vm-col-check's explicit 28px and letting the rest (no explicit
+     width at this breakpoint) share what's left. */
+  table.vm-table { table-layout: fixed; }
   .vm-drawer { width: 100vw !important; }
   .vm-drawer-resize-handle { display: none; }
   .vm-compare-modal { width: 100vw; height: 100vh; max-height: 100vh; }
@@ -929,4 +939,14 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
   table.vm-table { font-size: 12px; }
   .vm-table tbody tr { height: 56px; } /* slightly taller rows = easier tap targets on touch */
   .vm-table td { padding: 8px; }
+
+  /* Video ID Manager's 4 tabs (Consignors/Sex/Sire Types/Dam Types)
+     technically already scroll (.vm-idmgr-tabs has overflow-x:auto),
+     but confirmed live the overflow is small (~48px at 375px) and the
+     scrollbar itself isn't visually obvious, so "Dam Types" reads as
+     cut off rather than "scroll to see it". Trimming padding here
+     removes the overflow entirely at this width instead of relying on
+     a hard-to-discover scroll for a few dozen pixels. */
+  .vm-idmgr-tabs { padding: 0 12px; }
+  .vm-idmgr-tab { padding: 11px 8px; font-size: 12px; }
 }
