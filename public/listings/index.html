@@ -424,49 +424,61 @@ input[type=date],input[type=number]{font-family:inherit}
 <!-- Auction Suite theme bridge: visual overrides only. Core catalog-builder logic remains unchanged. -->
 <style id="auction-suite-theme-bridge">
 :root{
-  --navy:#131820;
-  --navy2:#1f2631;
-  --blue:#b8860b;
-  --blue-bright:#9a7209;
-  --deepblue:#131820;
-  --ink:#1a1d23;
+  --navy:#17263D;
+  --navy2:#223650;
+  --blue:#294F78;
+  --blue-bright:#203F60;
+  --deepblue:#17263D;
+  --ink:#182335;
   --paper:#ffffff;
-  --mist:#f5f1ea;
-  --line:#e6e0d4;
-  --bg:#f5f1ea;
+  --mist:#F4F6F8;
+  --line:#DCE2E8;
+  --bg:#F4F6F8;
   --bg2:#ffffff;
-  --txt:#1a1d23;
-  --dim:#555b66;
+  --txt:#182335;
+  --dim:#526174;
 }
-html,body{background:#f5f1ea;color:#1a1d23;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;}
+html,body{background:#F4F6F8;color:#182335;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;}
 h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;letter-spacing:-.01em;}
-.topbar{background:#131820;border-bottom:1px solid rgba(255,255,255,.08);padding:14px 18px;box-shadow:none;}
+.topbar{background:#17263D;border-bottom:1px solid rgba(255,255,255,.08);padding:14px 18px;box-shadow:none;}
 .topbar .brand{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#e8eaee;}
-.topbar .brand b{color:#f5d491;font-weight:600;}
-.crumb{background:rgba(255,255,255,.04);color:#8b919c;border:1px solid rgba(255,255,255,.06);}
-.crumb.on{background:rgba(184,134,11,.14);color:#f5d491;border-color:#d4a017;}
-.btn{background:#1a1d23;color:#fff;border:1px solid #1a1d23;border-radius:6px;box-shadow:none;}
-.btn:hover{background:#000;border-color:#000;}
-.btn.ghost{background:transparent;border:1px solid #d4cdbd;color:#555b66;}
-.btn.ghost:hover{background:#f0ece4;border-color:#b8860b;color:#1a1d23;}
+.topbar .brand b{color:#D9BC85;font-weight:600;}
+.crumb{background:rgba(255,255,255,.04);color:#AEB9C7;border:1px solid rgba(255,255,255,.06);}
+.crumb.on{background:rgba(168,131,66,.16);color:#D9BC85;border-color:#A88342;}
+.btn{background:#294F78;color:#fff;border:1px solid #294F78;border-radius:6px;box-shadow:none;}
+.btn:hover{background:#203F60;border-color:#203F60;}
+.btn.ghost{background:transparent;border:1px solid #C3CBD3;color:#526174;}
+.btn.ghost:hover{background:#EEF2F5;border-color:#A88342;color:#182335;}
 .btn.sm{border-radius:6px;}
-.drop,.card{background:#fff;border:1px solid #e6e0d4;box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);}
+.drop,.card{background:#fff;border:1px solid #DCE2E8;box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);}
 .drop{border-style:dashed;}
-.drop.hot{border-color:#b8860b;background:#fafaf7;}
-.note{background:#fff;border:1px solid #e6e0d4;border-left:3px solid #b8860b;color:#555b66;}
-.card h3{color:#1a1d23;font-size:12px;letter-spacing:.06em;}
-.card .sub,.field label,.field .hint,.ed-tools .lbl,.empty-rail{color:#555b66;}
-.field input,.field textarea{background:#fff;border:1px solid #d4cdbd;color:#1a1d23;border-radius:6px;}
-.field input:focus,.field textarea:focus{border-color:#131820;box-shadow:0 0 0 3px rgba(184,134,11,.08);}
-.ed-wrap{background:#f5f1ea;}
-.ed-rail{background:#131820;border-right:1px solid rgba(255,255,255,.08);}
-.ed-rail h4{color:#8b919c;}
-.thumb.on{border-color:#d4a017;}
-.thumb .tlabel{background:rgba(19,24,32,.9);color:#f5d491;}
-.ed-tools{background:#fff;border-bottom:1px solid #e6e0d4;}
-.ed-tools .vr{background:#e6e0d4;}
-.ed-tools select{background:#fff;border:1px solid #d4cdbd;color:#1a1d23;}
-.ed-canvas{background:#f5f1ea;}
+.drop.hot{border-color:#3478C0;background:#EEF2F5;}
+.note{background:#fff;border:1px solid #DCE2E8;border-left:3px solid #A88342;color:#526174;}
+.card h3{color:#182335;font-size:12px;letter-spacing:.06em;}
+.card .sub,.field label,.field .hint,.ed-tools .lbl,.empty-rail{color:#526174;}
+.field input,.field textarea{background:#fff;border:1px solid #C3CBD3;color:#182335;border-radius:6px;}
+.field input:focus,.field textarea:focus{border-color:#3478C0;box-shadow:0 0 0 3px rgba(41,79,120,.08);}
+.ed-wrap{background:#F4F6F8;}
+.ed-rail{background:#17263D;border-right:1px solid rgba(255,255,255,.08);}
+.ed-rail h4{color:#AEB9C7;}
+.thumb.on{border-color:#A88342;}
+.thumb .tlabel{background:rgba(23,38,61,.9);color:#D9BC85;}
+.ed-tools{background:#fff;border-bottom:1px solid #DCE2E8;}
+.ed-tools .vr{background:#DCE2E8;}
+.ed-tools select{background:#fff;border:1px solid #C3CBD3;color:#182335;}
+.ed-canvas{background:#F4F6F8;}
+
+/* Deliberately NOT retinted below this point: .sheet/.s-title/.cal-box/
+   .s-section/.s-thead/.s-foot are the live print/PDF preview content
+   itself — this file's own printed-catalog appearance, kept on its own
+   CMS-blue branding (see the ".sheet{...}" custom-property block
+   further down, explicitly commented "keep CMS blue print output
+   separate from Auction Suite chrome"). Retinting these here would
+   change what auctioneers' printed catalogs actually look like, not
+   just the editor's chrome around them — exactly what preserving
+   "print geometry and existing report output" rules out. Everything
+   above this line is editor-only UI (never appears in an exported
+   PDF) and is retinted to match the rest of the suite. */
 .sheet{box-shadow:0 10px 28px rgba(19,24,32,.18);}
 .s-title h1{color:#131820;}
 .cal-box{border-color:#b8860b;}
@@ -476,10 +488,10 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .s-section .lots{color:#d4cdbd;}
 .s-thead{background:#313844;}
 .s-foot{border-top-color:#b8860b;}
-.editing [contenteditable]:focus{box-shadow:inset 0 0 0 2px #b8860b;background:#fff8e8;}
-.row-gutter button{background:#131820;}
-.row-gutter button:hover{background:#b8860b;color:#fff;}
-.toast{background:#131820;border-color:#d4a017;color:#fff;}
+.editing [contenteditable]:focus{box-shadow:inset 0 0 0 2px #3478C0;background:#EAF1FA;}
+.row-gutter button{background:#17263D;}
+.row-gutter button:hover{background:#A88342;color:#fff;}
+.toast{background:#17263D;border-color:#A88342;color:#fff;}
 
 /* PDF/catalog sheet styling: keep CMS blue print output separate from Auction Suite chrome. */
 .sheet{
