@@ -123,6 +123,7 @@ p{margin:8px 0}
   border:1px solid rgba(239,68,68,.35);
   padding:10px 12px;
   border-radius:12px;
+  white-space: pre-line; /* a per-report failure list is set here as one multi-line string (\n-separated) — plain textContent alone collapses those to spaces */
 }
 
 .divider{
@@ -170,7 +171,8 @@ p{margin:8px 0}
 
 .resultsGrid{
   display:grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  /* min(,100%) so a card can't force overflow on a viewport narrower than 280px + page padding */
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap:14px
 }
 .resultsCol{

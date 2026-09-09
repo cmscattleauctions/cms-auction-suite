@@ -29,6 +29,17 @@ const TABS = [
   { id: 'lot-images',   label: 'Lot Images',   src: './lot-images/index.html',              ready: true, section: 'Auction Management' },
   { id: 'banners',      label: 'Banners',      src: './banners/index.html',                 ready: true, section: 'Auction Management' },
   { id: 'pre-auction',  label: 'Pre Auction',  src: './post-auction/index.html?mode=pre',   ready: true, section: 'Auction Management' },
+  // Was a complete, self-contained page with zero navigation entry
+  // anywhere in the shell — reachable only by typing its URL directly.
+  // Its own header comment describes it as producing "the Auction
+  // Results CSV in the exact column format the team uses downstream"
+  // (post-auction's own Buyer Reports/Contracts and listings.html's
+  // Results sheet mode both consume that exact format) — genuinely
+  // still load-bearing, not a superseded predecessor of something
+  // post-auction now does itself. Added here, between Pre and Post
+  // Auction, matching the real workflow order: pre-auction prep → the
+  // sale happens → results get entered here → post-auction reporting.
+  { id: 'results',      label: 'Results',      src: './results/index.html',                  ready: true, section: 'Auction Management' },
   { id: 'post-auction', label: 'Post Auction', src: './post-auction/index.html?mode=post',  ready: true, section: 'Auction Management' },
   { id: 'country-market', label: 'Country Market', src: './country-market/index.html',        ready: true, section: 'Country Market' },
   { id: 'video-manager', label: 'Video Manager', src: './video-manager/index.html',          ready: true, section: 'Video Management' },
@@ -324,6 +335,9 @@ function iconFor(id) {
       return svg`<rect x="3.5" y="3.5" width="13" height="13" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/>
                  <path d="M6 8 H14 M6 11 H14 M6 14 H11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
                  <circle cx="14.5" cy="5.5" r="2" fill="currentColor"/>`;
+    case 'results':
+      return svg`<path d="M4 16.5 V11 M9 16.5 V6 M14 16.5 V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                 <path d="M3 16.5 H17" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>`;
     case 'post-auction':
       return svg`<rect x="3.5" y="3.5" width="13" height="13" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/>
                  <path d="M6 8 H14 M6 11 H14 M6 14 H11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>

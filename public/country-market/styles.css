@@ -977,7 +977,7 @@ select { cursor: pointer; }
 }
 
 /* ── CONSIGNORS PAGE ─────────────────────────────────────────── */
-.con-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.con-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 14px; } /* min(,100%) so a card can't force overflow on a viewport narrower than 280px+padding */
 .con-card {
   background: var(--surface);
   border: 1px solid var(--border);

@@ -199,10 +199,6 @@ label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spa
 .vm-sort-option:hover { background: var(--bg-muted); }
 .vm-sort-option.active { color: var(--accent); font-weight: 700; background: var(--accent-bg); }
 
-.vm-view-toggle { display: flex; background: var(--bg-muted); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 3px; height: 34px; flex-shrink: 0; }
-.vm-view-btn { padding: 0 14px; font-size: 12px; font-weight: 600; background: none; border: none; border-radius: 5px; color: var(--text-secondary); }
-.vm-view-btn.active { background: var(--bg-surface); color: var(--text-primary); box-shadow: var(--shadow-xs); }
-
 .vm-active-filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 24px 0; }
 .vm-chip {
   display: inline-flex; align-items: center; gap: 6px; padding: 3px 7px 3px 9px; font-size: 11px;
@@ -269,6 +265,12 @@ table.vm-table { width: 100%; min-width: 100%; border-collapse: collapse; font-s
 .vm-exception-dot.is-warn { background: var(--format-legacy-fg); }
 .vm-exception-dot.is-bad { background: var(--format-redo-fg); }
 .vm-table td { padding: 6px 9px; vertical-align: middle; white-space: nowrap; }
+/* Aligned digits for clip counts and dates — spec's "align numeric
+   data consistently" (there's no dedicated price/weight column in
+   this table; cattle attributes are a collapsed text summary,
+   edited in the drawer, not here — see this file's own header
+   comment on renderTable()). */
+.vm-col-clips, .vm-col-added, .vm-col-published { font-variant-numeric: tabular-nums; }
 .vm-table th:nth-child(2), .vm-table td:nth-child(2) { width: 280px; }
 .vm-table th:nth-child(3), .vm-table td:nth-child(3) { min-width: 190px; }
 .vm-col-check { width: 28px; }
@@ -444,31 +446,6 @@ td:focus, .vm-cell:focus { outline: none; }
   font-size: 11.5px; color: var(--warning);
 }
 .vm-unrecognized-inline button { font-size: 11px; font-weight: 700; color: var(--accent); background: none; border: none; }
-
-/* =============================================================
- * GRID VIEW — compact secondary view
- * ============================================================= */
-.vm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; padding-top: 4px; }
-.vm-card {
-  background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  overflow: hidden; cursor: pointer; transition: border-color 120ms, box-shadow 120ms;
-}
-.vm-card:hover { border-color: var(--accent); box-shadow: var(--shadow-xs); }
-.vm-card-preview {
-  position: relative; aspect-ratio: 16 / 9; display: grid; place-items: center; color: var(--text-muted);
-  background: var(--bg-muted); overflow: hidden;
-}
-.vm-card-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.vm-card-preview svg { width: 20px; height: 20px; }
-.vm-card-clipbadge {
-  position: absolute; top: 5px; left: 5px; font-size: 9px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.04em; padding: 2px 6px; border-radius: 3px; background: rgba(19,24,32,0.72); color: #fff;
-}
-.vm-card-body { padding: 8px 10px 9px; }
-.vm-card-id { font-family: var(--font-mono); font-weight: 700; font-size: 11.5px; margin-bottom: 3px; color: var(--text-primary); display: flex; align-items: center; gap: 5px; }
-.vm-card-consignor { font-size: 12px; font-weight: 600; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vm-card-cattle { font-size: 11px; color: var(--text-secondary); margin-bottom: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vm-card-foot { display: flex; align-items: center; justify-content: flex-end; }
 
 /* =============================================================
  * DRAWER (right side)
@@ -685,8 +662,13 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 .vm-clip-card2-actions { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 8px; }
 .vm-clip-card2-actions .btn-sm { padding: 4px 8px; font-size: 11.5px; }
 
-/* ----- Sticky footer: one primary + an overflow menu for the rest ----- */
-.vm-drawer-footer { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border-subtle); background: var(--bg-surface); flex-shrink: 0; }
+/* ----- Sticky footer: one primary + an overflow menu for the rest -----
+ * Bottom padding includes env(safe-area-inset-bottom) so Save/the
+ * overflow menu aren't crowded against an iOS home-indicator area on
+ * a full-width mobile drawer (same pattern as shell.css's mobile
+ * topbar using safe-area-inset-top) — a no-op on any device without
+ * a safe-area inset. */
+.vm-drawer-footer { display: flex; align-items: center; gap: 8px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border-subtle); background: var(--bg-surface); flex-shrink: 0; }
 .vm-drawer-footer .btn-primary { flex: 1; }
 .vm-drawer-footer-spacer { flex: 1; }
 .vm-overflow-menu.vm-overflow-menu-up { top: auto; bottom: calc(100% + 4px); }
@@ -876,7 +858,7 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 }
 .vm-compare-modal .vm-modal-header { flex-shrink: 0; }
 .vm-compare-body { flex: 1; overflow-y: auto; padding-top: 16px; }
-.vm-compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+.vm-compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px; } /* min(,100%): a panel can't force overflow below 340px+padding in a narrow modal */
 .vm-compare-panel { position: relative; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; background: var(--bg-surface); }
 .vm-compare-rule-out {
   position: absolute; top: 8px; right: 8px; z-index: 5;
@@ -927,7 +909,7 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 
   .vm-toolbar { flex-wrap: wrap; padding: 10px 14px; }
   .vm-search { flex: 1 1 100%; max-width: none; order: 1; }
-  .vm-filters-wrap, .vm-sort-wrap, .vm-view-toggle { order: 2; }
+  .vm-filters-wrap, .vm-sort-wrap { order: 2; }
 
   .vm-active-filters, .vm-meta, .vm-content { padding-left: 14px; padding-right: 14px; }
 

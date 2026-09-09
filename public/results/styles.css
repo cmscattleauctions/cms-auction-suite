@@ -117,7 +117,10 @@ html, body {
 /* ----- video/frame grid ----- */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  /* min(,100%) so a card can't force overflow on a viewport narrower
+     than 300px + page padding — see lot-images/styles.css's .grid
+     for the same fix with the fuller explanation. */
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: var(--space-4);
 }
 
