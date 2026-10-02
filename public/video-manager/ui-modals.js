@@ -986,6 +986,23 @@ export { handleIdEntryLoop };
 /* =============================================================
  * CSV Usage Import
  * ============================================================= */
+/* Same-origin blob, so <a download> saves it instead of navigating. */
+function downloadUsageCsvTemplate() {
+  const csv = [
+    'Auction Date,Lot Number,YouTube Link,Auction Name',
+    '2026-08-13,800-A,https://youtu.be/VIDEO_ID,August Feeder Special',
+    '2026-08-13,801,https://youtu.be/VIDEO_ID,August Feeder Special',
+  ].join('\r\n') + '\r\n';
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'usage-import-template.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 export function openCsvImportModal(ctx) {
   let step = 'upload'; // upload -> preview -> done
   let csvText = '';
@@ -1005,7 +1022,8 @@ export function openCsvImportModal(ctx) {
         <div class="vm-modal-header"><h2>Import Auction Usage CSV</h2><button class="vm-modal-close" data-modal-close>&times;</button></div>
         <div class="vm-modal-body">
           ${stepsHtml}
-          <p class="muted" style="margin-bottom:12px;">Columns: Auction Date, Lot Number, YouTube Link (optionally Auction Name, Consignor). The same YouTube link may appear on multiple rows — that's valid, it means one video was used on multiple lots.</p>
+          <p class="muted" style="margin-bottom:12px;">Columns: Auction Date, Lot Number, YouTube Link (optionally Auction Name). The same YouTube link may appear on multiple rows — that's valid, it means one video was used on multiple lots. Don't use commas inside a value.</p>
+          <button class="btn btn-sm btn-ghost" id="csv-template-btn" type="button" style="margin-bottom:12px;">Download Template CSV</button>
           <div class="field"><label>CSV File</label><input type="file" id="csv-file-input" accept=".csv,text/csv" /></div>
           <div class="field"><label>…or paste CSV text</label><textarea id="csv-text-input" rows="8" placeholder="Auction Date,Lot Number,YouTube Link,Auction Name&#10;2026-08-13,800-A,https://youtu.be/tlh450heifers,August Feeder Special"></textarea></div>
         </div>
@@ -1067,6 +1085,8 @@ export function openCsvImportModal(ctx) {
 
   function wire() {
     modal.querySelectorAll('[data-modal-close]').forEach(b => b.addEventListener('click', close));
+    const templateBtn = modal.querySelector('#csv-template-btn');
+    if (templateBtn) templateBtn.addEventListener('click', downloadUsageCsvTemplate);
     const previewBtn = modal.querySelector('#csv-preview-btn');
     if (previewBtn) previewBtn.addEventListener('click', async () => {
       const fileInput = modal.querySelector('#csv-file-input');
