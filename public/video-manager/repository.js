@@ -736,6 +736,9 @@ export const VideoRepository = {
     const labels = { ready: 'Ready to Make', hold: 'On Hold', created: 'Completed' };
     v.status = status;
     v.isDraft = false;
+    // Whoever claimed it (Working On) is the one who built it — credit
+    // them as Video Maker so Completed shows their initials, not "Staff".
+    if (status === 'created' && v.workingOn) v.videoMaker = v.workingOn;
     logActivity(v, actor, 'status', `Moved to ${labels[status]}`);
     touch(v, actor);
     await persist(v);

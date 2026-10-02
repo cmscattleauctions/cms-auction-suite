@@ -1105,10 +1105,11 @@ function wireClipsTab(root, rec, ctx) {
   }));
 }
 
-function downloadClips(clips) {
-  const real = clips.filter(c => c.downloadUrl);
-  if (!real.length) { showToast('No files to download yet'); return; }
-  real.forEach(c => window.open(c.downloadUrl, '_blank', 'noopener'));
+async function downloadClips(clips) {
+  if (!clips.some(c => c.downloadUrl)) { showToast('No files to download yet'); return; }
+  const { total, failed } = await StorageData.downloadClips(clips, (n, of) =>
+    showToast(of > 1 ? `Downloading ${n} of ${of}…` : 'Downloading…'));
+  if (failed) showToast(`${failed} of ${total} download${total === 1 ? '' : 's'} failed`);
 }
 
 /* =============================================================

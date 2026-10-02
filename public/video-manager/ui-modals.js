@@ -7,7 +7,7 @@
 import { escapeHtml, formatDate, formatBytes, formatDuration, cattleSummaryLine } from './format.js';
 import { showToast, copyToClipboard } from './toast.js';
 import { resolveVideoIdEntry, CODE_KIND_LABELS, CODE_KIND_SHORT_LABELS } from './id-workflow.js';
-import { buildBaseId, formatMonthYear, parseVideoId, monthYearToInputValue, inputValueToMonthYear } from './video-id.js';
+import { buildBaseId, joinSuffix, formatMonthYear, parseVideoId, monthYearToInputValue, inputValueToMonthYear } from './video-id.js';
 import * as StorageData from './storage-data.js';
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -628,7 +628,10 @@ export function openUploadModal(ctx) {
           <div><label>Sire</label><select id="um-b-sire"><option value="">Select…</option>${sires.map(s => `<option value="${s.code}">${s.code}- ${escapeHtml(s.label)}</option>`).join('')}</select></div>
           <div><label>Dam</label><select id="um-b-dam"><option value="">Select…</option>${dams.map(s => `<option value="${s.code}">${s.code}- ${escapeHtml(s.label)}</option>`).join('')}</select></div>
         </div>
-        <div class="field"><label>Month / Year</label><input type="month" id="um-b-monthyear" /></div>
+        <div class="field-row">
+          <div><label>Month / Year</label><input type="month" id="um-b-monthyear" /></div>
+          <div><label>Suffix <span style="color:var(--text-muted);font-weight:400">(optional)</span></label><input type="number" id="um-b-suffix" min="1" step="1" placeholder="None" /></div>
+        </div>
         <div class="vm-generated-id-box is-placeholder" id="um-b-preview">
           <div><div class="label">Generated Video ID</div><div class="id">Fill in all fields</div></div>
         </div>
@@ -744,9 +747,12 @@ export function openUploadModal(ctx) {
     const damCode = modal.querySelector('#um-b-dam').value;
     const weight = modal.querySelector('#um-b-weight').value;
     const monthYear = inputValueToMonthYear(modal.querySelector('#um-b-monthyear').value);
+    // Only a whole number ≥ 1 counts as a suffix — same rule as the drawer's suffix editor.
+    const suffixNum = Number(modal.querySelector('#um-b-suffix').value.trim());
+    const suffix = Number.isInteger(suffixNum) && suffixNum >= 1 ? suffixNum : null;
     const box = modal.querySelector('#um-b-preview');
     if (consignorCode && sexCode && sireCode && damCode && weight && monthYear.length === 4) {
-      builtId = buildBaseId({ consignorCode, sexCode, sireCode, damCode, weight, monthYear });
+      builtId = joinSuffix(buildBaseId({ consignorCode, sexCode, sireCode, damCode, weight, monthYear }), suffix);
       box.classList.remove('is-placeholder');
       box.innerHTML = `<div><div class="label">Generated Video ID</div><div class="id">${escapeHtml(builtId)}</div></div><button class="btn btn-sm btn-ghost" id="um-b-copy" type="button">Copy</button>`;
       box.querySelector('#um-b-copy').addEventListener('click', async () => { await copyToClipboard(builtId); showToast('Copied'); });
@@ -899,7 +905,8 @@ export function openUploadModal(ctx) {
 
     // Case 2: fresh ID (typed or built) — full resolution loop (unrecognized codes + a
     // collision safety-net, since the Build panel doesn't get the live inline check above).
-    const rawId = builtId || idInput.value.trim();
+    // A hidden builder's leftover ID must not override what's typed in the Video ID box.
+    const rawId = (buildOpen && builtId) || idInput.value.trim();
     if (!rawId) { showToast('Enter a Video ID or build one'); return; }
 
     const feedbackEl = buildOpen ? modal.querySelector('#um-build-feedback') : null;

@@ -104,8 +104,7 @@ label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spa
   background: var(--sidebar-bg); border-radius: var(--radius-md); flex-shrink: 0;
 }
 .vm-logo svg { width: 18px; height: 18px; }
-.vm-topbar h1 { font-size: 17px; margin: 0; font-weight: 700; line-height: 1.2; }
-.vm-subtitle { font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
+.vm-topbar h1 { font-size: 22px; margin: 0; font-weight: 700; line-height: 32px; }
 .vm-topbar-actions { display: flex; gap: 8px; align-items: center; }
 
 /* ----- Tools dropdown ----- */
@@ -254,7 +253,7 @@ table.vm-table { width: 100%; min-width: 100%; border-collapse: collapse; font-s
 }
 /* Body rows reserve a 3px left border for the exception-color accent
    stripe — match it on the header so columns actually line up. */
-.vm-table thead th:first-child { border-left: 3px solid transparent; }
+.vm-table thead th:first-child { border-left: 3px solid var(--bg-muted); }
 .vm-table tbody tr { border-bottom: 1px solid var(--border-subtle); height: 52px; cursor: pointer; border-left: 3px solid transparent; }
 .vm-table tbody tr:hover { background: var(--bg-surface-hover); }
 .vm-table tbody tr.has-exception { border-left-color: var(--format-legacy-fg); }
@@ -912,7 +911,6 @@ body.vm-resizing { cursor: col-resize; user-select: none; }
 @media (max-width: 640px) {
   .vm-topbar { flex-wrap: wrap; row-gap: 8px; padding: 10px 14px; }
   .vm-topbar-actions { width: 100%; justify-content: flex-end; }
-  .vm-subtitle { display: none; } /* the title alone is enough at this width */
 
   .vm-tabs { overflow-x: auto; padding: 0 14px; -webkit-overflow-scrolling: touch; }
   .vm-tab { padding: 12px 10px; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
