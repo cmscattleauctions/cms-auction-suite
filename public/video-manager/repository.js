@@ -369,7 +369,7 @@ export const UsageRepository = {
     const header = lines[0].split(',').map(h => h.trim().toLowerCase());
     const col = name => header.findIndex(h => h.includes(name));
     const iDate = col('date'), iLot = col('lot'), iLink = col('youtube') >= 0 ? col('youtube') : col('link'),
-          iAuction = col('auction') >= 0 && !header[col('auction')].includes('date') ? col('auction') : -1;
+          iAuction = header.findIndex(h => h.includes('auction') && !h.includes('date'));
 
     const rows = lines.slice(1).map(line => {
       const cells = line.split(',').map(c => c.trim());
@@ -736,6 +736,9 @@ export const VideoRepository = {
     const labels = { ready: 'Ready to Make', hold: 'On Hold', created: 'Completed' };
     v.status = status;
     v.isDraft = false;
+    // Whoever claimed it (Working On) is the one who built it — credit
+    // them as Video Maker so Completed shows their initials, not "Staff".
+    if (status === 'created' && v.workingOn) v.videoMaker = v.workingOn;
     logActivity(v, actor, 'status', `Moved to ${labels[status]}`);
     touch(v, actor);
     await persist(v);

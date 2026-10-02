@@ -146,3 +146,33 @@ export async function deleteClipFile(storagePath) {
   if (!storage || !storagePath) return;
   try { await deleteObject(ref(storage, storagePath)); } catch { /* already gone — fine */ }
 }
+
+/* Save clips to disk instead of opening them in a tab. A cross-origin
+ * <a download> is ignored by browsers (they navigate instead), and
+ * window.open in a loop gets every call after the first popup-blocked —
+ * so fetch each file as a blob (the Storage bucket allows CORS GET) and
+ * download it from a same-origin object URL, one at a time. */
+export async function downloadClips(clips, onProgress) {
+  const real = clips.filter(c => c.downloadUrl);
+  let failed = 0;
+  for (let i = 0; i < real.length; i++) {
+    const c = real[i];
+    if (onProgress) onProgress(i + 1, real.length);
+    try {
+      const res = await fetch(c.downloadUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blobUrl = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = c.filename || `${c.id}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (err) {
+      console.error('Download failed', c.filename, err);
+      failed++;
+    }
+  }
+  return { total: real.length, failed };
+}

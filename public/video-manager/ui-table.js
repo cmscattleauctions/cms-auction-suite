@@ -216,7 +216,10 @@ function publishedCell(r) {
 }
 
 function addedCell(r) {
-  const initials = initialsFor(r.videoMaker || r.createdBy);
+  // Records completed before setStatus credited the claimer still have
+  // the generic actor ("Staff"/"Rep") as videoMaker — fall back to the claim.
+  const genericMaker = !r.videoMaker || r.videoMaker === 'Staff' || r.videoMaker === 'Rep';
+  const initials = initialsFor(genericMaker ? (r.workingOn || r.videoMaker || r.createdBy) : r.videoMaker);
   return `
     <div class="vm-added-cell">
       <div>${formatDateShort(r.dateAdded)}</div>
@@ -629,5 +632,7 @@ async function downloadAll(id, ctx) {
     showToast('No files to download yet');
     return;
   }
-  real.forEach(c => window.open(c.downloadUrl, '_blank', 'noopener'));
+  const { total, failed } = await StorageData.downloadClips(real, (n, of) =>
+    showToast(of > 1 ? `Downloading ${n} of ${of}…` : 'Downloading…'));
+  if (failed) showToast(`${failed} of ${total} download${total === 1 ? '' : 's'} failed`);
 }
