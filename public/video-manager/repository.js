@@ -158,8 +158,17 @@ async function persistReferenceList(key) {
   emitter.emit({ type: 'reference-changed' });
 }
 
+/**
+ * UI callers pass the generic 'Staff' as actor — swap in the signed-in
+ * person's name so history and Video Maker say who actually did it.
+ * 'Rep' (public upload page) and explicit names pass through unchanged.
+ */
+function who(actor) {
+  return actor === 'Staff' ? (FirestoreData.currentUserName() || actor) : actor;
+}
+
 function logActivity(record, actor, type, message) {
-  record.activity.unshift({ ts: new Date().toISOString(), actor, type, message });
+  record.activity.unshift({ ts: new Date().toISOString(), actor: who(actor), type, message });
 }
 
 /* =============================================================
@@ -633,8 +642,8 @@ export const VideoRepository = {
       // docs/firestore.rules), so any duplicate only surfaces here, via
       // the Video Manager's own existing duplicate-id detection.
       needsReview: !!((consignor && consignor.flaggedNew) || actor === 'Rep'),
-      videoMaker: fields.videoMaker || actor,
-      createdBy: actor,
+      videoMaker: fields.videoMaker || who(actor),
+      createdBy: who(actor),
       dateAdded: now, lastUpdated: now,
       notes: fields.notes || '',
       canvaLink: fields.canvaLink || null,
@@ -760,9 +769,9 @@ export const VideoRepository = {
     const labels = { ready: 'Ready to Make', hold: 'On Hold', created: 'Completed' };
     v.status = status;
     v.isDraft = false;
-    // Whoever claimed it (Working On) is the one who built it — credit
-    // them as Video Maker so Completed shows their initials, not "Staff".
-    if (status === 'created' && v.workingOn) v.videoMaker = v.workingOn;
+    // Video Maker on completion: whoever claimed it (Working On), else
+    // whoever added the YouTube link, else whoever is signed in now.
+    if (status === 'created') v.videoMaker = v.workingOn || v.youtubeAddedBy || who(actor);
     logActivity(v, actor, 'status', `Moved to ${labels[status]}`);
     touch(v, actor);
     await persist(v);
@@ -785,12 +794,15 @@ export const VideoRepository = {
     if (isReplacement) {
       v.previousYouTubeVideos.unshift({
         id: v.youtubeId, url: v.youtubeUrl, embedUrl: v.embedUrl, embedCode: v.embedCode,
-        replacedAt: new Date().toISOString(), replacedBy: actor, reason: reason || '',
+        replacedAt: new Date().toISOString(), replacedBy: who(actor), reason: reason || '',
       });
     }
 
     v.youtubeUrl = youtubeUrl;
     v.youtubeId = youtubeId;
+    v.youtubeAddedBy = who(actor);
+    // Link added after completion on an unclaimed video — that person built it.
+    if (v.status === 'created' && !v.workingOn) v.videoMaker = v.youtubeAddedBy;
     v.embedUrl = `https://www.youtube.com/embed/${youtubeId}?mute=1&autoplay=1&playlist=${youtubeId}&loop=1`;
     v.embedCode = `<iframe width="560" height="315" src="${v.embedUrl}" title="CMS Auction Video" frameborder="0" allowfullscreen></iframe>`;
     logActivity(v, actor, 'youtube', isReplacement

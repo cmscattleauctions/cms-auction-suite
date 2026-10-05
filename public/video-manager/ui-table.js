@@ -216,10 +216,12 @@ function publishedCell(r) {
 }
 
 function addedCell(r) {
-  // Records completed before setStatus credited the claimer still have
-  // the generic actor ("Staff"/"Rep") as videoMaker — fall back to the claim.
-  const genericMaker = !r.videoMaker || r.videoMaker === 'Staff' || r.videoMaker === 'Rep';
-  const initials = initialsFor(genericMaker ? (r.workingOn || r.videoMaker || r.createdBy) : r.videoMaker);
+  // Older records carry the generic actor ("Staff"/"Rep") as videoMaker —
+  // fall back to the claim, then the YouTube link's adder; show nothing
+  // rather than a meaningless "S".
+  const generic = name => !name || name === 'Staff' || name === 'Rep';
+  const maker = [r.videoMaker, r.workingOn, r.youtubeAddedBy].find(n => !generic(n));
+  const initials = initialsFor(maker);
   return `
     <div class="vm-added-cell">
       <div>${formatDateShort(r.dateAdded)}</div>
