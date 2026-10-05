@@ -38,11 +38,12 @@ export function renderTable(container, records, ctx) {
   // Paired with a class so narrow-viewport CSS can hide the same column
   // in both <th> and <td> — Video/Status stay put as the two columns
   // that answer "which video, is it usable"; the rest are detail.
+  const lead = [['', 'vm-col-check'], ['Video ID', 'vm-col-videoid'], ['Consignor', 'vm-col-consignor'], ['Cattle', 'vm-col-cattle'], ['Clips', 'vm-col-clips']];
   const headCells = isCreated
-    ? [['', 'vm-col-check'], ['Video', ''], ['Cattle', 'vm-col-cattle'], ['Clips', 'vm-col-clips'], ['Usage', 'vm-col-usage'], ['Published', 'vm-col-published'], ['Added', 'vm-col-added']]
+    ? [...lead, ['Usage', 'vm-col-usage'], ['Published', 'vm-col-published'], ['Added', 'vm-col-added']]
     : showWorkingOn
-      ? [['', 'vm-col-check'], ['Video', ''], ['Cattle', 'vm-col-cattle'], ['Clips', 'vm-col-clips'], ['Status', ''], ['Working On', 'vm-col-workingon'], ['Added', 'vm-col-added']]
-      : [['', 'vm-col-check'], ['Video', ''], ['Cattle', 'vm-col-cattle'], ['Clips', 'vm-col-clips'], ['Status', ''], ['Added', 'vm-col-added']];
+      ? [...lead, ['Status', ''], ['Working On', 'vm-col-workingon'], ['Added', 'vm-col-added']]
+      : [...lead, ['Status', ''], ['Added', 'vm-col-added']];
   const colspan = headCells.length;
 
   container.innerHTML = `
@@ -137,22 +138,25 @@ function initialsFor(name) {
 }
 
 /**
- * Merged identity cell — consignor name is the primary/scannable text,
- * Video ID is secondary underneath. Consignor is what staff actually
- * recognize a record by; the ID matters for lookups/copying but
- * shouldn't be the loudest thing in the row. Has Tags surfaces here as a
- * small badge rather than its own column — it's a flag on the record, not
- * a dimension worth a whole column of mostly-blank cells.
+ * Video ID gets its own column with a copy button (the ID is what gets
+ * pasted into lookups/listings); the exception dot and Has Tags badge
+ * ride along here since this is the row's leading identifier.
  */
-function identityCell(r, context) {
+function videoIdCell(r, context) {
   return `
-    <div class="vm-identity-cell">
-      <div class="vm-identity-text">
-        <div class="vm-identity-primary">${exceptionDot(r, context)}${escapeHtml(r.consignorName)}</div>
-        <div class="vm-identity-secondary">${escapeHtml(r.baseVideoId)}${r.suffix ? `<span class="suffix">-${r.suffix}</span>` : ''}</div>
-        ${r.hasTags ? `<span class="vm-tag-badge">Has Tags</span>` : ''}
+    <div class="vm-videoid-cell">
+      <div class="vm-videoid-line">
+        ${exceptionDot(r, context)}<span class="vm-videoid-text">${escapeHtml(r.baseVideoId)}${r.suffix ? `<span class="suffix">-${r.suffix}</span>` : ''}</span>
+        <button class="vm-copy-id" data-copy-videoid="${escapeHtml(r.videoId)}" type="button" title="Copy Video ID" aria-label="Copy Video ID">
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M3 10.5H2.5A1.5 1.5 0 0 1 1 9V2.5A1.5 1.5 0 0 1 2.5 1H9A1.5 1.5 0 0 1 10.5 2.5V3" stroke="currentColor" stroke-width="1.3"/></svg>
+        </button>
       </div>
+      ${r.hasTags ? `<span class="vm-tag-badge">Has Tags</span>` : ''}
     </div>`;
+}
+
+function consignorCell(r) {
+  return `<div class="vm-consignor-cell" title="${escapeHtml(r.consignorName)}">${escapeHtml(r.consignorName)}</div>`;
 }
 
 function cattleCell(r, ctx) {
@@ -253,7 +257,8 @@ function readyRowHtml(r, ctx, showWorkingOn) {
   return `
     <tr data-id="${escapeHtml(r.id)}" class="${rowExceptionClass(r, 'ready')} ${ctx.state.selectedId === r.id ? 'is-selected' : ''}">
       <td class="vm-col-check">${compareCheckboxCell(r)}</td>
-      <td>${identityCell(r, 'ready')}</td>
+      <td class="vm-col-videoid">${videoIdCell(r, 'ready')}</td>
+      <td class="vm-col-consignor">${consignorCell(r)}</td>
       <td class="vm-col-cattle">${cattleCell(r, ctx)}</td>
       <td class="vm-col-clips">${clipsCell(r)}</td>
       <td>${statusIssueCell(r)}</td>
@@ -266,7 +271,8 @@ function createdRowHtml(r, ctx) {
   return `
     <tr data-id="${escapeHtml(r.id)}" class="${rowExceptionClass(r, 'created')} ${ctx.state.selectedId === r.id ? 'is-selected' : ''}">
       <td class="vm-col-check">${compareCheckboxCell(r)}</td>
-      <td>${identityCell(r, 'created')}</td>
+      <td class="vm-col-videoid">${videoIdCell(r, 'created')}</td>
+      <td class="vm-col-consignor">${consignorCell(r)}</td>
       <td class="vm-col-cattle">${cattleCell(r, ctx)}</td>
       <td class="vm-col-clips">${clipsCell(r)}</td>
       <td class="vm-col-usage">${usageCell(r)}</td>
@@ -373,6 +379,13 @@ function wireRows(tbody, ctx) {
 
     const addFilesBtn = e.target.closest('[data-add-files]');
     if (addFilesBtn) { pickFilesForRow(addFilesBtn.dataset.addFiles, ctx); return; }
+
+    const copyIdBtn = e.target.closest('[data-copy-videoid]');
+    if (copyIdBtn) {
+      await copyToClipboard(copyIdBtn.dataset.copyVideoid);
+      showToast(`Copied ${copyIdBtn.dataset.copyVideoid}`);
+      return;
+    }
 
     const copyLinkBtn = e.target.closest('[data-copy-link]');
     if (copyLinkBtn) {

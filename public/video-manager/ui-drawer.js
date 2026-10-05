@@ -1101,7 +1101,14 @@ function wireClipsTab(root, rec, ctx) {
     const opening = menu.hidden;
     root.querySelectorAll('.vm-overflow-menu').forEach(m => m.hidden = true);
     menu.hidden = !opening;
-    if (opening) setTimeout(() => document.addEventListener('click', () => { menu.hidden = true; }, { once: true }), 0);
+    if (!opening) return;
+    // Last row of clips: open upward if dropping down would run past the drawer's scroll area.
+    menu.classList.remove('vm-overflow-menu-up');
+    const scroller = menu.closest('.vm-drawer-tabbody');
+    if (scroller && menu.getBoundingClientRect().bottom > scroller.getBoundingClientRect().bottom) {
+      menu.classList.add('vm-overflow-menu-up');
+    }
+    setTimeout(() => document.addEventListener('click', () => { menu.hidden = true; }, { once: true }), 0);
   }));
 }
 
