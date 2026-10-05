@@ -241,37 +241,164 @@ export function openVideoIdManagerModal(ctx) {
     </div>
     <div class="vm-idmgr-tabs" id="idmgr-tabs">
       ${ID_MANAGER_TABS.map(([id, label]) => `<button type="button" class="vm-idmgr-tab ${id === tab ? 'active' : ''}" data-idmgr-tab="${id}">${label}</button>`).join('')}
+      <div class="vm-idmgr-view-toggle" role="group" aria-label="Layout">
+        <button type="button" data-idmgr-view="tabs">One at a time</button>
+        <button type="button" data-idmgr-view="columns">Side by side</button>
+      </div>
     </div>
     <div class="vm-modal-body" id="idmgr-body"></div>
     <div class="vm-modal-footer"><button class="btn btn-primary" data-modal-close>Done</button></div>
   `, { wide: true });
 
+  // Remembered per browser — staff who like the all-in-one view shouldn't have to re-pick it every time.
+  let view = 'tabs';
+  try { if (localStorage.getItem('vm-idmgr-view') === 'columns') view = 'columns'; } catch {}
+
   modal.querySelector('#idmgr-tabs').addEventListener('click', e => {
+    const viewBtn = e.target.closest('[data-idmgr-view]');
+    if (viewBtn) {
+      view = viewBtn.dataset.idmgrView;
+      try { localStorage.setItem('vm-idmgr-view', view); } catch {}
+      paintTab();
+      return;
+    }
     const btn = e.target.closest('[data-idmgr-tab]');
     if (!btn) return;
     tab = btn.dataset.idmgrTab;
-    modal.querySelectorAll('[data-idmgr-tab]').forEach(b => b.classList.toggle('active', b.dataset.idmgrTab === tab));
     paintTab();
   });
 
   function paintTab() {
     const body = modal.querySelector('#idmgr-body');
-    if (tab === 'consignors') renderConsignorsTab(body, ctx);
-    else if (tab === 'sex') renderSexTab(body, ctx);
-    else if (tab === 'sire') renderCodeTab(body, ctx, {
-      title: 'Sire Type', get: () => ctx.ref.getSireTypes(),
-      add: (code, label) => ctx.ref.addSireType(code, label),
-      rename: (code, label) => ctx.ref.renameSireType(code, label),
-      setActive: (code, active) => ctx.ref.setSireActive(code, active),
+    const isColumns = view === 'columns';
+    modal.classList.toggle('vm-modal-xwide', isColumns);
+    modal.querySelectorAll('[data-idmgr-view]').forEach(b => b.classList.toggle('active', b.dataset.idmgrView === view));
+    modal.querySelectorAll('[data-idmgr-tab]').forEach(b => {
+      b.hidden = isColumns;
+      b.classList.toggle('active', b.dataset.idmgrTab === tab);
     });
-    else if (tab === 'dam') renderCodeTab(body, ctx, {
-      title: 'Dam Type', get: () => ctx.ref.getDamTypes(),
-      add: (code, label) => ctx.ref.addDamType(code, label),
-      rename: (code, label) => ctx.ref.renameDamType(code, label),
-      setActive: (code, active) => ctx.ref.setDamActive(code, active),
-    });
+    if (isColumns) renderIdColumns(body, ctx);
+    else if (tab === 'consignors') renderConsignorsTab(body, ctx);
+    else renderCodeTab(body, ctx, codeKindConfig(tab, ctx));
   }
   paintTab();
+}
+
+/** Sex/Sire/Dam share one shape ({code, label, active}) — one config per kind, used by both layouts. */
+function codeKindConfig(kind, ctx) {
+  const r = ctx.ref;
+  return {
+    sex:  { title: 'Sex',       get: () => r.getSexTypes(),  add: (c, l) => r.addSexType(c, l),  rename: (c, l) => r.renameSexType(c, l),  setActive: (c, a) => r.setSexActive(c, a) },
+    sire: { title: 'Sire Type', get: () => r.getSireTypes(), add: (c, l) => r.addSireType(c, l), rename: (c, l) => r.renameSireType(c, l), setActive: (c, a) => r.setSireActive(c, a) },
+    dam:  { title: 'Dam Type',  get: () => r.getDamTypes(),  add: (c, l) => r.addDamType(c, l),  rename: (c, l) => r.renameDamType(c, l),  setActive: (c, a) => r.setDamActive(c, a) },
+  }[kind];
+}
+
+/* =============================================================
+ * Video ID Manager — side-by-side layout
+ * -------------------------------------------------------------
+ * Consignor / Sex / Sire / Dam as four columns in ID order, each
+ * with its own scrolling list, inline rename, active toggle, and an
+ * add row — so a full ID's worth of codes can be read across at once.
+ * ============================================================= */
+function renderIdColumns(container, ctx) {
+  const consignorCfg = {
+    title: 'Consignor',
+    get: () => ctx.ref.getConsignors().map(c => ({ ...c, label: c.name })),
+    add: (code, name) => ctx.ref.addConsignor({ code, name }),
+    rename: (code, name) => ctx.ref.renameConsignor(code, name),
+    setActive: (code, active) => ctx.ref.setConsignorActive(code, active),
+    suggestCode: () => ctx.ref.suggestNextConsignorCode(),
+    searchable: true,
+  };
+  const cfgs = [consignorCfg, codeKindConfig('sex', ctx), codeKindConfig('sire', ctx), codeKindConfig('dam', ctx)];
+  container.innerHTML = `<div class="vm-idcols">${cfgs.map((_, i) => `<section class="vm-idcol" data-idcol="${i}"></section>`).join('')}</div>`;
+  cfgs.forEach((cfg, i) => renderIdColumn(container.querySelector(`[data-idcol="${i}"]`), ctx, cfg));
+}
+
+function renderIdColumn(col, ctx, cfg) {
+  let editingCode = null;
+  let query = '';
+  col.innerHTML = `
+    <header class="vm-idcol-head"><h3>${cfg.title}</h3><span class="vm-idcol-count"></span></header>
+    ${cfg.searchable ? `<input type="text" class="vm-idcol-search" placeholder="Search…" />` : ''}
+    <div class="vm-idcol-list"></div>
+    <form class="vm-idcol-add">
+      <input type="text" class="vm-idcol-add-code" placeholder="Code" inputmode="numeric" />
+      <input type="text" class="vm-idcol-add-name" placeholder="New ${cfg.title.toLowerCase()}" />
+      <button class="btn btn-xs btn-primary" type="submit">Add</button>
+    </form>`;
+  const list = col.querySelector('.vm-idcol-list');
+  const codeInput = col.querySelector('.vm-idcol-add-code');
+  if (cfg.suggestCode) codeInput.value = cfg.suggestCode();
+
+  function paint() {
+    const all = cfg.get();
+    const q = query.trim().toLowerCase();
+    const rows = q ? all.filter(r => r.label.toLowerCase().includes(q) || r.code.includes(q)) : all;
+    col.querySelector('.vm-idcol-count').textContent = all.length;
+    list.innerHTML = rows.map(r => editingCode === r.code ? `
+      <div class="vm-idcol-row is-editing" data-code="${escapeHtml(r.code)}">
+        <span class="vm-idcol-code">${escapeHtml(r.code)}</span>
+        <input type="text" class="vm-idcol-edit" value="${escapeHtml(r.label)}" />
+        <button class="btn btn-xs btn-primary" data-save type="button">Save</button>
+        <button class="btn btn-xs btn-ghost" data-cancel type="button">✕</button>
+      </div>` : `
+      <div class="vm-idcol-row ${r.active === false ? 'is-inactive' : ''}" data-code="${escapeHtml(r.code)}">
+        <span class="vm-idcol-code">${escapeHtml(r.code)}</span>
+        <span class="vm-idcol-name" title="${escapeHtml(r.label)}">${escapeHtml(r.label)}${r.flaggedNew ? ' <span class="vm-idmgr-status needs-review">NEW</span>' : ''}${r.active === false ? ' <span class="vm-idmgr-status inactive">Inactive</span>' : ''}</span>
+        <span class="vm-idcol-actions">
+          <button class="btn btn-xs btn-ghost" data-edit type="button">Edit</button>
+          <button class="btn btn-xs btn-ghost" data-toggle type="button" title="${r.active === false ? 'Activate' : 'Mark inactive'}">${r.active === false ? 'On' : 'Off'}</button>
+        </span>
+      </div>`).join('') || '<p class="muted vm-idcol-empty">No matches</p>';
+
+    const rowCode = el => el.closest('[data-code]').dataset.code;
+    list.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
+      editingCode = rowCode(b); paint();
+      const input = list.querySelector('.vm-idcol-edit');
+      input.focus(); input.select();
+    }));
+    list.querySelectorAll('[data-cancel]').forEach(b => b.addEventListener('click', () => { editingCode = null; paint(); }));
+    const save = async () => {
+      const label = list.querySelector('.vm-idcol-edit').value.trim();
+      if (!label) { showToast('Name cannot be empty'); return; }
+      try { await cfg.rename(editingCode, label); showToast(`Updated ${cfg.title.toLowerCase()} ${editingCode}`); editingCode = null; ctx.refresh(); paint(); }
+      catch (err) { showToast(err.message); }
+    };
+    list.querySelectorAll('[data-save]').forEach(b => b.addEventListener('click', save));
+    const editInput = list.querySelector('.vm-idcol-edit');
+    if (editInput) editInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); save(); }
+      if (e.key === 'Escape') { e.stopPropagation(); editingCode = null; paint(); }
+    });
+    list.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', async () => {
+      const code = rowCode(b);
+      const rec = cfg.get().find(r => r.code === code);
+      try { await cfg.setActive(code, rec.active === false); ctx.refresh(); paint(); }
+      catch (err) { showToast(err.message); }
+    }));
+  }
+  paint();
+
+  const search = col.querySelector('.vm-idcol-search');
+  if (search) search.addEventListener('input', e => { query = e.target.value; paint(); });
+  col.querySelector('.vm-idcol-add').addEventListener('submit', async e => {
+    e.preventDefault();
+    const nameInput = col.querySelector('.vm-idcol-add-name');
+    const code = codeInput.value.trim(), name = nameInput.value.trim();
+    if (!code || !name) { showToast('Enter both a code and a name'); return; }
+    if (!/^\d+$/.test(code)) { showToast('Code must be a number'); return; }
+    try {
+      await cfg.add(code, name);
+      showToast(`Added ${cfg.title.toLowerCase()} ${code} — ${name}`);
+      nameInput.value = '';
+      codeInput.value = cfg.suggestCode ? cfg.suggestCode() : '';
+      ctx.refresh();
+      paint();
+      list.scrollTop = list.scrollHeight;
+    } catch (err) { showToast(err.message); }
+  });
 }
 
 /**
@@ -490,18 +617,6 @@ function renderConsignorsTab(container, ctx) {
     const rec = await openNewConsignorModal(ctx);
     if (rec) { ctx.refresh(); paint(); }
   });
-}
-
-function renderSexTab(container, ctx) {
-  const rows = ctx.ref.getSexTypes();
-  container.innerHTML = `
-    <table class="vm-idmgr-table">
-      <thead><tr><th>Code</th><th>Name</th><th>Status</th></tr></thead>
-      <tbody>
-        ${rows.map(s => `<tr><td class="vm-idmgr-code">${escapeHtml(s.code)}${IDMGR_LOCK_ICON}</td><td>${escapeHtml(s.label)}</td><td>${statusText(s)}</td></tr>`).join('')}
-      </tbody>
-    </table>
-  `;
 }
 
 function renderCodeTab(container, ctx, cfg) {

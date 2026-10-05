@@ -118,7 +118,7 @@ function touch(record, actor) {
  * first time a document doesn't exist yet — rather than reassigned,
  * since nothing outside this file imports those array bindings.
  * ============================================================= */
-const REFERENCE_LISTS = { consignors: CONSIGNORS, sireTypes: SIRE_TYPES, damTypes: DAM_TYPES, staff: STAFF };
+const REFERENCE_LISTS = { consignors: CONSIGNORS, sexTypes: SEX_TYPES, sireTypes: SIRE_TYPES, damTypes: DAM_TYPES, staff: STAFF };
 let referenceLoadPromise = null;
 
 async function loadOrSeedReferenceList(key, arr) {
@@ -238,6 +238,30 @@ export const ReferenceDataRepository = {
     if (!rec) throw new Error('Consignor not found');
     rec.flaggedNew = false;
     await persistReferenceList('consignors');
+    return rec;
+  },
+
+  async addSexType(code, label) {
+    if (SEX_TYPES.some(s => s.code === String(code))) throw new Error('Sex code already exists');
+    const rec = { code: String(code), label, active: true };
+    SEX_TYPES.push(rec);
+    await persistReferenceList('sexTypes');
+    return rec;
+  },
+
+  async renameSexType(code, label) {
+    const rec = SEX_TYPES.find(s => s.code === String(code));
+    if (!rec) throw new Error('Sex type not found');
+    rec.label = label;
+    await persistReferenceList('sexTypes');
+    return rec;
+  },
+
+  async setSexActive(code, active) {
+    const rec = SEX_TYPES.find(s => s.code === String(code));
+    if (!rec) throw new Error('Sex type not found');
+    rec.active = active;
+    await persistReferenceList('sexTypes');
     return rec;
   },
 
