@@ -817,6 +817,13 @@ h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helveti
 .sheet .lotrow.gtop .cell.lot::before{background:#13235e !important;height:2.4px !important;z-index:20 !important;}
 .sheet .lotrow.gbot .cell.lot::after{background:#13235e !important;height:2.4px !important;z-index:20 !important;}
 .sheet .lotrow .cell.head .cc{font-size:calc(1.02em + 2pt) !important;}
+/* Lot numbers like "1002A" are wider than the 52px lot column minus its 7px side
+   padding (and the option-group bracket's 2.4px border), so they overflowed to the
+   right into the column line instead of centering. Drop the side padding and let
+   .cc size to its text so the flex column centers it — even when it's a hair wider
+   than the cell, it overflows evenly on both sides rather than only to the right. */
+.sheet .lotrow:not(.supplemental) .cell.lot{padding-left:0 !important;padding-right:0 !important;}
+.sheet .lotrow:not(.supplemental) .cell.lot .cc{width:auto !important;}
 
 @media (max-width: 760px){.view{padding:18px}.settings-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-wrap:wrap}.crumbs{width:100%;overflow:auto}.ed-rail{width:132px}.ed-canvas{padding:18px}}
 
