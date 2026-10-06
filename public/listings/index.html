@@ -286,8 +286,8 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    between whole fields, never mid-word. */
 .cond-group-wrap{position:relative;display:flex;flex-shrink:0}
 .block-end-spacer{flex-shrink:0}
-.cond-elbow{position:absolute;left:0;top:0;width:6px;height:2.4px;background:var(--deepblue)}
-.cond-bar{position:absolute;left:6px;top:0;bottom:0;width:2.4px;background:var(--deepblue)}
+.cond-elbow{position:absolute;left:0;top:0;width:44px;height:2.4px;background:var(--deepblue)}
+.cond-bar{position:absolute;left:44px;top:0;bottom:0;width:2.4px;background:var(--deepblue)}
 .cond-subrows{flex:1;min-width:0}
 .lotrow-condensed{position:relative;display:grid;align-items:stretch;flex-shrink:0;
   min-height:34px;background:none;font-size:calc(11px * var(--ts,1))}
@@ -296,11 +296,11 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    blockEndSpacerHTML) so the lot-group-spacing gap lands between the row and the
    divider, not stuck on the far side of it. */
 /* Short tick per row pointing from the bar toward that row's own lot number — same
-   x-position as .cond-bar (left:6px) so it reads as one small branch off the trunk
+   x-position as .cond-bar (left:44px) so it reads as one small branch off the trunk
    line, not a separate mark. Sits inside the now-touching shaded area (see .cond-span
    below), stopping a few px short of the lot number itself rather than running into it. */
-.lotrow-condensed::before{content:'';position:absolute;left:6px;top:50%;
-  width:5px;height:2px;background:var(--deepblue);transform:translateY(-50%)}
+.lotrow-condensed::before{content:'';position:absolute;left:44px;top:50%;
+  width:14px;height:2px;background:var(--deepblue);transform:translateY(-50%)}
 /* margin-left (not padding-left) for the gutter offset — a background/border on this
    box must never paint into that space, and padding is inside the box (so a tinted
    background there would bleed under the white indentation); margin is genuinely
@@ -308,12 +308,12 @@ h1,h2,h3{font-family:'Oswald',sans-serif;margin:0;font-weight:600}
    The box itself now starts right where .cond-bar ends, so the tint touches the bar
    directly — padding-left (inside the box) then gives the lot-number text its own
    breathing room without moving the tint's own left edge. */
-.cond-span{display:grid;grid-template-columns:calc(var(--lot-w,52px) - 12px) 68px 76px 58px minmax(150px,1fr) auto;
-  align-items:center;column-gap:12px;min-width:0;margin-left:8px;padding:5px 12px 5px 4px;
+.cond-span{display:grid;grid-template-columns:54px 68px 76px 58px minmax(150px,1fr) auto;
+  align-items:center;column-gap:12px;min-width:0;margin-left:46px;padding:5px 12px 5px 18px;
   color:#2a3354;background:var(--option-lot-bg,#e8ebf2);border-bottom:1px solid var(--line)}
 .cond-last .cond-span,.cond-last .cond-price,.cond-last .cond-price-fill{border-bottom:0}
 .cond-field{white-space:nowrap;min-width:0}
-.cond-field.cond-lot{text-align:center;overflow:visible;font-family:'Oswald';font-weight:700;font-size:1.4em;color:var(--deepblue)}
+.cond-field.cond-lot{font-family:'Oswald';font-weight:700;font-size:1.4em;color:var(--deepblue)}
 .cond-field-delivery{font-weight:600;color:#1a2444}
 /* differs-from-master flag: bolded rather than colored so it still reads correctly
    in black & white print/PDF. Shrink/Slide/Sex/Seller/Notes only ever render when
@@ -1715,7 +1715,7 @@ function condensedOptionGroupHTML(subLots,masterLot,bi,page,grid,cols){
   // which keeps them outside .cond-bar's bottom:0 anchor entirely (a margin here would
   // have grown this wrapper's own box, stretching the bar into the gap) while also
   // landing the gap BEFORE the divider draws instead of after it.
-  return `<div class="cond-group-wrap" style="--lot-w:${activeWidth('lot')}px">
+  return `<div class="cond-group-wrap">
       <div class="cond-elbow"></div>
       <div class="cond-bar"></div>
       <div class="cond-subrows">${rowsHtml}</div>
