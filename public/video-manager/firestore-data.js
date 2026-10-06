@@ -99,6 +99,17 @@ export function currentUserEmail() {
   try { return (auth && auth.currentUser && auth.currentUser.email) || ''; } catch { return ''; }
 }
 
+/**
+ * Accounts are email + password with no display name, so derive one
+ * from the email's local part: "jayton.h@…" -> "Jayton H" (initials JH).
+ * Returns '' when nobody is signed in.
+ */
+export function currentUserName() {
+  const local = currentUserEmail().split('@')[0];
+  return local.split(/[._\-+]+/).filter(Boolean)
+    .map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+}
+
 /** ID token for calling the transferClip Cloud Function — that endpoint verifies it server-side (see functions/index.js) rather than trusting Firestore/Storage rules, since it's a second front door onto Storage. */
 /**
  * Ask the transferClip Cloud Function to move a clip from a remote URL
