@@ -1565,8 +1565,31 @@ function notesHTML(lot){
   return applyBoldRules(html);
 }
 function sellerHTML(lot){
-  if(lotEdit(lot,'seller')!=null) return sanitizeRichText(lotEdit(lot,'seller'));
-  return `<span class="seller-name">${esc(lot.consignor)}</span>`+(lot.location?`<i>${esc(lot.location)}</i>`:'');
+  const e=lotEdit(lot,'seller');
+  if(e!=null){const p=sellerEditParts(e);return sellerPartsHTML(p.name,p.location);}
+  return sellerPartsHTML(esc(lot.consignor),lot.location?esc(lot.location):'');
+}
+function sellerPartsHTML(name,location){
+  return (name?`<span class="seller-name">${name}</span>`:'')+(location?`<i>${location}</i>`:'');
+}
+// A seller cell is two parts: the consignor name (<span class="seller-name">) and an
+// italic location (<i>). An edit saves the cell's raw innerHTML, and running that
+// straight through sanitizeRichText() dropped the seller-name span (no SPAN, no class
+// attributes), so an edited name lost its Oswald/size/color styling, and Enter-created
+// <div> lines collapsed together. Rebuild the structure instead: <i>/<em> text is the
+// location, everything else is the name (extra lines kept as <br>). Also repairs edits
+// saved before this fix, since those were already stored without the span.
+function sellerEditParts(raw){
+  const doc=new DOMParser().parseFromString(String(raw||''),'text/html');
+  const location=[...doc.body.querySelectorAll('i,em')]
+    .map(el=>{const t=el.textContent;el.remove();return t;})
+    .join(' ').replace(/\s+/g,' ').trim();
+  doc.body.querySelectorAll('div,p').forEach(el=>el.before(doc.createElement('br')));
+  const name=sanitizeRichText(doc.body.innerHTML)
+    .replace(/&nbsp;/g,' ')
+    .replace(/^(\s|<br>)+|(\s|<br>)+$/g,'')
+    .replace(/(\s*<br>\s*)+/g,'<br>');
+  return {name,location:esc(location)};
 }
 
 /* ===== condensed option-lot rendering (toggle: S.issue.optionLotLayout) =====
@@ -1603,7 +1626,9 @@ function condPlain(v){return stripTags(String(v||'')).replace(/\s+/g,' ').trim()
 // raw lot.consignor/desc1/desc2 can carry inconsistent whitespace or markup between
 // a master lot and its options (e.g. from CSV import) even when they visually read
 // identically, which was flagging a same-seller option as "differs" from its parent.
-function condSellerVal(lot){const e=lotEdit(lot,'seller');return condPlain(e!=null?e:(lot.consignor||''));}
+// Name only, on both branches: an edited seller's saved HTML also carries the <i>
+// location, which made an edited master read as "differs" from its unedited options.
+function condSellerVal(lot){const e=lotEdit(lot,'seller');return condPlain(e!=null?sellerEditParts(e).name.replace(/<br>/g,' '):(lot.consignor||''));}
 function condNotesVal(lot){const e=lotEdit(lot,'notes');return condPlain(e!=null?e:[lot.desc1,lot.desc2].filter(Boolean).join(' '));}
 function condensedFieldDiffs(lot,first){
   const diffs=[];
