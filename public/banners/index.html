@@ -238,11 +238,11 @@ details[open] .build-issues-summary::before { content: '▾ '; }
   <button class="nav-tab" onclick="showPage('settings', this)">Settings</button>
   <div class="mode-dropdown" style="margin-left:auto;">
     <button class="btn btn-ghost mode-dropdown-btn" id="btnModeDropdown" type="button">
-      <span id="modeDropdownLabel">Build Mode: Classic</span> <span class="caret">▾</span>
+      <span id="modeDropdownLabel">Build Mode: Automated</span> <span class="caret">▾</span>
     </button>
     <div class="mode-dropdown-menu" id="modeDropdownMenu" hidden>
-      <button type="button" class="mode-dropdown-item" data-mode="classic" title="Behaves exactly like the production builder — no video matching, no tags, no intro.">Classic</button>
-      <button type="button" class="mode-dropdown-item" data-mode="beta" title="Adds automated video matching, verification tags, and a Stinger intro. Opt-in, never required.">Automated Video Setup — Beta</button>
+      <button type="button" class="mode-dropdown-item" data-mode="classic" title="Banners and scenes only — no video matching, no tags, no stinger.">Classic</button>
+      <button type="button" class="mode-dropdown-item" data-mode="beta" title="Default. Adds automated video matching, verification tags (from the Video Tags column), and the stinger.">Automated Video Setup</button>
     </div>
   </div>
 </nav>
@@ -1324,6 +1324,10 @@ function parseWorkingOnCSV(text) {
     // .explicitVideoId / .youtubeUrl below, so capturing them here is
     // behaviorally inert for Classic — see beta/beta-main.js.
     description:  findKey(/^description$/i),
+    // "Video Tags" — the structured column (Master Data / Working On) the
+    // Automated builder reads verification tags from. Replaces scanning
+    // the free-text Description/notes.
+    videoTags:    findKey(/^video\s*tags?$/i),
     video:        findKey(/^video$/i),
     previewLink:  findKey(/^preview\s*video\s*link$/i),
     embedLink:    findKey(/^automated\s*embedded\s*link$/i),
@@ -1389,6 +1393,7 @@ function parseWorkingOnCSV(text) {
       locationDisplay: loc.city && finalState ? `${loc.city}, ${finalState}` : (loc.city || finalState || locationRaw),
       // Beta-only — see K.description/.video/.previewLink/.embedLink above.
       description: cleanCell(row[K.description] || ''),
+      videoTags: cleanCell(row[K.videoTags] || ''),
       explicitVideoId: cleanCell(row[K.video] || ''),
       youtubeUrl: cleanCell(row[K.previewLink] || '') || cleanCell(row[K.embedLink] || ''),
     };
@@ -2259,7 +2264,7 @@ async function dlObsJson() {
     // `output` above is never mutated in place — see beta-obs-augment.js.
     if (window.CMSBetaHooks?.isBeta?.()) {
       await window.CMSBetaHooks.buildAndExportBeta(output, CANVAS_W, CANVAS_H);
-      showToast('Beta auction OBS package downloaded');
+      showToast('Auction OBS package downloaded');
     } else {
       const blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -2784,7 +2789,7 @@ window.setResultsFilter = setResultsFilter;
   // when Settings isn't the currently-visible page).
   function setModeUI(mode) {
     const label = document.getElementById('modeDropdownLabel');
-    if (label) label.textContent = `Build Mode: ${mode === 'beta' ? 'Automated Beta' : 'Classic'}`;
+    if (label) label.textContent = `Build Mode: ${mode === 'beta' ? 'Automated' : 'Classic'}`;
     const settingsClassic = document.getElementById('settingsModeClassic');
     const settingsBeta = document.getElementById('settingsModeBeta');
     if (settingsClassic) settingsClassic.checked = (mode !== 'beta');

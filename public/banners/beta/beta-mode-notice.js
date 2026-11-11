@@ -15,7 +15,7 @@
  */
 export function renderModeNotice(container, { isBeta, setBuildMode }) {
   if (isBeta) {
-    container.innerHTML = `<span class="status-chip good" style="margin-bottom:16px;">Automated Beta feature</span>`;
+    container.innerHTML = `<span class="status-chip good" style="margin-bottom:16px;">Automated Video Setup feature</span>`;
     return;
   }
   container.innerHTML = `

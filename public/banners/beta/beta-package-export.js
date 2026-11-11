@@ -39,7 +39,7 @@ export async function fetchAsBlob(url) {
 
 function buildManifest({ auctionFolder, settings, lotPlans, uniqueVideoSources, tagAssets, unmatchedLots, missingTagImages, droppedTagWarnings }) {
   const lines = [];
-  lines.push('CMS Auction OBS Package — Automated Video Setup (Beta)');
+  lines.push('CMS Auction OBS Package — Automated Video Setup');
   lines.push(`Auction folder: ${auctionFolder}`);
   lines.push(`Generated: ${new Date().toISOString()}`);
   lines.push('');
@@ -53,6 +53,9 @@ function buildManifest({ auctionFolder, settings, lotPlans, uniqueVideoSources, 
   lines.push(`   since they don't change per auction. Make sure that download has been placed`);
   lines.push(`   into ${settings.lotBannersFolder} before importing this JSON.`);
   lines.push('3. In OBS: Scene Collection -> Import, choose the .json file from this package.');
+  lines.push('4. OBS Settings -> Video must be: Base (Canvas) 3840x2160, Output (Scaled) 1920x1080.');
+  lines.push('   Every lot video is fit to the full 3840x2160 canvas automatically, whatever its');
+  lines.push('   source resolution (1080p, 4K, vertical, etc.).');
   lines.push('');
   lines.push(`REQUIRED VIDEO FILES (${uniqueVideoSources.size})`);
   lines.push('----------------------------------------');

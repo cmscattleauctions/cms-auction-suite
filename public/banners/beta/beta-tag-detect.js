@@ -1,10 +1,11 @@
 /* =============================================================
  * Beta OBS Builder — Verification tag detection
  * -------------------------------------------------------------
- * Pure functions. No DOM, no Firebase. Parses the free-text
- * Description field (the source of truth — no structured ASV/NHTC/etc
- * fields are added to the data model) against a user-configured list
- * of verification tags loaded from Firestore.
+ * Pure functions. No DOM, no Firebase. Parses a lot's "Video Tags"
+ * column (Master Data / Working On CSV — the source of truth; the
+ * free-text Description/notes are no longer scanned) against a
+ * user-configured list of verification tags loaded from Firestore.
+ * A tag matches on its own name or any of its detection terms.
  *
  * Two passes:
  *   1. Exact/alias match  — case-insensitive, punctuation-resilient,
@@ -59,7 +60,7 @@ export function detectExactTags(description, tags) {
   const hits = [];
   for (const tag of tags) {
     if (!tag.enabled) continue;
-    const terms = Array.isArray(tag.detectionTerms) ? tag.detectionTerms : [];
+    const terms = [tag.name, ...(Array.isArray(tag.detectionTerms) ? tag.detectionTerms : [])].filter(Boolean);
     const matchedTerm = terms.find(t => containsTerm(normalizedDesc, normalize(t)));
     if (matchedTerm) hits.push({ tagId: tag.id, tagName: tag.name, matchedTerm });
   }
@@ -139,8 +140,8 @@ export function detectFuzzyTagSuggestions(description, tags, alreadyMatchedTagId
     let best = null; // { tag, term, distance }
     for (const tag of tags) {
       if (!tag.enabled || already.has(tag.id)) continue;
-      const terms = Array.isArray(tag.detectionTerms) ? tag.detectionTerms : [tag.name];
-      for (const term of terms.length ? terms : [tag.name]) {
+      const terms = [tag.name, ...(Array.isArray(tag.detectionTerms) ? tag.detectionTerms : [])].filter(Boolean);
+      for (const term of terms) {
         const normTerm = normalize(term);
         if (!normTerm || normToken === normTerm) continue; // exact would've matched already
         const dist = editDistance(normToken, normTerm);

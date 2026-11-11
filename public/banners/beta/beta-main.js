@@ -115,11 +115,13 @@ export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}, onP
   onProgress(8, 'Loading verification tag library…');
   const tags = await listEnabledTags();
 
-  // ---- Tag detection (Description is the sole source of truth) ----
-  onProgress(15, 'Scanning lot descriptions for tags…');
+  // ---- Tag detection — the "Video Tags" column is the sole source of
+  // truth (Master Data / Working On). Description/notes are NOT scanned.
+  onProgress(15, 'Reading Video Tags column…');
+  const hasVideoTagsColumn = !!parsedCsvState.headerKeys?.videoTags;
   const perLotTags = new Map();   // lot -> { applied: [...], pendingFuzzy: [...] }
   for (const row of parsedCsvState.lotRows) {
-    perLotTags.set(row.lot, detectTagsForLot(row.description, tags, fuzzyResolutions));
+    perLotTags.set(row.lot, detectTagsForLot(row.videoTags || '', tags, fuzzyResolutions));
   }
   const fuzzyGroups = groupFuzzySuggestions(perLotTags);
 
@@ -141,7 +143,6 @@ export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}, onP
       lotPlans.set(row.lot, {
         lot: row.lot, status: 'matched', cmsVideoId: result.cmsVideoId, source: result.source,
         youtubeId: result.youtubeId, tagIds,
-        videoScale: settings.assumedVideoWidth ? (settings.assumedVideoWidth < 3840 ? 3840 / settings.assumedVideoWidth : 1) : 1,
       });
     } else {
       lotPlans.set(row.lot, { lot: row.lot, status: 'unmatched', cmsVideoId: null, youtubeId: result.youtubeId, tagIds, reason: result.reason });
@@ -219,9 +220,9 @@ export async function runBetaPipeline(parsedCsvState, fuzzyResolutions = {}, onP
   const totalTagSources = [...perLotTags.values()].reduce((sum, r) => sum + r.applied.length, 0);
   const lotsWithTags = [...perLotTags.values()].filter(r => r.applied.length > 0).length;
 
-  onProgress(100, 'Beta review complete.');
+  onProgress(100, 'Review complete.');
   return {
-    settings, tags, perLotTags, fuzzyGroups,
+    settings, tags, perLotTags, fuzzyGroups, hasVideoTagsColumn,
     lotPlans, unmatchedLots, uniqueVideoSources,
     tagAssets, allTagAssets, missingTagImages, stingerAsset,
     summary: {
@@ -351,7 +352,6 @@ export async function buildAndExportBeta(ctx, classicObsJson, canvasW, canvasH) 
   for (const [lot, plan] of ctx.lotPlans.entries()) {
     lotPlansForAugment.set(lot, {
       cmsVideoId: plan.status === 'matched' ? plan.cmsVideoId : null,
-      videoScale: plan.videoScale,
       tagIds: plan.tagIds,
     });
   }

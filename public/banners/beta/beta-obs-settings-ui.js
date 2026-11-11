@@ -34,7 +34,7 @@ export async function initSettingsPage(root, { showToast, setBuildMode }) {
         </label>
         <label style="display:flex;gap:12px;align-items:flex-start;cursor:pointer;">
           <input type="radio" name="settingsBuildMode" value="beta" id="settingsModeBeta" style="margin-top:4px;">
-          <span><strong>Automated Video Setup — Beta</strong><br><span class="helper">Automatically creates video sources, verification tags, and stinger transitions.</span></span>
+          <span><strong>Automated Video Setup</strong> <span class="status-chip good">Default</span><br><span class="helper">Automatically creates video sources, verification tags, and stinger transitions.</span></span>
         </label>
       </div>
     </div>

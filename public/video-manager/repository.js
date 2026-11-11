@@ -668,6 +668,10 @@ export const VideoRepository = {
         ? `Record created as ${finalId} (Video ID collision with ${baseId})`
         : 'Record created' }],
     };
+    if (actor === 'Rep') {
+      await FirestoreData.createVideoAnon(record);
+      return { ...record };
+    }
     videos.unshift(record);
     await persist(record);
     return { ...record };
