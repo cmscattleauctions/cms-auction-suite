@@ -27,7 +27,10 @@ import {
   doc, getDoc, setDoc, serverTimestamp,
 } from './beta-firebase.js';
 
-const MODE_KEY = 'cms_obs_build_mode_v1';         // 'classic' | 'beta'
+// v2: Automated Video Setup is now the default (out of beta). A new key so
+// every browser starts on Automated once, then remembers an explicit
+// switch back to Classic.
+const MODE_KEY = 'cms_obs_build_mode_v2';         // 'classic' | 'beta'
 const SETTINGS_DOC_PATH = ['obsBetaSettings', 'default'];
 const SETTINGS_CACHE_KEY = 'cms_obs_beta_settings_v1';
 
@@ -59,8 +62,6 @@ export const DEFAULT_SETTINGS = {
   // read too.
   lotBannersFolder: '/Users/brysonmurray/Library/CloudStorage/Dropbox/Auction OBS/Lot Banners/',
   videoExt: 'mp4',
-  assumedVideoWidth: 1920,          // used only to compute a sane default on-canvas scale
-  assumedVideoHeight: 1080,
   tagLayout: {
     rightMargin: 80,
     bottomMargin: 80,
@@ -71,7 +72,7 @@ export const DEFAULT_SETTINGS = {
 
 export function getBuildMode() {
   const v = localStorage.getItem(MODE_KEY);
-  return v === 'beta' ? 'beta' : 'classic'; // Classic is always the default
+  return v === 'classic' ? 'classic' : 'beta'; // Automated is the default
 }
 export function setBuildMode(mode) {
   localStorage.setItem(MODE_KEY, mode === 'beta' ? 'beta' : 'classic');

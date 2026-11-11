@@ -19,18 +19,22 @@ const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled
  * focus, focus containment while open, focus restoration on close,
  * Escape dismissal) only needs to be implemented once here rather than
  * per modal. */
-function mountModal(innerHtml, { wide = false } = {}) {
+function mountModal(innerHtml, { wide = false, sheetOnMobile = false } = {}) {
   const root = document.getElementById('vm-modal-root');
   const previouslyFocused = document.activeElement;
   const backdrop = document.createElement('div');
-  backdrop.className = 'vm-modal-backdrop';
+  backdrop.className = `vm-modal-backdrop ${sheetOnMobile ? 'vm-sheet-mobile' : ''}`;
   backdrop.innerHTML = `<div class="vm-modal ${wide ? 'vm-modal-wide' : ''}" role="dialog" aria-modal="true" tabindex="-1">${innerHtml}</div>`;
   root.appendChild(backdrop);
+  // Lock the page behind the modal so touch-scrolling on a phone moves
+  // the modal body, not the table underneath it.
+  document.documentElement.classList.add('vm-modal-open');
   backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
 
   function close() {
     backdrop.removeEventListener('keydown', onKeydown);
     backdrop.remove();
+    if (!root.querySelector('.vm-modal-backdrop')) document.documentElement.classList.remove('vm-modal-open');
     // Restore focus to whatever opened this modal — if that element is
     // itself gone (e.g. the row it was on got removed by a refresh),
     // activeElement just falls back to <body>, which is fine.
@@ -232,15 +236,19 @@ export function openVideoIdManagerModal(ctx) {
       </div>
       <button class="vm-modal-close" data-modal-close>&times;</button>
     </div>
-    <div class="vm-modal-body" style="padding-bottom:0;">
+    <div class="vm-idmgr-top">
       <div class="vm-idmgr-explainer">
         <div class="cap">Example Video ID</div>
-        <div class="fmt">21<span class="sep">.</span>2<span class="sep">.</span>2<span class="sep">.</span>2<span class="sep">.</span>450<span class="sep">.</span>0826</div>
-        <div class="cap">Consignor · Sex · Sire · Dam · Weight · Month/Year</div>
+        <div class="vm-idmgr-example">
+          ${[['21', 'Consignor', 'consignors'], ['2', 'Sex', 'sex'], ['2', 'Sire', 'sire'], ['2', 'Dam', 'dam'], ['450', 'Weight', null], ['0826', 'Mo/Yr', null]]
+            .map(([v, l, t], i) => `${i ? '<span class="sep">.</span>' : ''}<span class="seg ${t ? 'is-link' : ''}" ${t ? `data-idmgr-tab="${t}" role="button" tabindex="0" title="Manage ${l} codes"` : ''}><span class="v">${v}</span><span class="l">${l}</span></span>`).join('')}
+        </div>
       </div>
     </div>
     <div class="vm-idmgr-tabs" id="idmgr-tabs">
-      ${ID_MANAGER_TABS.map(([id, label]) => `<button type="button" class="vm-idmgr-tab ${id === tab ? 'active' : ''}" data-idmgr-tab="${id}">${label}</button>`).join('')}
+      <div class="vm-idmgr-seg" role="tablist" aria-label="Code type">
+        ${ID_MANAGER_TABS.map(([id, label]) => `<button type="button" role="tab" class="vm-idmgr-tab ${id === tab ? 'active' : ''}" data-idmgr-tab="${id}">${label}</button>`).join('')}
+      </div>
       <div class="vm-idmgr-view-toggle" role="group" aria-label="Layout">
         <button type="button" data-idmgr-view="tabs">One at a time</button>
         <button type="button" data-idmgr-view="columns">Side by side</button>
@@ -253,6 +261,18 @@ export function openVideoIdManagerModal(ctx) {
   // Remembered per browser — staff who like the all-in-one view shouldn't have to re-pick it every time.
   let view = 'tabs';
   try { if (localStorage.getItem('vm-idmgr-view') === 'columns') view = 'columns'; } catch {}
+
+  // Clicking a segment of the example ID jumps to that code's tab.
+  modal.querySelector('.vm-idmgr-example').addEventListener('click', e => {
+    const seg = e.target.closest('[data-idmgr-tab]');
+    if (!seg) return;
+    tab = seg.dataset.idmgrTab;
+    view = 'tabs';
+    paintTab();
+  });
+  modal.querySelector('.vm-idmgr-example').addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-idmgr-tab]')) { e.preventDefault(); e.target.click(); }
+  });
 
   modal.querySelector('#idmgr-tabs').addEventListener('click', e => {
     const viewBtn = e.target.closest('[data-idmgr-view]');
@@ -273,10 +293,13 @@ export function openVideoIdManagerModal(ctx) {
     const isColumns = view === 'columns';
     modal.classList.toggle('vm-modal-xwide', isColumns);
     modal.querySelectorAll('[data-idmgr-view]').forEach(b => b.classList.toggle('active', b.dataset.idmgrView === view));
+    modal.querySelector('.vm-idmgr-seg').hidden = isColumns;
     modal.querySelectorAll('[data-idmgr-tab]').forEach(b => {
-      b.hidden = isColumns;
-      b.classList.toggle('active', b.dataset.idmgrTab === tab);
+      const on = !isColumns && b.dataset.idmgrTab === tab;
+      b.classList.toggle('active', on);
+      if (b.getAttribute('role') === 'tab') b.setAttribute('aria-selected', String(on));
     });
+    body.scrollTop = 0;
     if (isColumns) renderIdColumns(body, ctx);
     else if (tab === 'consignors') renderConsignorsTab(body, ctx);
     else renderCodeTab(body, ctx, codeKindConfig(tab, ctx));
@@ -755,7 +778,7 @@ export function openUploadModal(ctx) {
 
       <div class="field" style="margin-top:18px;">
         <label>Cattle Videos</label>
-        <div class="vm-dropzone" id="um-dropzone"><strong>Drop cattle clips here</strong><br>or choose files</div>
+        <div class="vm-dropzone" id="um-dropzone" tabindex="0" role="button" aria-label="Choose cattle video files"><strong>Drop cattle clips here</strong><br>or choose files</div>
         <input type="file" id="um-file-input" accept="video/*" multiple style="display:none" />
         <div id="um-file-list"></div>
         <div id="um-file-summary" class="vm-upload-summary"></div>
@@ -767,12 +790,18 @@ export function openUploadModal(ctx) {
       <button class="btn btn-ghost" data-modal-close>Cancel</button>
       <button class="btn btn-primary" id="um-submit">Create Video Record</button>
     </div>
-  `, { wide: true });
+  `, { wide: true, sheetOnMobile: true });
 
   /* ----- Video ID field: live existing-record detection ----- */
   const idInput = modal.querySelector('#um-id-input');
   const idResult = modal.querySelector('#um-id-result');
   let debounceTimer;
+  idInput.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (!idInput.value.trim() && !buildOpen) buildToggle.click();
+    else modal.querySelector('#um-dropzone').focus();
+  });
   idInput.addEventListener('input', () => {
     matchedExisting = null; idChoice = null;
     clearTimeout(debounceTimer);
@@ -812,6 +841,7 @@ export function openUploadModal(ctx) {
     buildOpen = !buildOpen;
     buildPanel.style.display = buildOpen ? '' : 'none';
     buildToggle.textContent = buildOpen ? '← Hide builder' : "Don't have a Video ID? Build one →";
+    if (buildOpen) consignorInput.focus();
   });
 
   /* ----- Consignor: searchable combo, type or pick from the list ----- */
@@ -824,25 +854,88 @@ export function openUploadModal(ctx) {
     consignorCodeBadge.hidden = !code;
     consignorCodeBadge.textContent = code ? `#${code}` : '';
   }
+  // Keyboard: ↑/↓ move the highlight, Enter picks it, Tab picks it (when
+  // you've typed something and nothing's chosen yet) and then moves on
+  // to the next field as normal, Escape closes the list.
+  let comboMatches = [];
+  let comboActive = -1;
+  function selectConsignor(code) {
+    const rec2 = consignors.find(c => c.code === code);
+    if (!rec2) return;
+    consignorInput.value = rec2.name;
+    consignorCombo.dataset.selectedCode = rec2.code;
+    consignorList.hidden = true;
+    updateConsignorCodeBadge();
+    updateBuildPreview();
+  }
+  function paintComboActive() {
+    consignorList.querySelectorAll('[data-code]').forEach((el, i) => {
+      el.classList.toggle('active', i === comboActive);
+      if (i === comboActive) el.scrollIntoView({ block: 'nearest' });
+    });
+  }
   function renderConsignorOptions(query) {
     const q = query.trim().toLowerCase();
-    const matches = q ? consignors.filter(c => c.name.toLowerCase().includes(q) || c.code.includes(q)) : consignors;
-    consignorList.innerHTML = matches.length
-      ? matches.slice(0, 30).map(c => `<button type="button" class="vm-combo-option" data-code="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${escapeHtml(c.code)})${c.flaggedNew ? ' — NEW' : ''}</button>`).join('')
+    let matches = q ? consignors.filter(c => c.name.toLowerCase().includes(q) || c.code.includes(q)) : consignors;
+    // Names that START with what you typed float to the top.
+    if (q) matches = [...matches].sort((a, b) => (b.name.toLowerCase().startsWith(q) || b.code === q) - (a.name.toLowerCase().startsWith(q) || a.code === q));
+    comboMatches = matches.slice(0, 30);
+    comboActive = q && comboMatches.length ? 0 : -1;
+    consignorList.innerHTML = comboMatches.length
+      ? comboMatches.map(c => `<button type="button" tabindex="-1" class="vm-combo-option" data-code="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${escapeHtml(c.code)})${c.flaggedNew ? ' — NEW' : ''}</button>`).join('')
       : `<div class="vm-combo-empty">No match</div>`;
     consignorList.hidden = false;
-    consignorList.querySelectorAll('[data-code]').forEach(opt => opt.addEventListener('click', () => {
-      const rec2 = consignors.find(c => c.code === opt.dataset.code);
-      consignorInput.value = rec2.name;
-      consignorCombo.dataset.selectedCode = rec2.code;
-      consignorList.hidden = true;
-      updateConsignorCodeBadge();
-      updateBuildPreview();
-    }));
+    // mousedown (not click) + preventDefault keeps focus in the input, so
+    // the blur-hide below can't race the pick.
+    consignorList.querySelectorAll('[data-code]').forEach(opt => opt.addEventListener('mousedown', e => { e.preventDefault(); selectConsignor(opt.dataset.code); }));
+    paintComboActive();
   }
-  consignorInput.addEventListener('focus', () => renderConsignorOptions(consignorInput.value));
+  consignorInput.addEventListener('focus', () => { if (!consignorCombo.dataset.selectedCode) renderConsignorOptions(consignorInput.value); });
   consignorInput.addEventListener('input', () => { consignorCombo.dataset.selectedCode = ''; updateConsignorCodeBadge(); renderConsignorOptions(consignorInput.value); });
   consignorInput.addEventListener('blur', () => setTimeout(() => { consignorList.hidden = true; }, 150));
+  consignorInput.addEventListener('keydown', e => {
+    const open = !consignorList.hidden && comboMatches.length;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (consignorList.hidden) renderConsignorOptions(consignorInput.value);
+      if (!comboMatches.length) return;
+      comboActive = e.key === 'ArrowDown'
+        ? Math.min(comboMatches.length - 1, comboActive + 1)
+        : Math.max(0, comboActive - 1);
+      paintComboActive();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (open) {
+        const pick = comboMatches[comboActive >= 0 ? comboActive : 0];
+        if (pick) selectConsignor(pick.code);
+        focusNextField(consignorInput);
+      }
+    } else if (e.key === 'Tab' && !e.shiftKey) {
+      if (open && !consignorCombo.dataset.selectedCode && consignorInput.value.trim() && comboActive >= 0) {
+        selectConsignor(comboMatches[comboActive].code);
+      }
+      consignorList.hidden = true; // let Tab move focus normally
+    } else if (e.key === 'Escape' && !consignorList.hidden) {
+      e.preventDefault();
+      e.stopPropagation(); // close the list, not the whole modal
+      consignorList.hidden = true;
+    }
+  });
+
+  // Enter in a single-line field (not the consignor search, which handles
+  // its own Enter above) jumps to the next field, same as Tab.
+  function focusNextField(fromEl) {
+    const els = Array.from(modal.querySelectorAll('input:not([type=file]):not([disabled]), select:not([disabled]), textarea, [tabindex="0"], #um-submit'))
+      .filter(el => el.offsetParent !== null);
+    const next = els[els.indexOf(fromEl) + 1];
+    if (next) next.focus();
+  }
+  modal.querySelector('#um-build-panel').addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.target === consignorInput) return;
+    if (!e.target.matches('input, select')) return;
+    e.preventDefault();
+    focusNextField(e.target);
+  });
 
   modal.querySelector('#um-new-consignor').addEventListener('click', async () => {
     const rec = await openNewConsignorModal(ctx);
@@ -884,6 +977,7 @@ export function openUploadModal(ctx) {
   const dropzone = modal.querySelector('#um-dropzone');
   const fileInput = modal.querySelector('#um-file-input');
   dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
   dropzone.addEventListener('dragover', e => e.preventDefault());
   dropzone.addEventListener('drop', e => {
     e.preventDefault();

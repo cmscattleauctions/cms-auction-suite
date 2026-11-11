@@ -226,6 +226,22 @@ export class ConflictError extends Error {
  * throws instead of overwriting; repository.js's persist() surfaces
  * that as a real, catchable error rather than a silent loss.
  */
+/**
+ * Public rep submission (anonymous session) — a plain create, NOT
+ * saveVideo()'s transaction. That transaction reads the doc first,
+ * and docs/firestore.rules never lets an anonymous session read
+ * videoRecords, so every public submission was rejected; it also adds
+ * a `version` field, which isValidAnonVideoSubmission()'s hasOnly()
+ * key list doesn't allow. A missing version reads as 0 everywhere
+ * (see saveVideo below), so staff edits afterwards work unchanged.
+ */
+export async function createVideoAnon(record) {
+  requireDb();
+  const clean = stripFileHandles(record);
+  delete clean.version;
+  await setDoc(doc(db, COLLECTION, record.id), clean);
+}
+
 export async function saveVideo(record) {
   requireDb();
   const ref = doc(db, COLLECTION, record.id);

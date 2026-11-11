@@ -28,6 +28,7 @@ import { formatMonthYear, buildBaseId, monthYearToInputValue, inputValueToMonthY
 import { showToast, copyToClipboard } from './toast.js';
 import { openDeleteConfirmModal } from './ui-modals.js';
 import * as StorageData from './storage-data.js';
+import { hydrateClipPosters, openClipViewer, clipDuration } from './clip-viewer.js';
 
 const FORMAT_BADGE_CLASS = { clean: 'format-clean', 'legacy-tagged': 'format-legacy', 'needs-redo': 'format-redo', unknown: 'format-unknown' };
 
@@ -58,7 +59,6 @@ let editingSuffix = false;
 let usageExpanded = false;
 let activityExpanded = false;
 let notesEditing = false;
-let previewClipId = null;
 let drawerWidth = getStoredWidth();
 
 export async function openDrawer(id, ctx) {
@@ -70,7 +70,6 @@ export async function openDrawer(id, ctx) {
   usageExpanded = false;
   activityExpanded = false;
   notesEditing = false;
-  previewClipId = null;
   await paint(ctx);
 }
 
@@ -99,7 +98,12 @@ async function paint(ctx) {
       <div class="vm-drawer-resize-handle" id="vm-drawer-resize" title="Drag to resize"></div>
       <div class="vm-drawer-header">
         <div class="vm-drawer-header-main">
-          <div class="vm-drawer-title">${escapeHtml(rec.videoId)}</div>
+          <div class="vm-drawer-title-row">
+            <div class="vm-drawer-title">${escapeHtml(rec.videoId)}</div>
+            <button class="vm-copy-id vm-drawer-copy-id" id="vm-drawer-copy-id" type="button" title="Copy Video ID" aria-label="Copy Video ID">
+              <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M3 10.5H2.5A1.5 1.5 0 0 1 1 9V2.5A1.5 1.5 0 0 1 2.5 1H9A1.5 1.5 0 0 1 10.5 2.5V3" stroke="currentColor" stroke-width="1.3"/></svg>
+            </button>
+          </div>
           ${consignorHeaderHtml(rec)}
           <div class="vm-drawer-cattleline">${escapeHtml(cattleLine)}</div>
           <div class="vm-drawer-badges">
@@ -136,6 +140,13 @@ async function paint(ctx) {
   const body = root.querySelector('#vm-drawer-tabbody');
   if (body) body.scrollTop = prevScrollTop;
 
+  root.querySelector('#vm-drawer-copy-id').addEventListener('click', async e => {
+    await copyToClipboard(rec.videoId);
+    showToast(`Copied ${rec.videoId}`);
+    const b = e.currentTarget;
+    b.classList.add('is-copied');
+    setTimeout(() => b.classList.remove('is-copied'), 1200);
+  });
   root.querySelector('#vm-drawer-close').addEventListener('click', () => ctx.closeDrawer());
   root.querySelector('#vm-drawer-backdrop').addEventListener('click', () => ctx.closeDrawer());
   root.querySelector('#vm-drawer-prev')?.addEventListener('click', () => navigateDrawer(-1, ctx));
@@ -163,6 +174,7 @@ async function paint(ctx) {
   wireCattleSection(root, rec, ctx);
 
   if (activeTab === 'details') {
+    wireClipStrip(root, rec, ctx);
     wireSuffixCell(root, rec, ctx);
     wireDuplicateBanner(root, rec, ctx);
     wireVideoMakerBanner(root, rec, ctx);
@@ -227,6 +239,7 @@ function detailsTabHtml(rec, ctx, sexLabel, sireLabel, damLabel) {
   return `
     ${rec.isDuplicateId ? duplicateBannerHtml(rec) : ''}
     ${rec.status === 'created' ? videoMakerBannerHtml(rec) : ''}
+    ${clipStripHtml(rec)}
     ${cattleSectionHtml(rec, ctx, sexLabel, sireLabel, damLabel)}
     ${rec.hasTags ? hasTagsSectionHtml(rec) : ''}
     ${publishingSectionHtml(rec)}
@@ -955,6 +968,37 @@ function recordInfoSectionHtml(rec) {
  * Download All is the primary action here per the workflow this tab
  * is actually used for: pulling files, not editing them.
  * ============================================================= */
+/* First-frame strip at the top of the Details tab — see the cattle the
+ * moment the drawer opens. Click a frame to open the viewer on that clip. */
+const STRIP_MAX = 6;
+function clipStripHtml(rec) {
+  const playable = rec.clips.filter(c => c.downloadUrl);
+  if (!playable.length) return '';
+  const shown = playable.slice(0, STRIP_MAX);
+  const more = playable.length - shown.length;
+  return `
+    <div class="vm-drawer-section vm-clip-strip-section">
+      <div class="vm-clip-strip">
+        ${shown.map((c, i) => `
+          <button type="button" class="vm-clip-strip-item" data-clip-card data-open-clip="${escapeHtml(c.id)}" title="Play clip ${i + 1}">
+            <span class="vm-clip-poster is-loading" data-poster-clip="${escapeHtml(c.id)}"></span>
+            <span class="vm-clip-badge-n">${i + 1}</span>
+            <span class="vm-clip-badge-dur" data-clip-dur hidden></span>
+          </button>`).join('')}
+        ${more > 0 ? `<button type="button" class="vm-clip-strip-more" data-goto-clips>+${more} more</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function wireClipStrip(root, rec, ctx) {
+  const strip = root.querySelector('.vm-clip-strip');
+  if (!strip) return;
+  hydrateClipPosters(strip, rec.clips);
+  strip.querySelectorAll('[data-open-clip]').forEach(b => b.addEventListener('click', () =>
+    openClipViewer(rec.clips, b.dataset.openClip, { title: rec.videoId, onDownload: clip => downloadClips([clip]) })));
+  strip.querySelector('[data-goto-clips]')?.addEventListener('click', () => { activeTab = 'clips'; paint(ctx); });
+}
+
 function clipsTabHtml(rec) {
   return `
     <div class="vm-drawer-section" style="border-bottom:none;">
@@ -963,9 +1007,10 @@ function clipsTabHtml(rec) {
         <div class="vm-clips-tab-actions">
           <button class="btn btn-primary btn-sm" id="c-download-all" type="button">Download All</button>
           <button class="btn btn-sm btn-ghost" id="c-add-clips" type="button">+ Add Clips</button>
+          ${rec.clips.some(c => c.downloadUrl) ? `<button class="btn btn-sm btn-ghost" id="c-view-all" type="button" style="margin-left:auto;">Open Viewer</button>` : ''}
         </div>
         <div class="vm-clip-list2">
-          ${rec.clips.map((c, i) => clipCardHtml(c, i, c.id === previewClipId)).join('')}
+          ${rec.clips.map((c, i) => clipCardHtml(c, i)).join('')}
         </div>
       ` : `
         <p class="muted">No clips uploaded yet.</p>
@@ -974,75 +1019,47 @@ function clipsTabHtml(rec) {
     </div>`;
 }
 
-function clipCardHtml(c, index, isPlaying) {
-  // The <video> element (and its src) only exists at all for the ONE
-  // clip currently playing — opening the drawer or its Clips tab must
-  // never fetch original clip bytes on its own. Every other clip shows
-  // a plain "click to load" placeholder with the same play-button
-  // affordance; nothing about that placeholder touches c.downloadUrl.
+function clipCardHtml(c, index) {
+  // The first frame is filled in lazily by clip-viewer.js's
+  // hydrateClipPosters (range-requests just enough of the clip for one
+  // frame, then caches a small JPEG in this browser). Clicking the
+  // frame opens the full-size viewer.
+  const dur = clipDuration(c);
   return `
-    <div class="vm-clip-card2 ${isPlaying ? 'is-playing' : ''}" data-clip-id="${escapeHtml(c.id)}">
-      <div class="vm-clip-card2-label">Clip ${index + 1}</div>
-      <div class="vm-clip-thumb" ${c.downloadUrl && !isPlaying ? `data-play-clip2="${escapeHtml(c.id)}" role="button" tabindex="0"` : ''}>
+    <div class="vm-clip-card2" data-clip-card data-clip-id="${escapeHtml(c.id)}">
+      <div class="vm-clip-thumb" ${c.downloadUrl ? `data-open-clip="${escapeHtml(c.id)}" role="button" tabindex="0" aria-label="Play clip ${index + 1}"` : ''}>
         ${c.downloadUrl
-          ? (isPlaying
-              ? `<video preload="metadata" muted playsinline controls autoplay data-clip-video="${escapeHtml(c.id)}" src="${escapeHtml(c.downloadUrl)}#t=0.5"></video>`
-              : `<div class="vm-clip-thumb-empty vm-clip-thumb-unloaded"></div>`)
+          ? `<div class="vm-clip-poster is-loading" data-poster-clip="${escapeHtml(c.id)}"></div>
+             <div class="vm-clip-play-btn" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg></div>`
           : `<div class="vm-clip-thumb-empty">No file yet</div>`}
-        ${c.downloadUrl && !isPlaying ? `
-          <div class="vm-clip-play-btn" title="Play">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>
-          </div>` : ''}
+        <span class="vm-clip-badge-n">${index + 1}</span>
+        <span class="vm-clip-badge-dur" data-clip-dur ${dur ? '' : 'hidden'}>${dur ? formatDuration(Math.round(dur)) : ''}</span>
       </div>
       <div class="vm-clip-meta-row">
-        <span>${formatDuration(c.durationSec)}</span>
+        <span class="vm-clip-fname" title="${escapeHtml(c.filename || '')}">${escapeHtml(c.filename || `Clip ${index + 1}`)}</span>
+      </div>
+      <div class="vm-clip-meta-row vm-clip-meta-sub">
         <span>${formatDate(c.uploadedAt)}</span>
         <span>${formatBytes(c.sizeBytes)}</span>
       </div>
       <div class="vm-clip-card2-actions">
         <button class="btn btn-sm btn-ghost" data-download-clip2="${escapeHtml(c.id)}" type="button">Download</button>
-        <span class="vm-overflow">
-          <button class="vm-overflow-btn" data-clip-more="${escapeHtml(c.id)}" type="button" title="More">⋯</button>
-          <div class="vm-overflow-menu" id="clip-menu-${escapeHtml(c.id)}" hidden>
-            <button data-play-clip2="${escapeHtml(c.id)}" type="button">${isPlaying ? 'Stop preview' : 'Preview'}</button>
-          </div>
-        </span>
+        ${c.downloadUrl ? `<button class="btn btn-sm btn-ghost" data-open-clip="${escapeHtml(c.id)}" type="button">Play</button>` : ''}
       </div>
     </div>`;
 }
 
-function setPreviewClip(rec, clipId) {
-  if (!clipId || clipId === previewClipId) { previewClipId = null; return; }
-  const clip = rec.clips.find(c => c.id === clipId);
-  if (!clip || !clip.downloadUrl) {
-    showToast('This clip has no file to preview yet');
-    previewClipId = null;
-    return;
-  }
-  previewClipId = clipId;
-}
-
-/* Force a real decoded frame to paint as the thumbnail. The `#t=0.5`
- * URL fragment alone isn't reliably honored as a poster frame across
- * browsers (some just show black until playback starts), so explicitly
- * seek once metadata is ready. Also swap in a "couldn't load" state on
- * error instead of leaving a blank/broken video box. */
-function wireClipThumbnails(root) {
-  root.querySelectorAll('[data-clip-video]').forEach(video => {
-    video.addEventListener('loadedmetadata', () => {
-      if (video.currentTime < 0.1) {
-        try { video.currentTime = Math.min(0.5, (video.duration || 1) / 4); } catch { /* ignore */ }
-      }
-    }, { once: true });
-    video.addEventListener('error', () => {
-      const thumb = video.closest('.vm-clip-thumb');
-      if (thumb) thumb.innerHTML = `<div class="vm-clip-thumb-empty vm-clip-thumb-error">Couldn't load preview</div>`;
-    }, { once: true });
-  });
-}
-
 function wireClipsTab(root, rec, ctx) {
-  wireClipThumbnails(root);
+  hydrateClipPosters(root, rec.clips);
+  const openViewer = (clipId) => openClipViewer(rec.clips, clipId, { title: rec.videoId, onDownload: clip => downloadClips([clip]) });
+  root.querySelector('#c-view-all')?.addEventListener('click', () => openViewer(rec.clips.find(c => c.downloadUrl)?.id));
+  root.querySelectorAll('[data-open-clip]').forEach(el => {
+    el.addEventListener('click', () => openViewer(el.dataset.openClip));
+    el.addEventListener('keydown', e => {
+      if (e.target !== el) return;
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openViewer(el.dataset.openClip); }
+    });
+  });
   const addBtn = root.querySelector('#c-add-clips');
   if (addBtn) addBtn.addEventListener('click', () => {
     const input = document.createElement('input');
@@ -1080,35 +1097,6 @@ function wireClipsTab(root, rec, ctx) {
   root.querySelectorAll('[data-download-clip2]').forEach(btn => btn.addEventListener('click', () => {
     const clip = rec.clips.find(c => c.id === btn.dataset.downloadClip2);
     downloadClips(clip ? [clip] : []);
-  }));
-  root.querySelectorAll('[data-play-clip2]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      setPreviewClip(rec, btn.dataset.playClip2);
-      paint(ctx);
-    });
-    btn.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        setPreviewClip(rec, btn.dataset.playClip2);
-        paint(ctx);
-      }
-    });
-  });
-  root.querySelectorAll('[data-clip-more]').forEach(btn => btn.addEventListener('click', e => {
-    e.stopPropagation();
-    const menu = root.querySelector(`#clip-menu-${btn.dataset.clipMore}`);
-    if (!menu) return;
-    const opening = menu.hidden;
-    root.querySelectorAll('.vm-overflow-menu').forEach(m => m.hidden = true);
-    menu.hidden = !opening;
-    if (!opening) return;
-    // Last row of clips: open upward if dropping down would run past the drawer's scroll area.
-    menu.classList.remove('vm-overflow-menu-up');
-    const scroller = menu.closest('.vm-drawer-tabbody');
-    if (scroller && menu.getBoundingClientRect().bottom > scroller.getBoundingClientRect().bottom) {
-      menu.classList.add('vm-overflow-menu-up');
-    }
-    setTimeout(() => document.addEventListener('click', () => { menu.hidden = true; }, { once: true }), 0);
   }));
 }
 

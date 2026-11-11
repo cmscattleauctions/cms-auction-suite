@@ -146,7 +146,7 @@ function render() {
 
     <div class="ru-card">
       <h2>Notes</h2>
-      <textarea id="f-notes" rows="3" placeholder="Optional — anything we should know">${escapeHtml(formState.notes)}</textarea>
+      <textarea id="f-notes" rows="3" maxlength="1500" placeholder="Optional — anything we should know">${escapeHtml(formState.notes)}</textarea>
     </div>
 
     <button class="btn btn-primary" id="f-submit" type="button" style="padding:16px;font-size:16px;">Submit Video</button>
@@ -412,7 +412,16 @@ async function onSubmit() {
     isOriginal: true, storagePath: f.storagePath, downloadUrl: f.downloadUrl,
   }));
 
-  await createRecord({ consignorCode, sexCode, sireCode, damCode, weight, monthYear, suffix: null, submittedByUid: currentUid() }, clips);
+  const btn = main.querySelector('#f-submit');
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+  try {
+    await createRecord({ consignorCode, sexCode, sireCode, damCode, weight, monthYear, suffix: null, submittedByUid: currentUid() }, clips);
+  } catch (err) {
+    console.error('[video-upload] submit failed:', err);
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit Video'; }
+    showToast(`Couldn't submit — ${err.code === 'permission-denied' ? 'the server rejected the submission' : (err.message || 'unknown error')}. Your videos are still uploaded; tap Submit to try again.`);
+    return;
+  }
   showSuccess(`Thanks! Your video was submitted for review.`);
 }
 

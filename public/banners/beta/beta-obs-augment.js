@@ -365,7 +365,7 @@ function applyStingerOverride(scene, transitionDurationMs) {
  *
  * @param baseObsJson  output of Classic's buildObsJson() — untouched
  * @param opts.canvasW/canvasH  must match Classic's CANVAS_W/CANVAS_H
- * @param opts.lotPlans  Map<lotId, { cmsVideoId: string|null, videoScale, tagIds: string[] }>
+ * @param opts.lotPlans  Map<lotId, { cmsVideoId: string|null, tagIds: string[] }>
  * @param opts.uniqueVideoSources  Map<cmsVideoId, localPath>  (FILE dedup for the local-path lookup only — never source sharing, see header)
  * @param opts.tagAssets  Map<tagId, { id, name, localPath, naturalWidth, naturalHeight, contentX, contentY, contentWidth, contentHeight, sortOrder, sizeAdjustPct, verticalOffsetPx }>
  * @param opts.tagLayout  { rightMargin, bottomMargin, spacing, tagHeight, leftMargin? }  (leftMargin defaults to rightMargin)
@@ -461,11 +461,22 @@ export function augmentObsJsonForBeta(baseObsJson, opts) {
       if (localPath) {
         const vsrc = makeMediaSource(localPath, `VIDEO - ${lot}`);
         newSources.push(vsrc);
-        const scale = plan.videoScale || 1;
-        items.unshift(makeSourceItem({
+        // Fit to the full base canvas (3840x2160) with OBS's own bounding
+        // box — "Scale to inner bounds", centered — so every video fills
+        // the canvas correctly regardless of its source resolution (1080p,
+        // 4K, phone-vertical...). Replaces the old fixed scale that assumed
+        // every file was 1920 wide. Output (1920x1080) is OBS's Video
+        // setting, not part of the scene collection — see MANIFEST.txt.
+        const item = makeSourceItem({
           sourceName: vsrc.name, sourceUuid: vsrc.uuid, itemId: nextId++,
-          canvasW, canvasH, posX: 0, posY: 0, scaleX: scale, scaleY: scale,
-        }));
+          canvasW, canvasH, posX: 0, posY: 0, scaleX: 1, scaleY: 1,
+        });
+        item.bounds_type = 2;   // OBS_BOUNDS_SCALE_INNER
+        item.bounds_align = 0;  // center within bounds
+        item.bounds = { x: canvasW, y: canvasH };
+        item.bounds_rel = { x: canvasW / (canvasH / 2), y: canvasH / (canvasH / 2) };
+        item.scale_filter = 'bicubic';
+        items.unshift(item);
       }
     }
 

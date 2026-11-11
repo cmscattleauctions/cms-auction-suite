@@ -48,7 +48,7 @@ function renderVideoSection(ctx) {
   const rememberOffers = [...lotPlans.values()].filter(p => p.rememberOffer && !p.rememberOffer.confirmed);
   return `
   <div class="card" style="margin-bottom:20px;">
-    <div class="section-title">Beta Review · Video Matching</div>
+    <div class="section-title">Review · Video Matching</div>
     <div class="beta-stat-line">
       <strong>${summary.videosMatched} / ${summary.totalLots}</strong> lots matched to a local video automatically
       <span class="status-chip ${summary.videosUnmatched ? 'warn' : 'good'}" style="margin-left:10px;">${pct}% matched</span>
@@ -126,15 +126,17 @@ function wireVideoSection(container, ctx, handlers) {
 /* ---------------- Verification Tags ---------------- */
 
 function renderTagSection(ctx) {
-  const { summary, fuzzyGroups, missingTagImages } = ctx;
+  const { summary, fuzzyGroups, missingTagImages, hasVideoTagsColumn } = ctx;
   return `
   <div class="card" style="margin-bottom:20px;">
-    <div class="section-title">Beta Review · Verification Tags</div>
+    <div class="section-title">Review · Verification Tags</div>
     <div class="beta-stat-line">
       <strong>${summary.exactTagMatches}</strong> exact tag matches across ${summary.lotsWithTags} lot(s)
       ${fuzzyGroups.length ? `<span class="status-chip warn" style="margin-left:10px;">${fuzzyGroups.length} possible match${fuzzyGroups.length === 1 ? '' : 'es'} need review</span>`
         : `<span class="status-chip good" style="margin-left:10px;">No fuzzy matches pending</span>`}
     </div>
+    <p class="helper" style="margin-top:6px;">Tags come from the <strong>Video Tags</strong> column (comma-separated tag names, e.g. <span class="mono">ASV, NHTC</span>). Descriptions/notes are not scanned.</p>
+    ${hasVideoTagsColumn === false ? `<div class="alert-banner" style="display:block;margin-top:14px;"><strong>No "Video Tags" column found in this CSV.</strong> No verification tags will be placed on lot videos. Add a <span class="mono">Video Tags</span> column to Master Data / Working On and re-export.</div>` : ''}
     ${missingTagImages.length ? `<div class="alert-banner" style="display:block;margin-top:14px;"><strong>Missing tag image${missingTagImages.length === 1 ? '' : 's'}:</strong> ${missingTagImages.map(esc).join(', ')} — upload an image for these in Verification Tags, or that tag will be skipped on affected lots.</div>` : ''}
     ${fuzzyGroups.length ? `
       <div class="beta-fuzzy-list">
@@ -179,7 +181,7 @@ function renderSummarySection(ctx) {
 
   return `
   <div class="card">
-    <div class="section-title">Beta Review · Build Summary</div>
+    <div class="section-title">Review · Build Summary</div>
     <div class="stats-row">
       <div class="stat"><div class="stat-num">${s.totalVideoScenes}</div><div class="stat-label">Video Scenes</div></div>
       <div class="stat"><div class="stat-num">${s.videosMatched}</div><div class="stat-label">Videos Attached</div></div>
