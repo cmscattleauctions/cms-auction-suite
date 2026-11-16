@@ -2530,289 +2530,781 @@ async function buildCompleteSummaryPdf({summaries, mode}){
 
 
 /* =========================================================================
-   SPECIAL REPORT 6: AUCTION RECAP SUMMARY
-   Single portrait PDF (can overflow to page 2) with comprehensive stats
+   COMPLETE BUYER / CONSIGNOR SUMMARY
+   Portrait US Letter, multi-page. Shares branding with the Auction
+   Performance Summary (navy / gold, CMS logo). The Rep summary still
+   uses buildCompleteSummaryPdf above.
    ========================================================================= */
+
+// Weighted totals for a set of SOLD lots. Lots with no base weight still
+// count toward head and gross, but not toward pounds - no estimated
+// weights are substituted. Averages are null when their divisor is zero.
+function aggregateSold(rows){
+  let head = 0, gross = 0, lbs = 0, weighedHead = 0;
+  for(const r of rows){
+    const h = toNumber(r[CONFIG.COLS.head]);
+    const w = toNumber(r[CONFIG.COLS.baseWeight]);
+    head += h;
+    gross += calculateLotTotal(r);
+    if(w > 0){ lbs += h * w; weighedHead += h; }
+  }
+  return {
+    lots: rows.length, head, gross, lbs,
+    weighedHead,
+    avgWt:  weighedHead > 0 ? lbs / weighedHead : null,
+    // No priced/weighed head at all -> value is unknown, not $0.
+    avgHd:  head > 0 && weighedHead > 0 ? gross / head : null,
+    avgCwt: lbs > 0 ? (gross / lbs) * 100 : null,
+  };
+}
+
+// Group rows by party name. Names are matched case- and spacing-
+// insensitively so one buyer/consignor never appears twice.
+function groupByParty(rows, col){
+  const m = new Map();
+  for(const r of rows){
+    const name = safeStr(r[col]) || "(Unassigned)";
+    const key = name.toLowerCase();
+    if(!m.has(key)) m.set(key, { name, rows: [] });
+    m.get(key).rows.push(r);
+  }
+  return Array.from(m.values());
+}
+
+async function buildPartySummaryPdf({allRows, mode}){
+  assertLibsLoaded();
+  const { PDFDocument, StandardFonts, rgb } = window.PDFLib;
+
+  const pdfDoc = await PDFDocument.create();
+  const font      = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold  = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const serifBold = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
+
+  const W = 612, H = 792, M = 30;
+  const contentW = W - 2*M;
+  const FOOTER_Y = 22;
+  const BOTTOM = FOOTER_Y + 18;          // lowest y a row may reach
+
+  const NAVY     = rgb(0.098, 0.180, 0.306);
+  const GOLD     = rgb(0.784, 0.627, 0.290);
+  const GOLD_BG  = rgb(0.973, 0.941, 0.863);
+  const INK      = rgb(0.10, 0.11, 0.14);
+  const MUTED    = rgb(0.38, 0.40, 0.44);
+  const RULE     = rgb(0.85, 0.86, 0.88);
+  const HEAD_BG  = rgb(0.910, 0.918, 0.929);
+  const WHITE    = rgb(1,1,1);
+
+  const isBuyer = mode === "buyer";
+  const TITLE = isBuyer ? "COMPLETE BUYER SUMMARY" : "COMPLETE CONSIGNOR SUMMARY";
+  const SIZE = isBuyer ? 9 : 8;          // consignor table has 11 columns
+  const LINE_H = SIZE + 2.6;
+
+  /* ---------- data ---------- */
+  const DASH = "—";
+  const int   = n => formatNumber(Math.round(n));
+  const money = n => formatMoney(n);
+  const opt   = (v, f) => v === null || v === undefined ? DASH : f(v);
+  const wt    = v => opt(v, n => int(n));
+  const pctOf = (part, whole) => whole > 0 ? `${((part / whole) * 100).toFixed(1)}%` : DASH;
+
+  const soldRows = allRows.filter(r => !isPO(r));
+  const poRows   = allRows.filter(r => isPO(r));
+  const sold     = aggregateSold(soldRows);
+  const poHead   = poRows.reduce((s, r) => s + toNumber(r[CONFIG.COLS.head]), 0);
+
+  let cols, bodyRows, totalRow, poCols, poBody, poTotal;
+
+  if(isBuyer){
+    const buyers = groupByParty(soldRows, CONFIG.COLS.buyer)
+      .map(g => ({ name: g.name, ...aggregateSold(g.rows) }))
+      .sort((a,b) => b.head - a.head || a.name.localeCompare(b.name));
+    cols = [
+      { label: "#",         w: 22, align: "right" },
+      { label: "Buyer",     flex: true, align: "left" },
+      { label: "Lots",      w: 38, align: "right" },
+      { label: "Head",      w: 50, align: "right" },
+      { label: "Avg Wt",    w: 50, align: "right" },
+      { label: "Avg $/Hd",  w: 70, align: "right" },
+      { label: "Avg $/Cwt", w: 66, align: "right" },
+      { label: "Total $",   w: 92, align: "right" },
+    ];
+    bodyRows = buyers.map((b, i) => [
+      String(i+1), b.name, int(b.lots), int(b.head), wt(b.avgWt),
+      opt(b.avgHd, money), opt(b.avgCwt, money), b.weighedHead > 0 || b.head === 0 ? money(b.gross) : DASH,
+    ]);
+    totalRow = ["", "SOLD TOTALS", int(sold.lots), int(sold.head), wt(sold.avgWt),
+      opt(sold.avgHd, money), opt(sold.avgCwt, money), money(sold.gross)];
+    poCols = [
+      { label: "Status", flex: true, align: "left" },
+      { label: "Lots",   w: 120, align: "right" },
+      { label: "Head",   w: 140, align: "right" },
+    ];
+    poBody = [["PO / Scratch", int(poRows.length), int(poHead)]];
+    poTotal = null;
+  } else {
+    const consignors = groupByParty(allRows, CONFIG.COLS.consignor).map(g => {
+      const soldPart = g.rows.filter(r => !isPO(r));
+      const poPart   = g.rows.filter(r => isPO(r));
+      return {
+        name: g.name,
+        lotsAdv: g.rows.length,
+        headAdv: g.rows.reduce((s, r) => s + toNumber(r[CONFIG.COLS.head]), 0),
+        poLots: poPart.length,
+        poHead: poPart.reduce((s, r) => s + toNumber(r[CONFIG.COLS.head]), 0),
+        ...aggregateSold(soldPart),
+      };
+    }).sort((a,b) => b.head - a.head || b.headAdv - a.headAdv || a.name.localeCompare(b.name));
+    cols = [
+      { label: "#",          w: 18, align: "right" },
+      { label: "Consignor",  flex: true, align: "left" },
+      { label: "Lots\nAdv",   w: 32, align: "right" },
+      { label: "Lots\nSold",  w: 32, align: "right" },
+      { label: "Head\nAdv",   w: 42, align: "right" },
+      { label: "Head\nSold",  w: 42, align: "right" },
+      { label: "Sold\n%",     w: 40, align: "right" },
+      { label: "Avg\nWt",     w: 36, align: "right" },
+      { label: "Avg\n$/Hd",   w: 56, align: "right" },
+      { label: "Avg\n$/Cwt",  w: 52, align: "right" },
+      { label: "Total $",    w: 72, align: "right" },
+    ];
+    bodyRows = consignors.map((c, i) => [
+      String(i+1), c.name, int(c.lotsAdv), int(c.lots), int(c.headAdv), int(c.head),
+      pctOf(c.head, c.headAdv), wt(c.avgWt), opt(c.avgHd, money), opt(c.avgCwt, money),
+      c.weighedHead > 0 || c.head === 0 ? money(c.gross) : DASH,
+    ]);
+    const lotsAdv = allRows.length;
+    const headAdv = allRows.reduce((s, r) => s + toNumber(r[CONFIG.COLS.head]), 0);
+    totalRow = ["", "SOLD TOTALS", int(lotsAdv), int(sold.lots), int(headAdv), int(sold.head),
+      pctOf(sold.head, headAdv), wt(sold.avgWt), opt(sold.avgHd, money), opt(sold.avgCwt, money), money(sold.gross)];
+    poCols = [
+      { label: "Consignor", flex: true, align: "left" },
+      { label: "PO Lots",   w: 120, align: "right" },
+      { label: "PO Head",   w: 140, align: "right" },
+    ];
+    poBody = consignors.filter(c => c.poLots > 0)
+      .sort((a,b) => b.poHead - a.poHead || a.name.localeCompare(b.name))
+      .map(c => [c.name, int(c.poLots), int(c.poHead)]);
+    poTotal = ["PO TOTALS", int(poRows.length), int(poHead)];
+  }
+
+  /* ---------- page + drawing helpers ---------- */
+  const auctionTitleBase = safeStr(auctionName.value) || "Auction";
+  const extra = safeStr(auctionLabel.value);
+  const auctionTitle = extra ? `${auctionTitleBase} - ${extra}` : auctionTitleBase;
+  const dateLine = reportDateLine(auctionDate.value);
+  const subtitle = dateLine ? `${dateLine}   |   ${auctionTitle}` : auctionTitle;
+
+  let logoImg = null;
+  const logoBytes = await loadReportLogoBytes();
+  if(logoBytes){ try { logoImg = await pdfDoc.embedPng(logoBytes); } catch(e){ logoImg = null; } }
+
+  function widthOf(s, size, f=font){ return f.widthOfTextAtSize(String(s), size); }
+  function fit(s, maxW, size, f=font){
+    let t = safeStr(s);
+    if(widthOf(t, size, f) <= maxW) return t;
+    while(t.length > 1 && widthOf(t + "...", size, f) > maxW) t = t.slice(0, -1);
+    return t.trimEnd() + "...";
+  }
+  function text(s, x, y, {size=SIZE, f=font, color=INK, align="left"} = {}){
+    const w = widthOf(s, size, f);
+    const dx = align === "right" ? -w : align === "center" ? -w/2 : 0;
+    page.drawText(String(s), { x: x + dx, y, size, font: f, color });
+  }
+  function hline(x1, x2, y, color=RULE, thickness=0.5){
+    page.drawLine({ start:{x:x1, y}, end:{x:x2, y}, thickness, color });
+  }
+
+  let page, y;
+  function drawHeader(first){
+    const bandH = first ? 82 : 40;
+    page.drawRectangle({ x: 0, y: H - bandH, width: W, height: bandH, color: NAVY });
+    if(first){
+      let divX = M + 120;
+      if(logoImg){
+        const lh = 58, lw = lh * (logoImg.width / logoImg.height);
+        page.drawRectangle({ x: M, y: H - bandH/2 - lh/2 - 3, width: lw + 12, height: lh + 6, color: WHITE });
+        page.drawImage(logoImg, { x: M + 6, y: H - bandH/2 - lh/2, width: lw, height: lh });
+        divX = M + lw + 12 + 18;
+      }
+      page.drawRectangle({ x: divX, y: H - bandH + 16, width: 2, height: bandH - 32, color: GOLD });
+      const tx = divX + 18;
+      let ts = 22;
+      while(ts > 14 && widthOf(TITLE, ts, serifBold) > M + contentW - tx) ts -= 0.5;
+      text(TITLE, tx, H - 38, { size: ts, f: serifBold, color: WHITE });
+      text(fit(subtitle, M + contentW - tx, 11), tx, H - 58, { size: 11, color: WHITE });
+      y = H - bandH - 10;
+      hline(M, M + contentW, y, GOLD, 1);
+      y -= 14;
+    } else {
+      text(TITLE, M, H - 26, { size: 13, f: serifBold, color: WHITE });
+      const cont = fit(`${subtitle}  (continued)`, contentW - 24 - widthOf(TITLE, 13, serifBold), 9);
+      text(cont, M + contentW, H - 25, { size: 9, color: WHITE, align: "right" });
+      y = H - bandH - 14;
+    }
+  }
+  function sectionBar(title){
+    const h = 24;
+    page.drawRectangle({ x: M, y: y - h, width: contentW, height: h, color: NAVY });
+    text(title, M + 12, y - 17, { size: 14, f: serifBold, color: WHITE });
+    y -= h;
+  }
+  function newPage(first=false){
+    page = pdfDoc.addPage([W, H]);
+    drawHeader(first);
+  }
+
+  // Resolve column x positions for a table of the given total width.
+  function layout(colsDef, width){
+    const fixed = colsDef.reduce((s, c) => s + (c.flex ? 0 : c.w), 0);
+    let x = M;
+    return colsDef.map(c => {
+      const w = c.flex ? width - fixed : c.w;
+      const out = { ...c, x, w };
+      x += w;
+      return out;
+    });
+  }
+  const PAD = 6;
+  function cellX(c){ return c.align === "right" ? c.x + c.w - PAD : c.x + PAD; }
+
+  function headerH(cs){ return cs.some(c => c.label.includes("\n")) ? 28 : 20; }
+  function tableHeader(cs, width){
+    const h = headerH(cs);
+    page.drawRectangle({ x: M, y: y - h, width, height: h, color: HEAD_BG });
+    cs.forEach(c => {
+      const parts = c.label.split("\n");
+      const first = y - h/2 - SIZE*0.35 + (parts.length - 1) * LINE_H / 2;
+      parts.forEach((pt, i) => text(pt, cellX(c), first - i * LINE_H, { size: SIZE, f: fontBold, color: NAVY, align: c.align }));
+    });
+    y -= h;
+    hline(M, M + width, y, NAVY, 0.8);
+  }
+  function rowLines(cs, row){
+    // Only text (left-aligned) columns wrap; numbers never do.
+    return cs.map((c, i) => c.align === "left"
+      ? wrapLines(font, row[i], SIZE, c.w - 2*PAD).slice(0, 3)
+      : [row[i]]);
+  }
+  function rowHeight(lines){ return Math.max(17, Math.max(...lines.map(l => l.length)) * LINE_H + 5); }
+
+  function drawRow(cs, width, row, {total=false} = {}){
+    const lines = rowLines(cs, row);
+    const h = rowHeight(lines);
+    if(total){
+      page.drawRectangle({ x: M, y: y - h, width, height: h, color: GOLD_BG });
+      hline(M, M + width, y, GOLD, 1);
+    }
+    const f = total ? fontBold : font;
+    cs.forEach((c, i) => {
+      const firstBase = y - h/2 + (lines[i].length - 1) * LINE_H / 2 - SIZE * 0.36;
+      lines[i].forEach((ln, li) => {
+        const s = c.align === "left" && lines[i].length === 3 && li === 2 ? fit(ln, c.w - 2*PAD, SIZE, f) : ln;
+        const isLabel = total && c.align === "left" && ln;
+        text(s, cellX(c), firstBase - li * LINE_H, { size: isLabel ? SIZE + 2 : SIZE, f: isLabel ? serifBold : f, color: INK, align: c.align });
+      });
+    });
+    y -= h;
+    hline(M, M + width, y, total ? GOLD : RULE, total ? 1 : 0.5);
+  }
+
+  // Draw a table that continues across pages, repeating its header.
+  function drawTable(colsDef, width, rows, total){
+    const cs = layout(colsDef, width);
+    tableHeader(cs, width);
+    rows.forEach((row, idx) => {
+      const h = rowHeight(rowLines(cs, row));
+      // keep the last body row together with the totals row
+      const need = h + (idx === rows.length - 1 && total ? rowHeight(rowLines(cs, total)) : 0);
+      if(y - need < BOTTOM){ newPage(); tableHeader(cs, width); }
+      drawRow(cs, width, row);
+    });
+    if(total){
+      const h = rowHeight(rowLines(cs, total));
+      if(y - h < BOTTOM){ newPage(); tableHeader(cs, width); }
+      drawRow(cs, width, total, { total: true });
+    }
+  }
+  function tableHeight(colsDef, width, rows, total){
+    const cs = layout(colsDef, width);
+    return headerH(cs) + [...rows, ...(total ? [total] : [])].reduce((s, r) => s + rowHeight(rowLines(cs, r)), 0);
+  }
+
+  /* ---------- render ---------- */
+  newPage(true);
+  sectionBar(isBuyer ? "BUYER DETAIL" : "CONSIGNOR DETAIL");
+  drawTable(cols, contentW, bodyRows, totalRow);
+
+  // PO / Scratch section - kept together when it fits on one page.
+  const poWidth = contentW;
+  const poRowsToDraw = poBody.length ? poBody : [["None", "0", "0"]];
+  const poH = 20 + 24 + tableHeight(poCols, poWidth, poRowsToDraw, poTotal);
+  const freshPageRoom = (H - 40 - 14) - BOTTOM;
+  if(y - poH < BOTTOM && poH <= freshPageRoom){ newPage(); }
+  else { y -= 10; hline(M, M + contentW, y, GOLD, 1); y -= 10; }
+  sectionBar("PO / SCRATCH");
+  drawTable(poCols, poWidth, poRowsToDraw, poTotal);
+
+  // Footer + page numbers (numbers only when there is more than one page)
+  const pages = pdfDoc.getPages();
+  pages.forEach((p, i) => {
+    page = p;
+    hline(M, M + contentW, FOOTER_Y + 10, GOLD, 0.8);
+    text("CMS Livestock Auction", M, FOOTER_Y, { size: 7.5, color: MUTED });
+    if(pages.length > 1) text(`Page ${i+1} of ${pages.length}`, M + contentW, FOOTER_Y, { size: 7.5, color: MUTED, align: "right" });
+  });
+
+  return await pdfDoc.save();
+}
+
+
+/* =========================================================================
+   SPECIAL REPORT 6: AUCTION PERFORMANCE SUMMARY
+   Single portrait page laid out to the approved mockup:
+   header -> Gross Sales | Averages -> Overview | Key Metrics ->
+   Participation (3 cols) -> Cattle Mix | Delivery Schedule.
+   ========================================================================= */
+let _reportLogoBytes = null;
+async function loadReportLogoBytes(){
+  if(_reportLogoBytes) return _reportLogoBytes;
+  try {
+    const res = await fetch("assets/logo-report.png");
+    if(!res.ok) return null;
+    _reportLogoBytes = new Uint8Array(await res.arrayBuffer());
+    return _reportLogoBytes;
+  } catch(e){
+    return null; // report still renders without the logo
+  }
+}
+
+// "February 12th, 2026 @ 1:00PM" -> "February 12, 2026"
+function reportDateLine(raw){
+  return safeStr(raw)
+    .split("@")[0]
+    .replace(/(\d+)(st|nd|rd|th)\b/gi, "$1")
+    .replace(/\s+,/g, ",")
+    .trim();
+}
+
+// Month bucket for the delivery schedule. Unparseable text is kept as-is
+// so nothing is silently dropped from the totals.
+function deliveryMonthLabel(raw){
+  const s = safeStr(raw);
+  if(!s) return "";
+  const MONTHS = ["January","February","March","April","May","June",
+                  "July","August","September","October","November","December"];
+  const num = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(num){
+    const m = parseInt(num[1], 10);
+    if(m >= 1 && m <= 12) return MONTHS[m-1];
+  }
+  const txt = s.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+  if(txt) return MONTHS.find(m => m.toLowerCase() === txt[1].toLowerCase());
+  return s;
+}
+
 async function buildAuctionRecapPdf({allRows}){
   assertLibsLoaded();
   const { PDFDocument, StandardFonts, rgb } = window.PDFLib;
 
   const pdfDoc = await PDFDocument.create();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const font      = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold  = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const serifBold = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
 
-  const W = 612;
-  const H = 792;
-  const M = 36;
+  const W = 612, H = 792, M = 28;
   const contentW = W - 2*M;
+  const GAP = 14;
 
-  const BLACK = rgb(0,0,0);
-  const GRAY = rgb(0.55, 0.55, 0.55);
-  const DARK_GRAY = rgb(0.3,0.3,0.3);
-  const SECTION_BG = rgb(0.94, 0.94, 0.94);
+  // CMS palette
+  const NAVY     = rgb(0.098, 0.180, 0.306);   // #192E4E
+  const GOLD     = rgb(0.784, 0.627, 0.290);   // #C8A04A
+  const INK      = rgb(0.10, 0.11, 0.14);
+  const MUTED    = rgb(0.30, 0.32, 0.36);
+  const BORDER   = rgb(0.78, 0.80, 0.83);
+  const RULE     = rgb(0.86, 0.87, 0.89);
+  const PANEL_BG = rgb(0.957, 0.961, 0.969);
+  const HEAD_BG  = rgb(0.902, 0.910, 0.922);
+  const ROW_ALT  = rgb(0.957, 0.961, 0.969);
+  const WHITE    = rgb(1,1,1);
 
-  let page = pdfDoc.addPage([W,H]);
-  let y = H - 50;
-  let pageNum = 1;
+  const page = pdfDoc.addPage([W,H]);
+
+  /* ---------- drawing helpers ---------- */
+  function fontFor(kind){ return kind === "serif" ? serifBold : kind === "bold" ? fontBold : font; }
+  function text(str, x, y, {size=9, kind="regular", color=INK, align="left"} = {}){
+    const s = String(str ?? "");
+    const f = fontFor(kind);
+    const w = f.widthOfTextAtSize(s, size);
+    const dx = align === "right" ? -w : align === "center" ? -w/2 : 0;
+    page.drawText(s, { x: x + dx, y, size, font: f, color });
+    return w;
+  }
+  function widthOf(str, size, kind="regular"){ return fontFor(kind).widthOfTextAtSize(String(str), size); }
+  function fit(str, maxW, size, kind="regular"){
+    let s = safeStr(str);
+    if(widthOf(s, size, kind) <= maxW) return s;
+    while(s.length > 1 && widthOf(s + "...", size, kind) > maxW) s = s.slice(0, -1);
+    return s.trimEnd() + "...";
+  }
+  // Wrap to at most `max` lines; the last line is truncated if needed.
+  function wrapMax(str, maxW, size, max=2){
+    const lines = wrapLines(font, str, size, maxW);
+    if(lines.length <= max) return lines;
+    const out = lines.slice(0, max);
+    out[max-1] = fit(lines.slice(max-1).join(" "), maxW, size);
+    return out;
+  }
+  function rect(x, yTop, w, h, {fill, border, bw=0.75} = {}){
+    page.drawRectangle({ x, y: yTop - h, width: w, height: h,
+      ...(fill ? { color: fill } : {}), ...(border ? { borderColor: border, borderWidth: bw } : {}) });
+  }
+  function hline(x1, x2, y, color=RULE, thickness=0.6){
+    page.drawLine({ start:{x:x1, y}, end:{x:x2, y}, thickness, color });
+  }
+  function vline(x, y1, y2, color=RULE, thickness=0.6){
+    page.drawLine({ start:{x, y:y1}, end:{x, y:y2}, thickness, color });
+  }
+  const BAR_H = 24;
+  function sectionBar(x, yTop, w, title){
+    rect(x, yTop, w, BAR_H, { fill: NAVY });
+    text(title.toUpperCase(), x + 12, yTop - 17, { size: 14, kind: "serif", color: WHITE });
+    return yTop - BAR_H;
+  }
+  // Grid table: gray header row, full cell borders.
+  // cols: [{label, w (fraction), align, kind}]; rows: [[...cells]]
+  function gridTable(x, yTop, w, cols, rows, {headH=22, rowH=22, size=10} = {}){
+    const xs = []; let cx = x;
+    cols.forEach(c => { xs.push(cx); cx += c.w * w; });
+    rect(x, yTop, w, headH, { fill: HEAD_BG });
+    cols.forEach((c, i) => {
+      if(!c.label) return;
+      const tx = c.align === "right" ? xs[i] + c.w*w - 10 : c.align === "center" ? xs[i] + c.w*w/2 : xs[i] + 10;
+      text(c.label, tx, yTop - headH/2 - 3.5, { size: size, kind: "bold", color: INK, align: c.align });
+    });
+    let yy = yTop - headH;
+    rows.forEach((row) => {
+      hline(x, x + w, yy, BORDER);
+      cols.forEach((c, i) => {
+        const cw = c.w * w;
+        const tx = c.align === "right" ? xs[i] + cw - 10 : c.align === "center" ? xs[i] + cw/2 : xs[i] + 10;
+        const val = c.align === "left" ? fit(row[i], cw - 16, size, c.kind || "regular") : row[i];
+        text(val, tx, yy - rowH/2 - size*0.35, { size, kind: c.kind || "regular", color: INK, align: c.align });
+      });
+      yy -= rowH;
+    });
+    for(let i = 1; i < xs.length; i++) vline(xs[i], yTop, yy, BORDER);
+    return yy;
+  }
+  // Icons on a 24-unit grid (SVG coords, y down from top-left).
+  function gavelIcon(x, yTop, size, color){
+    const scale = size / 24;
+    page.drawSvgPath("M6.2 9.6 L11.6 4.2 L16.2 8.8 L10.8 14.2 Z", { x, y: yTop, scale, color });
+    page.drawSvgPath("M10.6 2.6 L13.2 0 L17.8 4.6 L15.2 7.2 Z", { x, y: yTop, scale, color });
+    page.drawSvgPath("M4.6 11.2 L7.2 8.6 L11.8 13.2 L9.2 15.8 Z", { x, y: yTop, scale, color });
+    page.drawSvgPath("M13.4 10.4 L14.8 9 L23.4 17.6 L22 19 Z", { x, y: yTop, scale, color });
+    page.drawSvgPath("M1 19.2 L13 19.2 L14 21.4 L14 23.6 L0 23.6 L0 21.4 Z", { x, y: yTop, scale, color });
+  }
+  function cowIcon(x, yTop, size, color){
+    const scale = size / 24;
+    page.drawSvgPath(
+      "M6.4 7.2 C5.2 5.4 3 4.8 0.8 5.6 C1.2 8.2 3.4 9.6 6 9.6 L7.6 16.8 C8 19.8 9.8 21.6 12 21.6 " +
+      "C14.2 21.6 16 19.8 16.4 16.8 L18 9.6 C20.6 9.6 22.8 8.2 23.2 5.6 C21 4.8 18.8 5.4 17.6 7.2 " +
+      "C16.2 5.8 14.2 5 12 5 C9.8 5 7.8 5.8 6.4 7.2 Z",
+      { x, y: yTop, scale, borderColor: color, borderWidth: 1.4 });
+    page.drawSvgPath("M8.4 18.2 C9.4 17.2 14.6 17.2 15.6 18.2", { x, y: yTop, scale, borderColor: color, borderWidth: 1.2 });
+  }
+
+  /* ---------- metrics ---------- */
+  const H_COL = CONFIG.COLS.head;
+  const head = r => toNumber(r[H_COL]);
+  const lbs  = r => toNumber(r[H_COL]) * toNumber(r[CONFIG.COLS.baseWeight]);
+  const sum  = (rows, fn) => rows.reduce((s, r) => s + fn(r), 0);
+  const pct  = (part, whole) => whole > 0 ? `${((part / whole) * 100).toFixed(1)}%` : "0.0%";
+
+  const soldRows = allRows.filter(r => !isPO(r));
+
+  const lotsAdv = allRows.length,       lotsSold = soldRows.length;
+  const headAdv = sum(allRows, head),    headSold = sum(soldRows, head);
+  const lbsAdv  = sum(allRows, lbs),     lbsSold  = sum(soldRows, lbs);
+
+  const grossSales = sum(soldRows, calculateLotTotal);
+  const avgPerHead = headSold > 0 ? grossSales / headSold : 0;
+
+  const prices = soldRows.map(r => toNumber(r[CONFIG.COLS.price])).filter(p => p > 0);
+  // Weighted: gross / sold lbs x 100 (matches Buyer/Consignor summaries).
+  const avgPrice = aggregateSold(soldRows).avgCwt || 0;
+  const minPrice = prices.length ? Math.min(...prices) : 0;
+  const maxPrice = prices.length ? Math.max(...prices) : 0;
+
+  const weights = soldRows.map(r => toNumber(r[CONFIG.COLS.baseWeight])).filter(w => w > 0);
+  const minWt = weights.length ? Math.min(...weights) : 0;
+  const maxWt = weights.length ? Math.max(...weights) : 0;
+  const avgWt = aggregateSold(soldRows).avgWt || 0;   // weighed head only
+
+  const downMoney = sum(soldRows, r => toNumber(r[CONFIG.COLS.downMoney]));
+
+  const buyers     = new Set(soldRows.map(r => safeStr(r[CONFIG.COLS.buyer])).filter(Boolean));
+  const consignors = new Set(allRows.map(r => safeStr(r[CONFIG.COLS.consignor])).filter(Boolean));
+  const reps       = new Set(allRows.map(r => safeStr(getRepColumn(r))).filter(Boolean));
+
+  function topByHead(keyFn, n=3){
+    const m = new Map();
+    for(const r of soldRows){
+      const k = safeStr(keyFn(r));
+      if(!k) continue;
+      m.set(k, (m.get(k) || 0) + head(r));
+    }
+    return Array.from(m.entries()).sort((a,b) => b[1] - a[1]).slice(0, n);
+  }
+  const topBuyers     = topByHead(r => r[CONFIG.COLS.buyer]);
+  const topConsignors = topByHead(r => r[CONFIG.COLS.consignor]);
+  const topReps       = topByHead(r => getRepColumn(r));
+  const typeMix       = topByHead(r => safeStr(r[CONFIG.COLS.type]) || "Other", Infinity);
+
+  const MONTH_ORDER = ["January","February","March","April","May","June",
+                       "July","August","September","October","November","December"];
+  const byMonth = new Map();
+  for(const r of soldRows){
+    const raw = r["Delivery Start Date"] || r[CONFIG.COLS.delivery];
+    const label = deliveryMonthLabel(raw);
+    if(!label) continue;
+    byMonth.set(label, (byMonth.get(label) || 0) + head(r));
+  }
+  const delivery = Array.from(byMonth.entries()).sort((a,b) => {
+    const ai = MONTH_ORDER.indexOf(a[0]), bi = MONTH_ORDER.indexOf(b[0]);
+    if(ai >= 0 && bi >= 0) return ai - bi;
+    if(ai >= 0) return -1;
+    if(bi >= 0) return 1;
+    return b[1] - a[1];
+  });
+
+  const money = n => formatMoney(n);
+  const num   = n => formatNumber(Math.round(n));
 
   const auctionTitleBase = safeStr(auctionName.value) || "Auction";
   const extra = safeStr(auctionLabel.value);
-  const auctionTitle = extra ? `${auctionTitleBase} — ${extra}` : auctionTitleBase;
-  const aDate = safeStr(auctionDate.value) || "";
+  const auctionTitle = extra ? `${auctionTitleBase} - ${extra}` : auctionTitleBase;
+  const dateLine = reportDateLine(auctionDate.value);
 
-  function newPage(){
-    pageNum++;
-    page = pdfDoc.addPage([W,H]);
-    y = H - 50;
-    // Add page number
-    page.drawText(`Page ${pageNum}`, { x:W/2-15, y:20, size:8, font, color:GRAY });
-  }
-
-  function drawSectionHeader(text){
-    if(y < 60){ newPage(); }
-    page.drawRectangle({ x:M, y:y-14, width:contentW, height:14, color:SECTION_BG, borderWidth:0 });
-    page.drawText(text, { x:M+4, y:y-10, size:9, font:fontBold, color:BLACK });
-    y -= 18;
-  }
-
-  function drawLine(label, value){
-    if(y < 30){ newPage(); }
-    page.drawText(label, { x:M+10, y:y-9, size:8.5, font, color:BLACK });
-    page.drawText(value, { x:M+250, y:y-9, size:8.5, font:fontBold, color:BLACK });
-    y -= 11;
-  }
-
-  // Header
-  page.drawText("AUCTION RECAP SUMMARY", { x:M, y, size:14, font:fontBold, color:BLACK });
-  y -= 16;
-  page.drawText(auctionTitle, { x:M, y, size:10, font:fontBold, color:DARK_GRAY });
-  y -= 12;
-  if(aDate){ page.drawText(aDate, { x:M, y, size:9, font, color:DARK_GRAY }); y -= 16; }
-  else { y -= 10; }
-
-  page.drawLine({ start:{x:M, y}, end:{x:M+contentW, y}, thickness:1, color:GRAY });
-  y -= 15;
-
-  // Calculate all metrics
-  const soldRows = allRows.filter(r => !isPO(r));
-  const poRows = allRows.filter(r => isPO(r));
-
-  const totalLotsOffered = allRows.length;
-  const totalLotsSold = soldRows.length;
-  const sellThroughPct = totalLotsOffered > 0 ? ((totalLotsSold / totalLotsOffered) * 100).toFixed(1) : "0.0";
-
-  const totalHeadOffered = allRows.reduce((sum, r) => sum + toNumber(r[CONFIG.COLS.head]), 0);
-  const totalHeadSold = soldRows.reduce((sum, r) => sum + toNumber(r[CONFIG.COLS.head]), 0);
-  const headSoldPct = totalHeadOffered > 0 ? ((totalHeadSold / totalHeadOffered) * 100).toFixed(1) : "0.0";
-
-  const lotsPO = poRows.length;
-  const headPO = poRows.reduce((sum, r) => sum + toNumber(r[CONFIG.COLS.head]), 0);
-
-  const grossSales = soldRows.reduce((sum, r) => sum + calculateLotTotal(r), 0);
-  
-  const prices = soldRows.map(r => toNumber(r[CONFIG.COLS.price])).filter(p => p > 0);
-  const avgPrice = prices.length > 0 ? (prices.reduce((s,p)=>s+p,0) / prices.length).toFixed(2) : "0.00";
-  const minPrice = prices.length > 0 ? Math.min(...prices).toFixed(2) : "0.00";
-  const maxPrice = prices.length > 0 ? Math.max(...prices).toFixed(2) : "0.00";
-
-  const totalDownMoney = soldRows.reduce((sum, r) => sum + toNumber(r[CONFIG.COLS.downMoney]), 0);
-
-  const buyers = new Set(soldRows.map(r => safeStr(r[CONFIG.COLS.buyer])).filter(Boolean));
-  const consignors = new Set(allRows.map(r => safeStr(r[CONFIG.COLS.consignor])).filter(Boolean));
-  const reps = new Set(allRows.map(r => getRepColumn(r)).filter(Boolean));
-
-  // AUCTION OVERVIEW
-  drawSectionHeader("AUCTION OVERVIEW");
-  drawLine("Total Lots Offered:", formatNumber(totalLotsOffered));
-  drawLine("Total Lots Sold:", formatNumber(totalLotsSold));
-  drawLine("Sell-Through Rate:", `${sellThroughPct}%`);
-  y -= 4;
-  drawLine("Total Head Offered:", formatNumber(totalHeadOffered));
-  drawLine("Total Head Sold:", formatNumber(totalHeadSold));
-  drawLine("Head Sold Rate:", `${headSoldPct}%`);
-  y -= 4;
-  drawLine("Lots Passed/PO:", `${formatNumber(lotsPO)} (${((lotsPO/totalLotsOffered)*100).toFixed(1)}%)`);
-  drawLine("Head Passed/PO:", `${formatNumber(headPO)} (${((headPO/totalHeadOffered)*100).toFixed(1)}%)`);
-  y -= 8;
-
-  // FINANCIAL SUMMARY
-  drawSectionHeader("FINANCIAL SUMMARY");
-  drawLine("Gross Sales:", formatMoney(grossSales));
-  drawLine("Average Price (all sold):", `$${avgPrice}/cwt`);
-  drawLine("Price Range:", `$${minPrice} - $${maxPrice}/cwt`);
-  if(totalDownMoney > 0){
-    drawLine("Total Down Money Due:", formatMoney(totalDownMoney));
-  }
-  y -= 8;
-
-  // PARTICIPATION
-  drawSectionHeader("PARTICIPATION");
-  drawLine("Number of Buyers:", buyers.size.toString());
-  drawLine("Number of Consignors:", consignors.size.toString());
-  drawLine("Number of Representatives:", reps.size.toString());
-  y -= 8;
-
-  // TOP 3 BUYERS
-  drawSectionHeader("TOP 3 BUYERS");
-  const byBuyer = new Map();
-  for(const r of soldRows){
-    const buyer = safeStr(r[CONFIG.COLS.buyer]);
-    if(!buyer) continue;
-    if(!byBuyer.has(buyer)) byBuyer.set(buyer, 0);
-    byBuyer.set(buyer, byBuyer.get(buyer) + toNumber(r[CONFIG.COLS.head]));
-  }
-  const topBuyers = Array.from(byBuyer.entries())
-    .sort((a,b) => b[1] - a[1])
-    .slice(0, 3);
-  
-  for(let i=0; i<topBuyers.length; i++){
-    const [buyer, head] = topBuyers[i];
-    drawLine(`${i+1}. ${buyer}:`, `${formatNumber(head)} head`);
-  }
-  y -= 8;
-
-  // TOP 3 CONSIGNORS
-  drawSectionHeader("TOP 3 CONSIGNORS");
-  const byConsignor = new Map();
-  for(const r of soldRows){
-    const consignor = safeStr(r[CONFIG.COLS.consignor]);
-    if(!consignor) continue;
-    if(!byConsignor.has(consignor)) byConsignor.set(consignor, 0);
-    byConsignor.set(consignor, byConsignor.get(consignor) + toNumber(r[CONFIG.COLS.head]));
-  }
-  const topConsignors = Array.from(byConsignor.entries())
-    .sort((a,b) => b[1] - a[1])
-    .slice(0, 3);
-  
-  for(let i=0; i<topConsignors.length; i++){
-    const [consignor, head] = topConsignors[i];
-    drawLine(`${i+1}. ${consignor}:`, `${formatNumber(head)} head`);
-  }
-  y -= 8;
-
-  // TOP 3 REPS
-  drawSectionHeader("TOP 3 REPS");
-  const byRep = new Map();
-  for(const r of soldRows){
-    const rep = getRepColumn(r);
-    if(!rep) continue;
-    if(!byRep.has(rep)) byRep.set(rep, {head:0, sales:0});
-    const stats = byRep.get(rep);
-    stats.head += toNumber(r[CONFIG.COLS.head]);
-    stats.sales += calculateLotTotal(r);
-  }
-  const topReps = Array.from(byRep.entries())
-    .sort((a,b) => b[1].sales - a[1].sales)
-    .slice(0, 3);
-  
-  for(let i=0; i<topReps.length; i++){
-    const [rep, stats] = topReps[i];
-    drawLine(`${i+1}. ${rep}:`, `${formatNumber(stats.head)} head, ${formatMoney(stats.sales)}`);
-  }
-  y -= 8;
-
-  // CATTLE BREAKDOWN
-  if(y < 80){ newPage(); }
-  drawSectionHeader("CATTLE BREAKDOWN");
-  
-  // By Type
-  const headByType = new Map();
-  for(const r of soldRows){
-    const type = safeStr(r[CONFIG.COLS.type]) || "Other";
-    headByType.set(type, (headByType.get(type) || 0) + toNumber(r[CONFIG.COLS.head]));
-  }
-  const sortedByType = Array.from(headByType.entries()).sort((a,b) => b[1] - a[1]);
-  
-  page.drawText("By Type:", { x:M+10, y:y-9, size:8.5, font:fontBold, color:BLACK });
-  y -= 11;
-  for(const [type, head] of sortedByType){
-    if(y < 40){ newPage(); }
-    const pct = ((head / totalHeadSold) * 100).toFixed(1);
-    page.drawText(`  ${type}:`, { x:M+15, y:y-8, size:8, font, color:BLACK });
-    page.drawText(`${formatNumber(head)} head (${pct}%)`, { x:M+150, y:y-8, size:8, font, color:DARK_GRAY });
-    y -= 10;
-  }
-  y -= 4;
-
-  // By Sex
-  const headBySex = new Map();
-  for(const r of soldRows){
-    const sex = safeStr(r[CONFIG.COLS.sex]) || "Unknown";
-    headBySex.set(sex, (headBySex.get(sex) || 0) + toNumber(r[CONFIG.COLS.head]));
-  }
-  const sortedBySex = Array.from(headBySex.entries()).sort((a,b) => b[1] - a[1]);
-  
-  if(y < 50){ newPage(); }
-  page.drawText("By Sex:", { x:M+10, y:y-9, size:8.5, font:fontBold, color:BLACK });
-  y -= 11;
-  for(const [sex, head] of sortedBySex){
-    if(y < 40){ newPage(); }
-    const pct = ((head / totalHeadSold) * 100).toFixed(1);
-    page.drawText(`  ${sex}:`, { x:M+15, y:y-8, size:8, font, color:BLACK });
-    page.drawText(`${formatNumber(head)} head (${pct}%)`, { x:M+150, y:y-8, size:8, font, color:DARK_GRAY });
-    y -= 10;
-  }
-  y -= 8;
-
-  // DELIVERY SCHEDULE (by month from Delivery Start Date column)
-  if(y < 80){ newPage(); }
-  drawSectionHeader("DELIVERY SCHEDULE");
-  
-  // Extract month/year from Delivery Start Date column
-  const headByMonth = new Map();
-  for(const r of soldRows){
-    // Try to get delivery start date, fall back to delivery if not present
-    const deliveryStartDate = safeStr(r["Delivery Start Date"]) || safeStr(r[CONFIG.COLS.delivery]);
-    if(!deliveryStartDate) continue;
-    
-    // Try to parse as date and extract month/year
-    let monthYear = deliveryStartDate;
+  /* ---------- 1. HEADER ---------- */
+  let y = H - 26;
+  const LOGO_H = 52;
+  let logoRight = M;
+  const logoBytes = await loadReportLogoBytes();
+  if(logoBytes){
     try {
-      // Try to parse date formats like "1/16/2026" or "January 16, 2026" or "January 2026"
-      const dateMatch = deliveryStartDate.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-      if(dateMatch){
-        const month = parseInt(dateMatch[1]);
-        const year = dateMatch[2];
-        const monthNames = ["January", "February", "March", "April", "May", "June", 
-                           "July", "August", "September", "October", "November", "December"];
-        monthYear = `${monthNames[month-1]} ${year}`;
-      } else {
-        // Try to extract month name and year from text
-        const textMatch = deliveryStartDate.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s*(\d{4})?/i);
-        if(textMatch){
-          monthYear = textMatch[2] ? `${textMatch[1]} ${textMatch[2]}` : textMatch[1];
-        } else {
-          // Just use as-is if we can't parse it
-          monthYear = deliveryStartDate;
-        }
-      }
-    } catch(e){
-      monthYear = deliveryStartDate;
-    }
-    
-    headByMonth.set(monthYear, (headByMonth.get(monthYear) || 0) + toNumber(r[CONFIG.COLS.head]));
+      const img = await pdfDoc.embedPng(logoBytes);
+      const logoW = LOGO_H * (img.width / img.height);
+      page.drawImage(img, { x: M + 6, y: y - LOGO_H, width: logoW, height: LOGO_H });
+      logoRight = M + 6 + logoW;
+    } catch(e){ /* text-only header */ }
   }
-  
-  const sortedByMonth = Array.from(headByMonth.entries()).sort((a,b) => {
-    // Sort by month order if possible
-    const monthOrder = {
-      "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6,
-      "July": 7, "August": 8, "September": 9, "October": 10, "November": 11, "December": 12
-    };
-    const aMonth = a[0].match(/January|February|March|April|May|June|July|August|September|October|November|December/i);
-    const bMonth = b[0].match(/January|February|March|April|May|June|July|August|September|October|November|December/i);
-    if(aMonth && bMonth){
-      return monthOrder[aMonth[0]] - monthOrder[bMonth[0]];
-    }
-    return b[1] - a[1]; // fallback to head count
+  const divX = Math.max(logoRight + 22, M + 150);
+  vline(divX, y - 2, y - LOGO_H + 2, GOLD, 1.5);
+  const titleX = divX + 22;
+  const titleMaxW = M + contentW - titleX;
+  let titleSize = 22;
+  while(titleSize > 14 && widthOf("AUCTION PERFORMANCE SUMMARY", titleSize, "serif") > titleMaxW) titleSize -= 0.5;
+  text("AUCTION PERFORMANCE SUMMARY", titleX, y - 24, { size: titleSize, kind: "serif", color: NAVY });
+  const subtitle = dateLine ? `${dateLine}   |   ${auctionTitle}` : auctionTitle;
+  text(fit(subtitle, titleMaxW, 12), titleX, y - 46, { size: 12, color: INK });
+
+  y -= LOGO_H + 10;
+  hline(M, M + contentW, y, GOLD, 1.5);
+  y -= 12;
+
+  /* ---------- 2. TOP ROW: Gross Sales | Averages ---------- */
+  const colW = (contentW - GAP) / 2;
+  const leftX = M, rightX = M + colW + GAP;
+  const TOP_H = 98;
+
+  // Left: Gross Sales
+  rect(leftX, y, colW, TOP_H, { fill: PANEL_BG, border: BORDER });
+  gavelIcon(leftX + 16, y - 30, 40, GOLD);
+  const gDiv = leftX + 70;
+  vline(gDiv, y - 22, y - TOP_H + 22, BORDER, 0.9);
+  text("GROSS SALES", gDiv + 14, y - 37, { size: 15, kind: "serif", color: INK });
+  const grossStr = money(grossSales);
+  let grossSize = 30;
+  while(grossSize > 16 && widthOf(grossStr, grossSize, "serif") > colW - (gDiv - leftX) - 26) grossSize -= 0.5;
+  text(grossStr, gDiv + 14, y - 70, { size: grossSize, kind: "serif", color: INK });
+
+  // Right: Avg $/Hd + Avg $/Cwt, then four counts
+  rect(rightX, y, colW, TOP_H, { fill: PANEL_BG, border: BORDER });
+  cowIcon(rightX + 10, y - TOP_H/2 + 20, 40, INK);
+  const iDiv = rightX + 60;
+  vline(iDiv, y - 12, y - TOP_H + 12, BORDER, 0.9);
+  const avgW = (rightX + colW - iDiv) / 2;
+  const avgC1 = iDiv + avgW / 2, avgC2 = iDiv + avgW * 1.5;
+  vline(iDiv + avgW, y - 12, y - 48, GOLD, 1.2);
+  text("Avg $/Hd",  avgC1, y - 20, { size: 12, kind: "serif", color: INK, align: "center" });
+  text("Avg $/Cwt", avgC2, y - 20, { size: 12, kind: "serif", color: INK, align: "center" });
+  const avgSize = Math.min(22, ...[money(avgPerHead), money(avgPrice)].map(s => 22 * (avgW - 12) / widthOf(s, 22, "serif")));
+  text(money(avgPerHead), avgC1, y - 44, { size: avgSize, kind: "serif", color: INK, align: "center" });
+  text(money(avgPrice),   avgC2, y - 44, { size: avgSize, kind: "serif", color: INK, align: "center" });
+  hline(iDiv + 8, rightX + colW - 8, y - 56, BORDER);
+  const counts = [
+    ["Head", "Advertised", num(headAdv)],
+    ["Head", "Sold",       num(headSold)],
+    ["Lbs",  "Advertised", num(lbsAdv)],
+    ["Lbs",  "Sold",       num(lbsSold)],
+  ];
+  const cntX = iDiv + 4;
+  const cntW = (rightX + colW - 4 - cntX) / counts.length;
+  counts.forEach(([l1, l2, val], i) => {
+    const cx = cntX + i * cntW + cntW / 2;
+    if(i > 0) vline(cntX + i * cntW, y - 62, y - TOP_H + 8, BORDER);
+    text(l1, cx, y - 67, { size: 7.5, color: MUTED, align: "center" });
+    text(l2, cx, y - 76, { size: 7.5, color: MUTED, align: "center" });
+    const vs = Math.min(11.5, 11.5 * (cntW - 6) / widthOf(val, 11.5, "serif"));
+    text(val, cx, y - 90, { size: vs, kind: "serif", color: INK, align: "center" });
   });
-  
-  for(const [month, head] of sortedByMonth){
-    if(y < 40){ newPage(); }
-    page.drawText(`  ${month}:`, { x:M+15, y:y-8, size:8, font, color:BLACK });
-    page.drawText(`${formatNumber(head)} head`, { x:M+150, y:y-8, size:8, font, color:DARK_GRAY });
-    y -= 10;
+
+  y -= TOP_H + GAP;
+
+  /* ---------- 3. MIDDLE ROW: Overview table | Key Metrics ---------- */
+  const metricRows = [
+    ["Gross Sales:",    money(grossSales)],
+    ["Weight Range:",   minWt ? `${num(minWt)}–${num(maxWt)} lb` : "-"],
+    ["Avg Weight:",     avgWt ? `${num(avgWt)} lb` : "-"],
+    ["Price Range:",    prices.length ? `${money(minPrice)} – ${money(maxPrice)}/cwt` : "-"],
+    ["Average Price:",  prices.length ? `${money(avgPrice)}/cwt` : "-"],
+    ["Down Money Due:", money(downMoney)],
+  ];
+  const KM_ROW = 18;
+  const MID_BODY = metricRows.length * KM_ROW;
+  const MID_H = BAR_H + MID_BODY;
+
+  // Left: Auction Overview
+  rect(leftX, y, colW, MID_H, { border: BORDER });
+  let ty = sectionBar(leftX, y, colW, "Auction Overview");
+  const ovHead = 30, ovRow = (MID_BODY - ovHead) / 3;
+  gridTable(leftX, ty, colW, [
+    { label: "",           w: 0.22, align: "left",  kind: "bold" },
+    { label: "Advertised", w: 0.28, align: "right" },
+    { label: "Sold",       w: 0.26, align: "right" },
+    { label: "PO %",       w: 0.24, align: "right" },
+  ], [
+    ["Head", num(headAdv), num(headSold), pct(headAdv - headSold, headAdv)],
+    ["Lbs",  num(lbsAdv),  num(lbsSold),  pct(lbsAdv - lbsSold, lbsAdv)],
+    ["Lots", num(lotsAdv), num(lotsSold), pct(lotsAdv - lotsSold, lotsAdv)],
+  ], { headH: ovHead, rowH: ovRow, size: 10.5 });
+
+  // Right: Key Metrics
+  rect(rightX, y, colW, MID_H, { border: BORDER });
+  ty = sectionBar(rightX, y, colW, "Key Metrics");
+  metricRows.forEach(([label, val], i) => {
+    if(i % 2 === 0) rect(rightX + 0.5, ty, colW - 1, KM_ROW, { fill: ROW_ALT });
+    const base = ty - KM_ROW / 2 - 3.6;
+    text(label, rightX + 14, base, { size: 10, color: INK });
+    text(val, rightX + colW - 14, base, { size: 10, color: INK, align: "right" });
+    ty -= KM_ROW;
+    if(i < metricRows.length - 1) hline(rightX, rightX + colW, ty, RULE);
+  });
+
+  y -= MID_H + GAP;
+
+  /* ---------- 4. PARTICIPATION (full width, 3 equal columns) ---------- */
+  const pColW = contentW / 3;
+  const P_SIZE = 10;
+  const P_LINE = 12;
+  const partCols = [
+    { title: "Buyers",     count: buyers.size,     top: topBuyers },
+    { title: "Consignors", count: consignors.size, top: topConsignors },
+    { title: "Reps",       count: reps.size,       top: topReps },
+  ].map(col => {
+    const padL = 16, padR = 16;
+    const items = [0,1,2].map(i => {
+      const e = col.top[i];
+      if(!e) return { lines: ["—"], hd: "" };
+      const hd = `${num(e[1])} hd`;
+      const nameW = pColW - padL - padR - 18 - widthOf(hd, P_SIZE) - 10;
+      return { lines: wrapMax(e[0], nameW, P_SIZE, 2), hd };
+    });
+    return { ...col, items, padL, padR };
+  });
+  const rowHeights = [0,1,2].map(i => Math.max(...partCols.map(c => 8 + c.items[i].lines.length * P_LINE)));
+  const P_TOP = 60;
+  const PART_H = BAR_H + P_TOP + rowHeights.reduce((s,h) => s+h, 0) + 6;
+  rect(M, y, contentW, PART_H, { fill: PANEL_BG, border: BORDER });
+  ty = sectionBar(M, y, contentW, "Participation");
+  partCols.forEach((col, ci) => {
+    const cx = M + ci * pColW;
+    const mid = cx + pColW / 2;
+    if(ci > 0) vline(cx, ty - 12, y - PART_H + 12, GOLD, 1.2);
+    text(num(col.count), mid, ty - 27, { size: 24, kind: "serif", color: INK, align: "center" });
+    text(col.title, mid, ty - 44, { size: 13, kind: "serif", color: INK, align: "center" });
+    const lx = cx + col.padL, rx = cx + pColW - col.padR;
+    hline(lx, rx, ty - 52, GOLD, 1);
+    let ry = ty - P_TOP + 2;
+    col.items.forEach((it, i) => {
+      const rh = rowHeights[i];
+      const firstBase = ry - (rh - it.lines.length * P_LINE) / 2 - P_SIZE + 1;
+      text(`${i+1}.`, lx, firstBase, { size: P_SIZE, color: INK });
+      it.lines.forEach((ln, li) => text(ln, lx + 18, firstBase - li * P_LINE, { size: P_SIZE, color: INK }));
+      if(it.hd){
+        const midBase = ry - rh / 2 - P_SIZE * 0.35;
+        text(it.hd, rx, midBase, { size: P_SIZE, color: INK, align: "right" });
+      }
+      ry -= rh;
+      if(i < 2) hline(lx + 16, rx, ry, BORDER);
+    });
+  });
+
+  y -= PART_H + GAP;
+
+  /* ---------- 6. FOOTER (reserve space first) ---------- */
+  const FOOT_Y = 22;
+  hline(M, M + contentW, FOOT_Y + 22, GOLD, 1.2);
+  const footer = `CMS LIVESTOCK AUCTION   |   ${(dateLine || "").toUpperCase()}`.replace(/\s+\|\s+$/, "");
+  const fSize = 9.5, track = 1.6;
+  const chars = footer.split("");
+  const fW = chars.reduce((s, ch) => s + widthOf(ch, fSize) + track, -track);
+  let fx = W / 2 - fW / 2;
+  for(const ch of chars){ text(ch, fx, FOOT_Y, { size: fSize, color: NAVY }); fx += widthOf(ch, fSize) + track; }
+  hline(M + 10, W/2 - fW/2 - 18, FOOT_Y + 3, GOLD, 1);
+  hline(W/2 + fW/2 + 18, M + contentW - 10, FOOT_Y + 3, GOLD, 1);
+
+  /* ---------- 5. BOTTOM ROW: Cattle Mix | Delivery Schedule ---------- */
+  const mixW = contentW * 0.615 - GAP / 2;
+  const delW = contentW - mixW - GAP;
+  const delX = M + mixW + GAP;
+  const bottomH = y - (FOOT_Y + 22 + 12);
+  const bodyH = bottomH - BAR_H;
+
+  // Keep everything on one page: past ~11pt rows, roll the smallest
+  // buckets into one "Other" row.
+  function capRows(list, headH){
+    const fitRows = Math.max(2, Math.floor((bodyH - headH) / 12));
+    if(list.length <= fitRows) return list;
+    const keep = [...list].sort((a,b) => b[1] - a[1]).slice(0, fitRows - 1);
+    const kept = new Set(keep.map(e => e[0]));
+    const rest = list.filter(e => !kept.has(e[0]));
+    return list.filter(e => kept.has(e[0]))
+      .concat([[`Other (${rest.length})`, rest.reduce((s, e) => s + e[1], 0)]]);
   }
+
+  function bottomPanel(x, w, title, cols, rows, headH, maxRowH, size){
+    rect(x, y, w, bottomH, { border: BORDER });
+    const t = sectionBar(x, y, w, title);
+    const n = Math.max(rows.length, 1);
+    const rowH = Math.min(maxRowH, (bodyH - headH) / n);
+    const s = Math.min(size, rowH * 0.62);
+    gridTable(x, t, w, cols, rows, { headH, rowH, size: s });
+  }
+
+  const mixRows = capRows(typeMix, 30);
+  bottomPanel(M, mixW, "Cattle Type / Mix", [
+    { label: "Type",           w: 0.46, align: "left" },
+    { label: "Sold Head",      w: 0.27, align: "center" },
+    { label: "% of Sold Head", w: 0.27, align: "center" },
+  ], mixRows.map(([t, hd]) => [t, num(hd), pct(hd, headSold)]), 30, 40, 11);
+
+  const delRows = capRows(delivery, 22);
+  bottomPanel(delX, delW, "Delivery Schedule", [
+    { label: "Month", w: 0.55, align: "left" },
+    { label: "Head",  w: 0.45, align: "center" },
+  ], delRows.map(([m, hd]) => [m, num(hd)]), 22, 20, 10);
 
   return await pdfDoc.save();
 }
@@ -3778,28 +4270,7 @@ function wireBuild(){
         // Complete Buyer Summary
         if(chkCompleteBuyer.checked){
           try{
-            const byBuyer = groupBy(soldRows, CONFIG.COLS.buyer);
-            const summaries = [];
-            for(const [buyer, rows] of byBuyer.entries()){
-              if(!buyer) continue;
-              const lotCount = rows.length;
-              const totalHead = rows.reduce((sum, r) => sum + toNumber(r[CONFIG.COLS.head]), 0);
-              const totalSales = rows.reduce((sum, r) => sum + calculateLotTotal(r), 0);
-              const downMoney = rows.reduce((sum, r) => sum + toNumber(r[CONFIG.COLS.downMoney]), 0);
-              summaries.push({ name: buyer, lotCount, totalHead, totalSales, downMoney, isPO: false });
-            }
-            
-            // Add PO/SCRATCH buyers at the bottom
-            const poRows = csvRows.filter(r => isPO(r));
-            const byPOBuyer = groupBy(poRows, CONFIG.COLS.buyer);
-            for(const [buyer, rows] of byPOBuyer.entries()){
-              if(!buyer) continue;
-              const lotCount = rows.length;
-              const totalHead = rows.reduce((sum, r) => sum + toNumber(r[CONFIG.COLS.head]), 0);
-              summaries.push({ name: buyer, lotCount, totalHead, totalSales: 0, downMoney: 0, isPO: true });
-            }
-            
-            const bytes = await buildCompleteSummaryPdf({ summaries, mode: "buyer" });
+            const bytes = await buildPartySummaryPdf({ allRows: csvRows, mode: "buyer" });
             generated.completeBuyer = { filename: "Complete-Buyer-Summary.pdf", bytes, count: 1 };
           } catch(err){
             errors.push(`Complete Buyer Summary: ${err.message}`);
@@ -3809,27 +4280,7 @@ function wireBuild(){
         // Complete Consignor Summary
         if(chkCompleteConsignor.checked){
           try{
-            const byConsignor = groupBy(soldRows, CONFIG.COLS.consignor);
-            const summaries = [];
-            for(const [consignor, rows] of byConsignor.entries()){
-              if(!consignor) continue;
-              const lotCount = rows.length;
-              const totalHead = rows.reduce((sum, r) => sum + toNumber(r[CONFIG.COLS.head]), 0);
-              const totalSales = rows.reduce((sum, r) => sum + calculateLotTotal(r), 0);
-              summaries.push({ name: consignor, lotCount, totalHead, totalSales, isPO: false });
-            }
-            
-            // Add PO/SCRATCH consignors at the bottom
-            const poRows = csvRows.filter(r => isPO(r));
-            const byPOConsignor = groupBy(poRows, CONFIG.COLS.consignor);
-            for(const [consignor, rows] of byPOConsignor.entries()){
-              if(!consignor) continue;
-              const lotCount = rows.length;
-              const totalHead = rows.reduce((sum, r) => sum + toNumber(r[CONFIG.COLS.head]), 0);
-              summaries.push({ name: consignor, lotCount, totalHead, totalSales: 0, isPO: true });
-            }
-            
-            const bytes = await buildCompleteSummaryPdf({ summaries, mode: "consignor" });
+            const bytes = await buildPartySummaryPdf({ allRows: csvRows, mode: "consignor" });
             generated.completeConsignor = { filename: "Complete-Consignor-Summary.pdf", bytes, count: 1 };
           } catch(err){
             errors.push(`Complete Consignor Summary: ${err.message}`);
