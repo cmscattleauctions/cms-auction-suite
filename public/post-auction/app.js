@@ -2391,149 +2391,9 @@ async function buildSalesSummaryPdf({entityName, rows, mode}){
 
 
 /* =========================================================================
-   SPECIAL REPORT 4-5: COMPLETE BUYER/CONSIGNOR SUMMARY
-   Single portrait PDF listing all entities with totals
-   ========================================================================= */
-async function buildCompleteSummaryPdf({summaries, mode}){
-  assertLibsLoaded();
-  const { PDFDocument, StandardFonts, rgb } = window.PDFLib;
-
-  const pdfDoc = await PDFDocument.create();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-  const W = 612;
-  const H = 792;
-  const M = 36;
-  const contentW = W - 2*M;
-
-  const BLACK = rgb(0,0,0);
-  const GRAY = rgb(0.55, 0.55, 0.55);
-  const DARK_GRAY = rgb(0.3,0.3,0.3);
-
-  let page = pdfDoc.addPage([W,H]);
-  let y = H - 50;
-
-  const auctionTitleBase = safeStr(auctionName.value) || "Auction";
-  const extra = safeStr(auctionLabel.value);
-  const auctionTitle = extra ? `${auctionTitleBase} — ${extra}` : auctionTitleBase;
-
-  // Header
-  const title = mode === "buyer" ? "COMPLETE BUYER SUMMARY" : 
-                mode === "rep" ? "COMPLETE REP SUMMARY" : 
-                "COMPLETE CONSIGNOR SUMMARY";
-  page.drawText(title, { x:M, y, size:14, font:fontBold, color:BLACK });
-  y -= 16;
-  page.drawText(auctionTitle, { x:M, y, size:9, font, color:DARK_GRAY });
-  y -= 25;
-
-  page.drawLine({ start:{x:M, y}, end:{x:M+contentW, y}, thickness:1, color:GRAY });
-  y -= 15;
-
-  // Table header
-  const nameCol = mode === "buyer" ? "Buyer Name" : 
-                  mode === "rep" ? "Rep Name" : 
-                  "Consignor Name";
-  page.drawText(nameCol, { x:M+5, y:y-10, size:9, font:fontBold, color:DARK_GRAY });
-  page.drawText("# Lots", { x:M+250, y:y-10, size:9, font:fontBold, color:DARK_GRAY });
-  page.drawText("Head", { x:M+310, y:y-10, size:9, font:fontBold, color:DARK_GRAY });
-  page.drawText("Total $", { x:M+370, y:y-10, size:9, font:fontBold, color:DARK_GRAY });
-  if(mode === "buyer"){
-    page.drawText("Down Money", { x:M+460, y:y-10, size:9, font:fontBold, color:DARK_GRAY });
-  }
-  y -= 14;
-
-  page.drawLine({ start:{x:M, y}, end:{x:M+contentW, y}, thickness:0.5, color:GRAY });
-  y -= 12;
-
-  function newPage(){
-    page = pdfDoc.addPage([W,H]);
-    y = H - 50;
-  }
-
-  // Separate sold and PO summaries
-  const soldSummaries = summaries.filter(s => !s.isPO);
-  const poSummaries = summaries.filter(s => s.isPO);
-  
-  // Sort sold by total $ descending
-  const sortedSold = [...soldSummaries].sort((a,b) => b.totalSales - a.totalSales);
-  
-  // Sort PO alphabetically
-  const sortedPO = [...poSummaries].sort((a,b) => a.name.localeCompare(b.name));
-
-  // Render sold buyers/consignors
-  for(const s of sortedSold){
-    if(y < 50){ newPage(); }
-
-    page.drawText(s.name, { x:M+5, y:y-9, size:9, font, color:BLACK });
-    page.drawText(formatNumber(s.lotCount), { x:M+250, y:y-9, size:9, font, color:BLACK });
-    page.drawText(formatNumber(s.totalHead), { x:M+310, y:y-9, size:9, font, color:BLACK });
-    page.drawText(formatMoney(s.totalSales), { x:M+370, y:y-9, size:9, font, color:BLACK });
-    if(mode === "buyer" && s.downMoney !== undefined){
-      page.drawText(formatMoney(s.downMoney), { x:M+460, y:y-9, size:9, font, color:BLACK });
-    }
-    
-    y -= 12;
-  }
-  
-  // Sold totals before PO section
-  const soldLots = soldSummaries.reduce((sum, s) => sum + s.lotCount, 0);
-  const soldHead = soldSummaries.reduce((sum, s) => sum + s.totalHead, 0);
-  const soldSales = soldSummaries.reduce((sum, s) => sum + s.totalSales, 0);
-  const soldDownMoney = mode === "buyer" ? soldSummaries.reduce((sum, s) => sum + (s.downMoney || 0), 0) : 0;
-  
-  if(y < 50){ newPage(); }
-  page.drawLine({ start:{x:M, y}, end:{x:M+contentW, y}, thickness:0.5, color:GRAY });
-  y -= 12;
-  page.drawText("SOLD TOTALS:", { x:M+5, y:y-9, size:9, font:fontBold, color:BLACK });
-  page.drawText(formatNumber(soldHead) + " head", { x:M+310, y:y-9, size:9, font:fontBold, color:BLACK });
-  y -= 16;
-  
-  // Render PO buyers/consignors (if any) in gray
-  if(sortedPO.length > 0){
-    if(y < 50){ newPage(); }
-    y -= 8;
-    page.drawText("--- PO/SCRATCH ---", { x:M+5, y:y-9, size:9, font:fontBold, color:DARK_GRAY });
-    y -= 12;
-    
-    for(const s of sortedPO){
-      if(y < 50){ newPage(); }
-
-      page.drawText(s.name, { x:M+5, y:y-9, size:9, font, color:DARK_GRAY });
-      page.drawText(formatNumber(s.lotCount), { x:M+250, y:y-9, size:9, font, color:DARK_GRAY });
-      page.drawText(formatNumber(s.totalHead), { x:M+310, y:y-9, size:9, font, color:DARK_GRAY });
-      page.drawText("PO", { x:M+370, y:y-9, size:9, font, color:DARK_GRAY });
-      
-      y -= 12;
-    }
-  }
-
-  // Grand totals (sold + PO)
-  const grandLots = summaries.reduce((sum, s) => sum + s.lotCount, 0);
-  const grandHead = summaries.reduce((sum, s) => sum + s.totalHead, 0);
-  const grandDownMoney = mode === "buyer" ? summaries.reduce((sum, s) => sum + (s.downMoney || 0), 0) : 0;
-
-  if(y < 50){ newPage(); }
-  page.drawLine({ start:{x:M, y}, end:{x:M+contentW, y}, thickness:1, color:GRAY });
-  y -= 14;
-
-  page.drawText("GRAND TOTAL:", { x:M+5, y:y-10, size:10, font:fontBold, color:BLACK });
-  page.drawText(formatNumber(grandLots), { x:M+250, y:y-10, size:10, font:fontBold, color:BLACK });
-  page.drawText(formatNumber(grandHead) + " head", { x:M+310, y:y-10, size:10, font:fontBold, color:BLACK });
-  page.drawText(formatMoney(soldSales), { x:M+370, y:y-10, size:10, font:fontBold, color:BLACK });
-  if(mode === "buyer" && soldDownMoney > 0){
-    page.drawText(formatMoney(soldDownMoney), { x:M+460, y:y-10, size:10, font:fontBold, color:BLACK });
-  }
-
-  return await pdfDoc.save();
-}
-
-
-/* =========================================================================
-   COMPLETE BUYER / CONSIGNOR SUMMARY
+   COMPLETE BUYER / CONSIGNOR / REP SUMMARY
    Portrait US Letter, multi-page. Shares branding with the Auction
-   Performance Summary (navy / gold, CMS logo). The Rep summary still
-   uses buildCompleteSummaryPdf above.
+   Performance Summary (navy / gold, CMS logo).
    ========================================================================= */
 
 // Weighted totals for a set of SOLD lots. Lots with no base weight still
@@ -2563,7 +2423,7 @@ function aggregateSold(rows){
 function groupByParty(rows, col){
   const m = new Map();
   for(const r of rows){
-    const name = safeStr(r[col]) || "(Unassigned)";
+    const name = safeStr(typeof col === "function" ? col(r) : r[col]) || "(Unassigned)";
     const key = name.toLowerCase();
     if(!m.has(key)) m.set(key, { name, rows: [] });
     m.get(key).rows.push(r);
@@ -2595,7 +2455,11 @@ async function buildPartySummaryPdf({allRows, mode}){
   const WHITE    = rgb(1,1,1);
 
   const isBuyer = mode === "buyer";
-  const TITLE = isBuyer ? "COMPLETE BUYER SUMMARY" : "COMPLETE CONSIGNOR SUMMARY";
+  const isRep = mode === "rep";
+  const TITLE = isBuyer ? "COMPLETE BUYER SUMMARY" : isRep ? "COMPLETE REP SUMMARY" : "COMPLETE CONSIGNOR SUMMARY";
+  const PARTY = isRep ? "Rep" : "Consignor";
+  // Rep summary covers only lots with a rep assigned (existing rule).
+  if(isRep) allRows = allRows.filter(r => safeStr(getRepColumn(r)) !== "");
   const SIZE = isBuyer ? 9 : 8;          // consignor table has 11 columns
   const LINE_H = SIZE + 2.6;
 
@@ -2642,7 +2506,8 @@ async function buildPartySummaryPdf({allRows, mode}){
     poBody = [["PO / Scratch", int(poRows.length), int(poHead)]];
     poTotal = null;
   } else {
-    const consignors = groupByParty(allRows, CONFIG.COLS.consignor).map(g => {
+    const partyCol = isRep ? (r => getRepColumn(r)) : CONFIG.COLS.consignor;
+    const consignors = groupByParty(allRows, partyCol).map(g => {
       const soldPart = g.rows.filter(r => !isPO(r));
       const poPart   = g.rows.filter(r => isPO(r));
       return {
@@ -2656,7 +2521,7 @@ async function buildPartySummaryPdf({allRows, mode}){
     }).sort((a,b) => b.head - a.head || b.headAdv - a.headAdv || a.name.localeCompare(b.name));
     cols = [
       { label: "#",          w: 18, align: "right" },
-      { label: "Consignor",  flex: true, align: "left" },
+      { label: PARTY,        flex: true, align: "left" },
       { label: "Lots\nAdv",   w: 32, align: "right" },
       { label: "Lots\nSold",  w: 32, align: "right" },
       { label: "Head\nAdv",   w: 42, align: "right" },
@@ -2677,7 +2542,7 @@ async function buildPartySummaryPdf({allRows, mode}){
     totalRow = ["", "SOLD TOTALS", int(lotsAdv), int(sold.lots), int(headAdv), int(sold.head),
       pctOf(sold.head, headAdv), wt(sold.avgWt), opt(sold.avgHd, money), opt(sold.avgCwt, money), money(sold.gross)];
     poCols = [
-      { label: "Consignor", flex: true, align: "left" },
+      { label: PARTY,       flex: true, align: "left" },
       { label: "PO Lots",   w: 120, align: "right" },
       { label: "PO Head",   w: 140, align: "right" },
     ];
@@ -2831,7 +2696,10 @@ async function buildPartySummaryPdf({allRows, mode}){
 
   /* ---------- render ---------- */
   newPage(true);
-  sectionBar(isBuyer ? "BUYER DETAIL" : "CONSIGNOR DETAIL");
+  sectionBar(`${(isBuyer ? "Buyer" : PARTY).toUpperCase()} DETAIL`);
+  if(!bodyRows.length){
+    bodyRows = [cols.map((c, i) => i === 1 ? (isRep ? "No rep-assigned lots" : "No sold lots") : "")];
+  }
   drawTable(cols, contentW, bodyRows, totalRow);
 
   // PO / Scratch section - kept together when it fits on one page.
@@ -4290,48 +4158,7 @@ function wireBuild(){
         // Complete Rep Summary
         if(chkCompleteRep.checked){
           try{
-            // Create byRep Map for this report
-            const repRows = csvRows.filter(r => {
-              const rep = getRepColumn(r);
-              return safeStr(rep) !== "";
-            });
-            const byRep = new Map();
-            for(const r of repRows){
-              const rep = safeStr(getRepColumn(r));
-              if(!rep) continue;
-              if(!byRep.has(rep)) byRep.set(rep, []);
-              byRep.get(rep).push(r);
-            }
-            
-            const summaries = [];
-            
-            if(byRep && byRep.size > 0){
-              // Build sold summaries
-              for(const [rep, rows] of byRep.entries()){
-                if(!rep || rep.trim() === "") continue;
-                const soldReps = rows.filter(r => !isPO(r));
-                if(soldReps.length > 0){
-                  const lotCount = soldReps.length;
-                  const totalHead = soldReps.reduce((sum, r) => sum + toNumber(r[CONFIG.COLS.head]), 0);
-                  const totalSales = soldReps.reduce((sum, r) => sum + calculateLotTotal(r), 0);
-                  summaries.push({ name: rep, lotCount, totalHead, totalSales, isPO: false });
-                }
-              }
-              
-              // Add PO/SCRATCH reps at the bottom
-              for(const [rep, rows] of byRep.entries()){
-                if(!rep || rep.trim() === "") continue;
-                const poReps = rows.filter(r => isPO(r));
-                if(poReps.length > 0){
-                  const lotCount = poReps.length;
-                  const totalHead = poReps.reduce((sum, r) => sum + toNumber(r[CONFIG.COLS.head]), 0);
-                  summaries.push({ name: rep, lotCount, totalHead, totalSales: 0, isPO: true });
-                }
-              }
-            }
-            
-            // Generate even if empty (will show "No reps" in PDF)
-            const bytes = await buildCompleteSummaryPdf({ summaries, mode: "rep" });
+            const bytes = await buildPartySummaryPdf({ allRows: csvRows, mode: "rep" });
             generated.completeRep = { filename: "Complete-Rep-Summary.pdf", bytes, count: 1 };
           } catch(err){
             errors.push(`Complete Rep Summary: ${err.message}`);
